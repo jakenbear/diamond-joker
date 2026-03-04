@@ -6,23 +6,12 @@
  * Only selected cards are evaluated as the poker hand.
  */
 
+import HAND_TABLE from '../data/hand_table.js';
+
 const SUITS = ['H', 'D', 'C', 'S'];
 const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]; // 11=J, 12=Q, 13=K, 14=A
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
-
-const HAND_TABLE = [
-  { handName: 'Royal Flush',      outcome: 'Perfect Game',       chips: 15, mult: 20 },
-  { handName: 'Straight Flush',   outcome: 'Walk-Off',           chips: 10, mult: 10 },
-  { handName: 'Four of a Kind',   outcome: 'Inside-the-Park HR', chips: 6,  mult: 6 },
-  { handName: 'Full House',       outcome: 'RBI Double',         chips: 3,  mult: 2.5 },
-  { handName: 'Flush',            outcome: 'Grand Slam',         chips: 5,  mult: 5 },
-  { handName: 'Straight',         outcome: 'Home Run',           chips: 4,  mult: 4 },
-  { handName: 'Three of a Kind',  outcome: 'Triple',             chips: 3,  mult: 3 },
-  { handName: 'Two Pair',         outcome: 'Double',             chips: 2,  mult: 2 },
-  { handName: 'Pair',             outcome: 'Single',             chips: 1,  mult: 1.5 },
-  { handName: 'High Card',        outcome: 'Strikeout',          chips: 0,  mult: 1 },
-];
 
 export default class CardEngine {
   constructor() {
