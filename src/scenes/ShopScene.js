@@ -46,6 +46,7 @@ export default class ShopScene extends Phaser.Scene {
     this.add.rectangle(640, 110, 600, 2, 0x334455);
 
     this._renderShopCards();
+    this._renderBattingOrder();
     this._createDoneButton();
   }
 
@@ -249,6 +250,36 @@ export default class ShopScene extends Phaser.Scene {
       baseball: this.baseball,
       cardEngine: this.cardEngine,
       purchasesMade: this.purchasesMade,
+    });
+  }
+
+  _renderBattingOrder() {
+    const roster = this.rosterManager.getRoster();
+    const currentIdx = this.rosterManager.getCurrentBatterIndex();
+
+    this.add.text(140, 478, 'BATTING ORDER', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    const startY = 498;
+    const rowH = 16;
+
+    roster.forEach((player, i) => {
+      const y = startY + i * rowH;
+      const isNext = i === currentIdx;
+
+      const arrow = isNext ? '\u25B6 ' : '  ';
+      const num = `${i + 1}`.padStart(2);
+      const traits = player.traits.length > 0
+        ? ` [${player.traits.map(t => t.name).join(', ')}]`
+        : '';
+
+      const line = `${arrow}${num}. ${player.name}${traits}`;
+      this.add.text(30, y, line, {
+        fontSize: '11px', fontFamily: 'monospace',
+        color: isNext ? '#69f0ae' : '#777777',
+        fontStyle: isNext ? 'bold' : 'normal',
+      });
     });
   }
 
