@@ -1119,6 +1119,8 @@ export default class GameScene extends Phaser.Scene {
       this.cardEngine.discardsRemaining += bonusDiscards;
     }
 
+    this.discardCount = 0;
+
     this.dealOrder = this.cardEngine.hand.map((_, i) => i);
     this.sortMode = 'default';
     this._updateSortHighlight();
@@ -1136,6 +1138,14 @@ export default class GameScene extends Phaser.Scene {
     this.inputLocked = true;
     this.handPreviewText.setAlpha(0);
     this.scorePreviewText.setAlpha(0);
+
+    // Strike / Foul callout
+    this.discardCount = (this.discardCount || 0) + 1;
+    if (this.discardCount <= 2) {
+      this._showScorePopup(`STRIKE ${this.discardCount}!`, '#ff5252', 640, 175);
+    } else {
+      this._showScorePopup('FOUL!', '#ffab40', 640, 175);
+    }
 
     const displayIndices = [...this.selectedIndices];
     displayIndices.forEach(idx => {
