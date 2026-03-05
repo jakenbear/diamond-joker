@@ -1438,7 +1438,6 @@ export default class GameScene extends Phaser.Scene {
   _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg) {
     const steps = [];
     const stepDelay = 350;
-    const baseY = 370;
     let runningChips = handResult.chips - bonuses.powerChips + pitcherPenalty.chips;
     let runningMult = handResult.mult - bonuses.contactMult + pitcherPenalty.mult;
 
@@ -1508,23 +1507,25 @@ export default class GameScene extends Phaser.Scene {
     this.cascadeTexts.forEach(t => t.destroy());
     this.cascadeTexts = [];
 
-    // Animate each step
+    // Animate each step — centered inside the base diamond
+    const dCenter = this.baseDiamondCenter;
+    const totalHeight = steps.length * 22;
+    const cascadeStartY = dCenter.y - totalHeight / 2 + 11;
+
     steps.forEach((step, i) => {
       this.time.delayedCall(i * stepDelay, () => {
-        const y = baseY + i * 24;
-        const fontSize = step.isFinal ? '22px' : '13px';
-        const txt = this.add.text(620, y, step.text, {
+        const y = cascadeStartY + i * 22;
+        const fontSize = step.isFinal ? '20px' : '12px';
+        const txt = this.add.text(dCenter.x, y, step.text, {
           fontSize, fontFamily: 'monospace', color: step.color,
           fontStyle: step.isFinal ? 'bold' : 'normal',
-        }).setOrigin(0, 0.5).setDepth(10).setAlpha(0);
+        }).setOrigin(0.5, 0.5).setDepth(10).setAlpha(0);
         this.cascadeTexts.push(txt);
 
-        // Slide in from left + fade in
-        txt.x -= 20;
+        // Fade in
         this.tweens.add({
           targets: txt,
           alpha: 1,
-          x: '+=20',
           duration: 200,
           ease: 'Quad.easeOut',
         });
