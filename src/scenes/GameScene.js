@@ -1142,9 +1142,9 @@ export default class GameScene extends Phaser.Scene {
     // Strike / Foul callout
     this.discardCount = (this.discardCount || 0) + 1;
     if (this.discardCount <= 2) {
-      this._showScorePopup(`STRIKE ${this.discardCount}!`, '#ff5252', 640, 175);
+      this._showScorePopup(`STRIKE ${this.discardCount}!`, '#ff5252', 640, 260);
     } else {
-      this._showScorePopup('FOUL!', '#ffab40', 640, 175);
+      this._showScorePopup('FOUL!', '#ffab40', 640, 260);
     }
 
     const displayIndices = [...this.selectedIndices];
