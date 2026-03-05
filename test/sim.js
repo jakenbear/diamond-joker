@@ -5,7 +5,7 @@
 
 import CardEngine from '../src/CardEngine.js';
 import BaseballState from '../src/BaseballState.js';
-import RosterManager from '../src/RosterManager.js';
+import RosterManager, { PITCH_TYPES } from '../src/RosterManager.js';
 import TraitManager from '../src/TraitManager.js';
 import EffectEngine, { checkCondition } from '../src/EffectEngine.js';
 import HAND_TABLE from '../data/hand_table.js';
@@ -151,7 +151,7 @@ group('1a. Hand Evaluation');
 group('1b. Rank Quality (statistical, N=1000)');
 
 {
-  // Low pair (rank 2-5): ~40% groundout rate
+  // Low pair (rank 3): ~74% groundout rate (0.80 - (3-2)*0.06 = 0.74)
   let groundouts = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
@@ -160,10 +160,34 @@ group('1b. Rank Quality (statistical, N=1000)');
     if (r.handName === 'Groundout') groundouts++;
   }
   const rate = groundouts / N;
-  assertClose(rate, 0.30, 0.50, `Low Pair groundout rate ~40%`);
+  assertClose(rate, 0.64, 0.84, `Low Pair (3s) groundout rate ~74%`);
 }
 {
-  // Low Two Pair: ~20% groundout rate
+  // Mid pair (rank 8): ~44% groundout rate (0.80 - 6*0.06 = 0.44)
+  let groundouts = 0;
+  const N = 1000;
+  for (let i = 0; i < N; i++) {
+    const cards = makeCards([[8,'H'],[8,'D'],[3,'C'],[5,'S'],[11,'H']]);
+    const r = CardEngine.evaluateHand(cards);
+    if (r.handName === 'Groundout') groundouts++;
+  }
+  const rate = groundouts / N;
+  assertClose(rate, 0.34, 0.54, `Mid Pair (8s) groundout rate ~44%`);
+}
+{
+  // High pair (rank A): ~8% groundout rate (0.80 - 12*0.06 = 0.08)
+  let groundouts = 0;
+  const N = 1000;
+  for (let i = 0; i < N; i++) {
+    const cards = makeCards([[14,'H'],[14,'D'],[3,'C'],[5,'S'],[7,'H']]);
+    const r = CardEngine.evaluateHand(cards);
+    if (r.handName === 'Groundout') groundouts++;
+  }
+  const rate = groundouts / N;
+  assertClose(rate, 0.02, 0.16, `High Pair (Aces) groundout rate ~8%`);
+}
+{
+  // Low Two Pair: ~20% groundout rate (unchanged)
   let groundouts = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
@@ -175,7 +199,7 @@ group('1b. Rank Quality (statistical, N=1000)');
   assertClose(rate, 0.10, 0.30, `Low Two Pair groundout rate ~20%`);
 }
 {
-  // Low Three of a Kind: ~10% flyout rate
+  // Low Three of a Kind: ~10% flyout rate (unchanged)
   let flyouts = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
@@ -187,28 +211,66 @@ group('1b. Rank Quality (statistical, N=1000)');
   assertClose(rate, 0.03, 0.18, `Low Three of a Kind flyout rate ~10%`);
 }
 {
-  // High pair (10-14): bonus chips
-  // Pair of 10s → +1 chip, Pair of Aces → +5 chips
-  const tens = makeCards([[10,'H'],[10,'D'],[3,'C'],[5,'S'],[7,'H']]);
-  const r10 = CardEngine.evaluateHand(tens);
-  assert(r10.chips === HAND_TABLE[8].chips + 1, 'Pair of 10s: +1 bonus chip');
-
-  const aces = makeCards([[14,'H'],[14,'D'],[3,'C'],[5,'S'],[7,'H']]);
-  const rA = CardEngine.evaluateHand(aces);
-  assert(rA.chips === HAND_TABLE[8].chips + 5, 'Pair of Aces: +5 bonus chips');
+  // High pair bonus chips still apply when pair survives out check
+  // Run many trials to get one that survives (Aces have 92% survival)
+  let found = false;
+  for (let i = 0; i < 100; i++) {
+    const tens = makeCards([[10,'H'],[10,'D'],[3,'C'],[5,'S'],[7,'H']]);
+    const r10 = CardEngine.evaluateHand(tens);
+    if (r10.handName === 'Pair') {
+      assert(r10.chips === HAND_TABLE[8].chips + 1, 'Pair of 10s (when surviving): +1 bonus chip');
+      found = true;
+      break;
+    }
+  }
+  if (!found) assert(false, 'Pair of 10s: could not get surviving pair in 100 tries');
 }
 {
-  // Mid-range (6-9): no modification
-  const sixes = makeCards([[6,'H'],[6,'D'],[3,'C'],[9,'S'],[11,'H']]);
-  const r = CardEngine.evaluateHand(sixes);
-  // Mid-range pair should not get groundouted or get bonus chips
-  // (occasionally might still be 'Pair' — just check it's not modified when it's Pair)
-  if (r.handName === 'Pair') {
-    assert(r.chips === HAND_TABLE[8].chips, 'Mid-range pair (6s): no modification');
-  } else {
-    // This shouldn't happen for rank 6 (only 2-5 get groundout)
-    assert(false, 'Mid-range pair (6s): no modification (unexpected hand)');
+  // Pair groundout carries pairRank for contact save
+  const cards = makeCards([[3,'H'],[3,'D'],[7,'C'],[9,'S'],[11,'H']]);
+  let foundGroundout = false;
+  for (let i = 0; i < 50; i++) {
+    const r = CardEngine.evaluateHand(cards);
+    if (r.wasGroundout) {
+      assert(r.pairRank === 3, 'Groundout from pair carries pairRank');
+      foundGroundout = true;
+      break;
+    }
   }
+  if (!foundGroundout) assert(false, 'Could not get groundout from low pair in 50 tries');
+}
+{
+  // Contact save: high contact batter rescues groundout pairs (statistical)
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const N = 2000;
+  let lowContactSaves = 0, highContactSaves = 0;
+  // Test with a pair of 6s (outChance ~56%)
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    // Force batter to have contact=3
+    rm.roster[0] = { ...rm.roster[0], contact: 3 };
+    const groundoutResult = {
+      outcome: 'Groundout', handName: 'Groundout', chips: 0, mult: 1, score: 0,
+      wasGroundout: true, originalHand: 'Pair', pairRank: 6,
+    };
+    const { bonuses } = rm.applyBatterModifiers(groundoutResult, { inning: 1 });
+    if (bonuses.contactSave) lowContactSaves++;
+  }
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    rm.roster[0] = { ...rm.roster[0], contact: 9 };
+    const groundoutResult = {
+      outcome: 'Groundout', handName: 'Groundout', chips: 0, mult: 1, score: 0,
+      wasGroundout: true, originalHand: 'Pair', pairRank: 6,
+    };
+    const { bonuses } = rm.applyBatterModifiers(groundoutResult, { inning: 1 });
+    if (bonuses.contactSave) highContactSaves++;
+  }
+  assert(highContactSaves > lowContactSaves,
+    `High contact saves more (${highContactSaves}) than low contact (${lowContactSaves})`);
+  assertClose(lowContactSaves / N, 0.10, 0.26, `Contact 3 save rate ~18%`);
+  assertClose(highContactSaves / N, 0.44, 0.64, `Contact 9 save rate ~54%`);
 }
 
 // ── 1c. Deck Integrity ─────────────────────────────────
@@ -477,6 +539,143 @@ group('1f. Trait Effects via EffectEngine');
   assert(checkCondition(cond, {}, { outs: 0 }) === true, 'condition: or (0 outs)');
   assert(checkCondition(cond, {}, { outs: 1 }) === false, 'condition: or (1 out)');
   assert(checkCondition(cond, {}, { outs: 2 }) === true, 'condition: or (2 outs)');
+}
+
+// ── 1h. Pitch Type Modifiers ────────────────────────────
+
+group('1h. Pitch Type Modifiers');
+
+{
+  // PITCH_TYPES export exists with expected keys
+  assert(PITCH_TYPES.fastball && PITCH_TYPES.breaking && PITCH_TYPES.changeup && PITCH_TYPES.ibb,
+    'PITCH_TYPES has fastball, breaking, changeup, ibb');
+}
+{
+  // Fastball hit rate < changeup hit rate (statistical, N=2000)
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const N = 2000;
+  let fastballHits = 0, changeupHits = 0;
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    const bases = [false, false, false];
+    const fb = rm.simSingleAtBat(1, 'fastball', bases);
+    if (!fb.isOut && !fb.walked) fastballHits++;
+  }
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    const bases = [false, false, false];
+    const cu = rm.simSingleAtBat(1, 'changeup', bases);
+    if (!cu.isOut && !cu.walked) changeupHits++;
+  }
+  assert(fastballHits < changeupHits, `Fastball hit rate (${fastballHits}) < changeup hit rate (${changeupHits})`);
+}
+{
+  // Fastball K rate > changeup K rate (statistical, N=2000)
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const N = 2000;
+  let fastballKs = 0, changeupKs = 0;
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    const bases = [false, false, false];
+    const fb = rm.simSingleAtBat(1, 'fastball', bases);
+    if (fb.outcome === 'Strikeout') fastballKs++;
+  }
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    const bases = [false, false, false];
+    const cu = rm.simSingleAtBat(1, 'changeup', bases);
+    if (cu.outcome === 'Strikeout') changeupKs++;
+  }
+  assert(fastballKs > changeupKs, `Fastball K rate (${fastballKs}) > changeup K rate (${changeupKs})`);
+}
+{
+  // Fastball XBH rate > changeup XBH rate (statistical, N=3000)
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const N = 3000;
+  let fastballXBH = 0, changeupXBH = 0;
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    const bases = [false, false, false];
+    const fb = rm.simSingleAtBat(1, 'fastball', bases);
+    if (['Double', 'Triple', 'Home Run'].includes(fb.outcome)) fastballXBH++;
+  }
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    const bases = [false, false, false];
+    const cu = rm.simSingleAtBat(1, 'changeup', bases);
+    if (['Double', 'Triple', 'Home Run'].includes(cu.outcome)) changeupXBH++;
+  }
+  assert(fastballXBH > changeupXBH, `Fastball XBH (${fastballXBH}) > changeup XBH (${changeupXBH})`);
+}
+{
+  // Breaking ball walk rate with low control pitcher (control=3 → 12% walk chance)
+  // Use a custom pitcher with low control
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const N = 2000;
+  let walks = 0;
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    rm.myPitcher = { ...rm.myPitcher, control: 3 };
+    const bases = [false, false, false];
+    const r = rm.simSingleAtBat(1, 'breaking', bases);
+    if (r.walked) walks++;
+  }
+  const walkRate = walks / N;
+  assertClose(walkRate, 0.05, 0.20, `Breaking ball walk rate with control 3 ~12%`);
+}
+{
+  // Breaking ball no walks with high control (control=6+)
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const N = 500;
+  let walks = 0;
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    rm.myPitcher = { ...rm.myPitcher, control: 7 };
+    const bases = [false, false, false];
+    const r = rm.simSingleAtBat(1, 'breaking', bases);
+    if (r.walked) walks++;
+  }
+  assert(walks === 0, `Breaking ball 0 walks with control 7 (got ${walks})`);
+}
+{
+  // IBB always walks
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const rm = new RosterManager(canada, 0, usa);
+  const bases = [false, false, false];
+  const r = rm.simSingleAtBat(1, 'ibb', bases);
+  assert(r.walked === true, 'IBB always walks');
+  assert(r.outcome === 'Walk (IBB)', 'IBB outcome is Walk (IBB)');
+  assert(bases[0] === true, 'IBB puts batter on 1st');
+}
+{
+  // Stamina drains correctly per pitch type
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const rm = new RosterManager(canada, 0, usa);
+  assert(rm.getMyPitcherStamina() === 1.0, 'Stamina starts at 1.0');
+  const bases = [false, false, false];
+  rm.simSingleAtBat(1, 'fastball', bases);
+  assertClose(rm.getMyPitcherStamina(), 0.93, 0.95, 'Stamina after fastball ~0.94');
+  rm.simSingleAtBat(1, 'changeup', [false, false, false]);
+  assertClose(rm.getMyPitcherStamina(), 0.91, 0.93, 'Stamina after changeup ~0.92');
+  rm.simSingleAtBat(1, 'ibb', [false, false, false]);
+  assertClose(rm.getMyPitcherStamina(), 0.91, 0.93, 'Stamina unchanged after IBB');
+}
+{
+  // Existing simOpponentHalfInning backward compat
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const rm = new RosterManager(canada, 0, usa);
+  const sim = rm.simOpponentHalfInning(1);
+  assert(typeof sim.runs === 'number', 'simOpponentHalfInning still returns runs');
+  assert(Array.isArray(sim.log), 'simOpponentHalfInning still returns log array');
+  assert(sim.log.length >= 3, 'simOpponentHalfInning log has at least 3 entries (3 outs)');
 }
 
 // ── 1g. BaseballState ──────────────────────────────────
@@ -840,10 +1039,128 @@ group('1g-extra. Shop Flow');
 }
 
 // ═══════════════════════════════════════════════════════
+//  SMART TEST BRAIN — plays like a real player
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Evaluate every non-empty subset of a hand, return the best play.
+ * Prefers highest score; breaks ties by preferring more cards (5-card hands
+ * unlock flushes/straights). Avoids Strikeout (score 0) when possible.
+ */
+function findBestPlay(hand) {
+  let bestScore = -1;
+  let bestSize = 0;
+  let bestIndices = [0];
+
+  for (let mask = 1; mask < (1 << hand.length); mask++) {
+    const indices = [];
+    for (let i = 0; i < hand.length; i++) {
+      if (mask & (1 << i)) indices.push(i);
+    }
+    const cards = indices.map(i => hand[i]);
+    const result = CardEngine.evaluateHand(cards);
+
+    // Rank: score first, then prefer more cards for tie-breaking
+    const score = result.score;
+    if (score > bestScore || (score === bestScore && indices.length > bestSize)) {
+      bestScore = score;
+      bestSize = indices.length;
+      bestIndices = indices;
+    }
+  }
+
+  return bestIndices;
+}
+
+/**
+ * Decide which card indices to discard (if any).
+ * Strategy:
+ *  - If we already have a pair+ (score > 0), don't discard
+ *  - If 4-to-a-flush, keep the 4 suited cards, discard the outlier
+ *  - If we have a pair, keep the pair + highest kicker, discard 2
+ *  - Otherwise keep 2 highest cards, discard 3
+ */
+function pickDiscards(hand) {
+  // Check current best
+  const bestIndices = findBestPlay(hand);
+  const bestCards = bestIndices.map(i => hand[i]);
+  const bestResult = CardEngine.evaluateHand(bestCards);
+  if (bestResult.score > 0) return []; // already have a hit, don't risk it
+
+  // 4-to-a-flush check
+  const suitCounts = {};
+  for (let i = 0; i < hand.length; i++) {
+    const s = hand[i].suit;
+    if (!suitCounts[s]) suitCounts[s] = [];
+    suitCounts[s].push(i);
+  }
+  for (const indices of Object.values(suitCounts)) {
+    if (indices.length >= 4) {
+      // Keep these 4, discard the rest
+      const keepSet = new Set(indices);
+      return hand.map((_, i) => i).filter(i => !keepSet.has(i));
+    }
+  }
+
+  // 4-to-a-straight check
+  const sorted = hand.map((c, i) => ({ rank: c.rank, idx: i })).sort((a, b) => a.rank - b.rank);
+  for (let start = 0; start <= sorted.length - 4; start++) {
+    const window = sorted.slice(start, start + 4);
+    const uniqueRanks = new Set(window.map(c => c.rank));
+    if (uniqueRanks.size === 4) {
+      const minR = window[0].rank;
+      const maxR = window[3].rank;
+      if (maxR - minR <= 4) {
+        // Keep these 4, discard the outlier
+        const keepSet = new Set(window.map(c => c.idx));
+        return hand.map((_, i) => i).filter(i => !keepSet.has(i));
+      }
+    }
+  }
+
+  // Keep paired cards
+  const rankIndices = {};
+  for (let i = 0; i < hand.length; i++) {
+    const r = hand[i].rank;
+    if (!rankIndices[r]) rankIndices[r] = [];
+    rankIndices[r].push(i);
+  }
+  const pairedIndices = [];
+  for (const indices of Object.values(rankIndices)) {
+    if (indices.length >= 2) pairedIndices.push(...indices);
+  }
+  if (pairedIndices.length > 0) {
+    const keepSet = new Set(pairedIndices);
+    return hand.map((_, i) => i).filter(i => !keepSet.has(i));
+  }
+
+  // No draws, no pairs: keep 2 highest, discard 3
+  const byRank = hand.map((c, i) => ({ rank: c.rank, idx: i })).sort((a, b) => b.rank - a.rank);
+  const keepSet = new Set([byRank[0].idx, byRank[1].idx]);
+  return hand.map((_, i) => i).filter(i => !keepSet.has(i));
+}
+
+/**
+ * Full smart at-bat: discard if needed, then pick best play.
+ */
+function smartAtBat(ce) {
+  // Discard phase (use up to 2 discards)
+  for (let d = 0; d < 2; d++) {
+    if (ce.discardsRemaining <= 0) break;
+    const toDiscard = pickDiscards(ce.hand);
+    if (toDiscard.length === 0) break;
+    ce.discard(toDiscard);
+  }
+  // Play best hand
+  const indices = findBestPlay(ce.hand);
+  return ce.playHand(indices);
+}
+
+// ═══════════════════════════════════════════════════════
 //  PART 2: INTEGRATION — Full Game Simulation
 // ═══════════════════════════════════════════════════════
 
-group('2a. Single Game Walkthrough');
+group('2a. Single Game Walkthrough (smart brain)');
 
 {
   const canada = TEAMS.find(t => t.id === 'CAN');
@@ -894,16 +1211,14 @@ group('2a. Single Game Walkthrough');
       return c;
     };
 
-    // Play random selection of 1-5 cards
-    const handSize = ce.hand.length;
-    const selectCount = Math.min(handSize, Math.floor(Math.random() * 5) + 1);
-    const indices = [];
-    const available = Array.from({ length: handSize }, (_, i) => i);
-    for (let i = 0; i < selectCount; i++) {
-      const pick = Math.floor(Math.random() * available.length);
-      indices.push(available.splice(pick, 1)[0]);
+    // Smart play: discard then pick best hand
+    for (let d = 0; d < 2; d++) {
+      if (ce.discardsRemaining <= 0) break;
+      const toDiscard = pickDiscards(ce.hand);
+      if (toDiscard.length === 0) break;
+      ce.discard(toDiscard);
     }
-
+    const indices = findBestPlay(ce.hand);
     const evalResult = ce.playHand(indices, combinedPre, null, null);
 
     // Apply post modifiers manually
@@ -930,7 +1245,7 @@ group('2a. Single Game Walkthrough');
 
 // ── 2b. Statistical Sim ────────────────────────────────
 
-group('2b. Statistical Sim (N=100 games)');
+group('2b. Statistical Sim — smart brain (N=100 games)');
 
 {
   const N_GAMES = 100;
@@ -970,16 +1285,7 @@ group('2b. Statistical Sim (N=100 games)');
         ce.newAtBat();
         totalAtBats++;
 
-        const handSize = ce.hand.length;
-        const selectCount = Math.min(handSize, Math.floor(Math.random() * 5) + 1);
-        const available = Array.from({ length: handSize }, (_, i) => i);
-        const indices = [];
-        for (let i = 0; i < selectCount; i++) {
-          const pick = Math.floor(Math.random() * available.length);
-          indices.push(available.splice(pick, 1)[0]);
-        }
-
-        const evalResult = ce.playHand(indices);
+        const evalResult = smartAtBat(ce);
         const { result } = rm.applyBatterModifiers(evalResult, bs.getStatus());
         const final = rm.applyPitcherModifiers(result, bs.getStatus());
 
@@ -1005,7 +1311,7 @@ group('2b. Statistical Sim (N=100 games)');
   assert(crashes === 0, `0 crashes in ${N_GAMES} games`);
 
   // Print statistics
-  console.log(`\n\x1b[1m  ── Statistics (${N_GAMES} games) ──\x1b[0m`);
+  console.log(`\n\x1b[1m  ── Statistics (${N_GAMES} games, smart brain) ──\x1b[0m`);
   console.log(`  Avg player runs/game:   ${(totalPlayerRuns / N_GAMES).toFixed(1)}`);
   console.log(`  Avg opponent runs/game: ${(totalOpponentRuns / N_GAMES).toFixed(1)}`);
   console.log(`  Player win rate:        ${((wins / N_GAMES) * 100).toFixed(1)}%`);

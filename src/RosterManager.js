@@ -7,6 +7,41 @@ import TEAMS from '../data/teams.js';
 const MAX_TRAITS_PER_PLAYER = 2;
 const MAX_PITCHER_TRAITS = 2;
 
+const PITCH_TYPES = {
+  fastball: {
+    name: 'Fastball',
+    hitChanceMod: -0.03,
+    kBonusMult: 1.15,
+    xbhMult: 1.4,
+    staminaCost: 0.06,
+    description: 'Best strikeout pitch, but drains stamina and hits go further',
+  },
+  breaking: {
+    name: 'Breaking Ball',
+    hitChanceMod: -0.05,
+    kBonusMult: 1.0,
+    xbhMult: 0.8,
+    staminaCost: 0.04,
+    description: 'Harder to hit, but walk risk if low control',
+  },
+  changeup: {
+    name: 'Changeup',
+    hitChanceMod: 0,
+    kBonusMult: 0.95,
+    xbhMult: 0.6,
+    staminaCost: 0.02,
+    description: 'Cheapest on stamina, limits extra-base hits',
+  },
+  ibb: {
+    name: 'Intentional Walk',
+    hitChanceMod: 0,
+    kBonusMult: 0,
+    xbhMult: 0,
+    staminaCost: 0,
+    description: 'Puts batter on 1st base',
+  },
+};
+
 export default class RosterManager {
   /**
    * @param {Object} team - Your team object from TEAMS
@@ -24,6 +59,7 @@ export default class RosterManager {
 
     // Your pitcher (pitches against opponent batters)
     this.myPitcher = { ...team.pitchers[pitcherIndex] };
+    this.myPitcherStamina = 1.0;
 
     // Opponent team
     this.opponentTeam = opponentTeam;
@@ -61,6 +97,108 @@ export default class RosterManager {
     return this.opponentTeam;
   }
 
+  getMyPitcherStamina() {
+    return this.myPitcherStamina;
+  }
+
+  /**
+   * Simulate a single opponent at-bat with a chosen pitch type.
+   * Drains stamina, advances opponent batter index.
+   * @param {number} inning - current inning for fatigue calc
+   * @param {string} pitchType - key from PITCH_TYPES
+   * @param {boolean[]} bases - [1st, 2nd, 3rd] runner state (mutated in place)
+   * @returns {{ outcome: string, isOut: boolean, basesGained: number, batter: object, walked: boolean, scored: number }}
+   */
+  simSingleAtBat(inning, pitchType, bases) {
+    const pitcher = this.myPitcher;
+    const fatigue = this._getPitcherFatigue(pitcher, inning);
+    const pitch = PITCH_TYPES[pitchType];
+    const batter = this.opponentRoster[this.opponentBatterIndex];
+
+    // Drain stamina
+    this.myPitcherStamina = Math.max(0, this.myPitcherStamina - pitch.staminaCost);
+
+    // IBB — automatic walk
+    if (pitchType === 'ibb') {
+      const scored = this._advanceRunners(bases, 1, 0);
+      this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
+      return { outcome: 'Walk (IBB)', isOut: false, basesGained: 1, batter, walked: true, scored };
+    }
+
+    const result = this._simAtBatWithPitch(pitcher, batter, fatigue, pitch);
+
+    // Breaking ball walk risk: max(0, (6 - control) * 0.04)
+    if (pitchType === 'breaking' && !result.isOut) {
+      // Only check walk risk if it wasn't already an out
+    }
+    if (pitchType === 'breaking') {
+      const walkChance = Math.max(0, (6 - pitcher.control) * 0.04);
+      if (walkChance > 0 && Math.random() < walkChance) {
+        const scored = this._advanceRunners(bases, 1, 0);
+        this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
+        return { outcome: 'Walk', isOut: false, basesGained: 1, batter, walked: true, scored };
+      }
+    }
+
+    let scored = 0;
+    if (result.isOut) {
+      // No runner advancement on outs
+    } else {
+      scored = this._advanceRunners(bases, result.basesGained, batter.speed);
+    }
+
+    this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
+    return { outcome: result.outcome, isOut: result.isOut, basesGained: result.basesGained, batter, walked: false, scored };
+  }
+
+  /**
+   * At-bat sim with pitch type modifiers applied.
+   * Stamina modulates fatigue: effectiveFatigue = inningFatigue * (0.5 + stamina * 0.5)
+   */
+  _simAtBatWithPitch(pitcher, batter, fatigue, pitch) {
+    const effectiveFatigue = fatigue * (0.5 + this.myPitcherStamina * 0.5);
+
+    const pitchStrength = (pitcher.velocity * 0.6 + pitcher.control * 0.4) * effectiveFatigue;
+    const batStrength = batter.contact * 0.6 + batter.power * 0.4;
+
+    const matchup = batStrength - pitchStrength;
+    const baseHitChance = Math.min(0.50, Math.max(0.12, 0.28 + matchup * 0.025));
+    const hitChance = Math.min(0.50, Math.max(0.05, baseHitChance + pitch.hitChanceMod));
+
+    const roll = Math.random();
+
+    if (roll > hitChance) {
+      // Out — apply K bonus
+      const outRoll = Math.random();
+      const kThreshold = (pitcher.velocity >= 8 ? 0.4 : 0.2) * pitch.kBonusMult;
+      if (outRoll < kThreshold) {
+        return { outcome: 'Strikeout', isOut: true, basesGained: 0 };
+      } else if (outRoll < kThreshold + 0.3) {
+        return { outcome: 'Groundout', isOut: true, basesGained: 0 };
+      } else {
+        return { outcome: 'Flyout', isOut: true, basesGained: 0 };
+      }
+    }
+
+    // Hit — apply XBH multiplier
+    const hitRoll = Math.random();
+    const powerFactor = batter.power / 10;
+
+    const hrChance = (0.01 + powerFactor * 0.03) * pitch.xbhMult;
+    const tripleChance = (0.05 + powerFactor * 0.08) * pitch.xbhMult;
+    const doubleChance = (0.20 + powerFactor * 0.12) * pitch.xbhMult;
+
+    if (hitRoll < hrChance) {
+      return { outcome: 'Home Run', isOut: false, basesGained: 4 };
+    } else if (hitRoll < tripleChance) {
+      return { outcome: 'Triple', isOut: false, basesGained: 3 };
+    } else if (hitRoll < doubleChance) {
+      return { outcome: 'Double', isOut: false, basesGained: 2 };
+    } else {
+      return { outcome: 'Single', isOut: false, basesGained: 1 };
+    }
+  }
+
   setPitcherTraits(traits) {
     this.pitcher.traits = traits.slice(0, MAX_PITCHER_TRAITS);
   }
@@ -89,7 +227,24 @@ export default class RosterManager {
   applyBatterModifiers(evalResult, gameState) {
     const batter = this.getCurrentBatter();
     const result = { ...evalResult };
-    const bonuses = { powerChips: 0, contactMult: 0 };
+    const bonuses = { powerChips: 0, contactMult: 0, contactSave: false };
+
+    // Contact save: batter can rescue a pair that became a Groundout
+    if (result.wasGroundout && result.originalHand === 'Pair') {
+      const saveChance = batter.contact * 0.06;
+      if (Math.random() < saveChance) {
+        result.outcome = 'Single';
+        result.handName = 'Pair';
+        result.chips = 1;
+        result.mult = 1.5;
+        result.score = 2;
+        result.wasGroundout = false;
+        bonuses.contactSave = true;
+        // Fall through to apply normal hit bonuses below
+      } else {
+        return { result, bonuses };
+      }
+    }
 
     const isHit = result.outcome !== 'Strikeout' && result.outcome !== 'Groundout' && result.outcome !== 'Flyout';
     if (!isHit) return { result, bonuses };
@@ -298,4 +453,4 @@ export default class RosterManager {
   }
 }
 
-export { TEAMS, MAX_TRAITS_PER_PLAYER, MAX_PITCHER_TRAITS };
+export { TEAMS, MAX_TRAITS_PER_PLAYER, MAX_PITCHER_TRAITS, PITCH_TYPES };

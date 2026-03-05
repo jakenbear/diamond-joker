@@ -5,7 +5,7 @@
  */
 import CardEngine from '../CardEngine.js';
 import BaseballState from '../BaseballState.js';
-import RosterManager from '../RosterManager.js';
+import RosterManager, { PITCH_TYPES } from '../RosterManager.js';
 import TraitManager from '../TraitManager.js';
 
 const SUIT_SYMBOLS = { H: '\u2665', D: '\u2666', C: '\u2663', S: '\u2660' };
@@ -1619,85 +1619,195 @@ export default class GameScene extends Phaser.Scene {
     const oppLabel = oppTeam ? `${oppTeam.logo} ${oppTeam.nickname}` : 'Opponent';
     const myPitcher = this.rosterManager.getMyPitcher();
 
+    this._pitchState = {
+      outs: 0,
+      runs: 0,
+      bases: [false, false, false],
+      oppLabel,
+      myPitcher,
+      logElements: [],
+      logIndex: 0,
+    };
+
     this.resultText.setColor('#ffffff');
     this.resultText.setText(`${oppLabel} batting...`);
     this.handNameText.setText(`${myPitcher.name} pitching`);
     this.handNameText.setColor('#81c784');
 
-    // Run the sim
-    const sim = this.rosterManager.simOpponentHalfInning(this.baseball.getStatus().inning);
+    this._updateBases(this._pitchState.bases);
+    this._showPitchSelection();
+  }
 
-    // Show play-by-play log one entry at a time
-    const logY = 420;
-    const logElements = [];
+  _showPitchSelection() {
+    const ps = this._pitchState;
+    const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
+    const stamina = this.rosterManager.getMyPitcherStamina();
+    const staminaPct = Math.round(stamina * 100);
+    const staminaColor = staminaPct > 50 ? '#69f0ae' : staminaPct > 25 ? '#ffd600' : '#ff5252';
 
-    // Clear area for log display
-    const logBg = this.add.rectangle(640, logY + sim.log.length * 12, 500, sim.log.length * 26 + 20, 0x000000, 0.5)
-      .setDepth(8);
-    logElements.push(logBg);
+    // Show batter info + stamina in result area
+    this.resultText.setText(`${batter.name} (${batter.pos}) — CON ${batter.contact} / POW ${batter.power}`);
+    this.resultText.setColor('#ffffff');
+    this.handNameText.setText(`Stamina: ${staminaPct}%  |  ${ps.outs} out${ps.outs !== 1 ? 's' : ''}  |  ${ps.runs} run${ps.runs !== 1 ? 's' : ''}`);
+    this.handNameText.setColor(staminaColor);
 
-    sim.log.forEach((entry, i) => {
-      this.time.delayedCall(400 + i * 500, () => {
-        const icon = entry.isOut ? '\u274c' : '\u2705';
-        let text = `${icon} ${entry.batter} - ${entry.outcome}`;
-        if (!entry.isOut && entry.scored > 0) {
-          text += ` (${entry.scored} run${entry.scored > 1 ? 's' : ''})`;
-        }
+    this._createPitchButtons();
+  }
 
-        const color = entry.isOut ? '#999999' : (entry.scored > 0 ? '#ff8a80' : '#ffe082');
-        const logLine = this.add.text(640, logY + i * 26, text, {
-          fontSize: '14px', fontFamily: 'monospace', color,
-        }).setOrigin(0.5).setDepth(9).setAlpha(0);
-        logElements.push(logLine);
+  _createPitchButtons() {
+    this._destroyPitchButtons();
+    this._pitchButtons = [];
 
-        this.tweens.add({
-          targets: logLine,
-          alpha: 1, y: logLine.y - 5,
-          duration: 200,
-        });
+    const keys = ['fastball', 'breaking', 'changeup', 'ibb'];
+    const colors = [0xe53935, 0x1e88e5, 0x43a047, 0x757575];
+    const stamina = this.rosterManager.getMyPitcherStamina();
+
+    keys.forEach((key, i) => {
+      const pitch = PITCH_TYPES[key];
+      const x = HAND_START_X + i * CARD_SPACING;
+      const y = HAND_Y;
+
+      // Card background
+      const bg = this.add.rectangle(x, y, CARD_W, CARD_H, colors[i], 0.9)
+        .setDepth(5).setStrokeStyle(2, 0xffffff)
+        .setInteractive({ useHandCursor: true });
+
+      // Pitch name
+      const nameText = this.add.text(x, y - 45, pitch.name, {
+        fontSize: '13px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+        align: 'center', wordWrap: { width: CARD_W - 10 },
+      }).setOrigin(0.5).setDepth(6);
+
+      // Cost label
+      const costPct = Math.round(pitch.staminaCost * 100);
+      const costLabel = key === 'ibb' ? 'FREE' : `-${costPct}%`;
+      const costText = this.add.text(x, y - 15, costLabel, {
+        fontSize: '11px', fontFamily: 'monospace', color: '#ffd600',
+      }).setOrigin(0.5).setDepth(6);
+
+      // Short description
+      const descText = this.add.text(x, y + 15, this._pitchShortDesc(key), {
+        fontSize: '9px', fontFamily: 'monospace', color: '#cccccc',
+        align: 'center', wordWrap: { width: CARD_W - 10 },
+      }).setOrigin(0.5).setDepth(6);
+
+      // Hover effects
+      bg.on('pointerover', () => {
+        bg.setStrokeStyle(3, 0xffd600);
+        this.tweens.add({ targets: [bg, nameText, costText, descText], y: y - 8, duration: 100 });
       });
+      bg.on('pointerout', () => {
+        bg.setStrokeStyle(2, 0xffffff);
+        this.tweens.add({ targets: [bg, nameText, costText, descText], y: y, duration: 100 });
+      });
+      bg.on('pointerdown', () => this._onPitchSelected(key));
+
+      this._pitchButtons.push(bg, nameText, costText, descText);
+    });
+  }
+
+  _pitchShortDesc(key) {
+    switch (key) {
+      case 'fastball': return 'High K\nMore XBH';
+      case 'breaking': return 'Hard to hit\nWalk risk';
+      case 'changeup': return 'Saves arm\nSafe hits';
+      case 'ibb': return 'Free pass\nto 1st base';
+      default: return '';
+    }
+  }
+
+  _destroyPitchButtons() {
+    if (this._pitchButtons) {
+      this._pitchButtons.forEach(el => el.destroy());
+      this._pitchButtons = null;
+    }
+  }
+
+  _onPitchSelected(pitchType) {
+    this._destroyPitchButtons();
+
+    const ps = this._pitchState;
+    const inning = this.baseball.getStatus().inning;
+    const result = this.rosterManager.simSingleAtBat(inning, pitchType, ps.bases);
+
+    if (result.isOut) {
+      ps.outs++;
+    }
+    ps.runs += result.scored || 0;
+
+    // Show result line
+    const icon = result.isOut ? '\u274c' : (result.walked ? '\ud83d\udeb6' : '\u2705');
+    let text = `${icon} ${result.batter.name} - ${result.outcome}`;
+    if (!result.isOut && result.scored > 0) {
+      text += ` (${result.scored} run${result.scored > 1 ? 's' : ''})`;
+    }
+
+    const color = result.isOut ? '#999999' : (result.scored > 0 ? '#ff8a80' : '#ffe082');
+    const logY = 420 + ps.logIndex * 26;
+    const logLine = this.add.text(640, logY + 5, text, {
+      fontSize: '14px', fontFamily: 'monospace', color,
+    }).setOrigin(0.5).setDepth(9).setAlpha(0);
+    ps.logElements.push(logLine);
+    ps.logIndex++;
+
+    this.tweens.add({
+      targets: logLine,
+      alpha: 1, y: logY,
+      duration: 200,
     });
 
-    // After all log entries shown, show summary + advance
-    const totalDelay = 400 + sim.log.length * 500 + 800;
+    // Update bases display
+    this._updateBases(ps.bases);
 
-    this.time.delayedCall(totalDelay, () => {
-      // Pass sim runs to switchSide
-      const switchResult = this.baseball.switchSide(sim.runs);
+    // Check if inning is over
+    if (ps.outs >= 3) {
+      this.time.delayedCall(800, () => this._finishOpponentHalf());
+    } else {
+      // Prompt next pitch
+      this.time.delayedCall(600, () => this._showPitchSelection());
+    }
+  }
 
-      // Clean up log
-      logElements.forEach(el => {
-        this.tweens.add({ targets: el, alpha: 0, duration: 300 });
-      });
-      this.time.delayedCall(350, () => logElements.forEach(el => el.destroy()));
+  _finishOpponentHalf() {
+    const ps = this._pitchState;
 
-      // Show summary
-      const summary = sim.runs === 0
-        ? `${myPitcher.name} shuts them down!`
-        : `${oppLabel} score${sim.runs === 1 ? 's' : ''} ${sim.runs} run${sim.runs !== 1 ? 's' : ''}`;
-      this.resultText.setText(summary);
-      this.resultText.setColor(sim.runs > 0 ? '#ff8a80' : '#69f0ae');
-      this.handNameText.setText('');
+    // Clean up log elements
+    ps.logElements.forEach(el => {
+      this.tweens.add({ targets: el, alpha: 0, duration: 300 });
+    });
+    this.time.delayedCall(350, () => ps.logElements.forEach(el => el.destroy()));
 
-      this.tweens.add({
-        targets: this.scoreText,
-        scale: { from: 1.3, to: 1 },
-        duration: 400, ease: 'Back.easeOut',
-      });
+    // switchSide with accumulated runs
+    this.baseball.switchSide(ps.runs);
 
-      this._updateScoreboard();
+    // Show summary
+    const summary = ps.runs === 0
+      ? `${ps.myPitcher.name} shuts them down!`
+      : `${ps.oppLabel} score${ps.runs === 1 ? 's' : ''} ${ps.runs} run${ps.runs !== 1 ? 's' : ''}`;
+    this.resultText.setText(summary);
+    this.resultText.setColor(ps.runs > 0 ? '#ff8a80' : '#69f0ae');
+    this.handNameText.setText('');
 
-      this.time.delayedCall(1800, () => {
-        if (this.baseball.isGameOver()) {
-          this._endGame();
-          return;
-        }
-        if (this.baseball.shouldShowShop()) {
-          this._goToShop();
-          return;
-        }
-        this._showInningTransition();
-      });
+    this.tweens.add({
+      targets: this.scoreText,
+      scale: { from: 1.3, to: 1 },
+      duration: 400, ease: 'Back.easeOut',
+    });
+
+    this._updateScoreboard();
+    // Clear bases for next inning
+    this._updateBases([false, false, false]);
+
+    this.time.delayedCall(1800, () => {
+      if (this.baseball.isGameOver()) {
+        this._endGame();
+        return;
+      }
+      if (this.baseball.shouldShowShop()) {
+        this._goToShop();
+        return;
+      }
+      this._showInningTransition();
     });
   }
 

@@ -279,10 +279,32 @@ export default class CardEngine {
    *   Three of a Kind: 10% flyout
    */
   static _applyRankQuality(entry, pairRank, handIdx) {
-    // Low rank: 2-5 → chance of out, scaled by hand strength
+    // Pairs: rank-scaled out chance (all ranks, not just low)
+    if (handIdx === 8) {
+      const outChance = Math.max(0.05, 0.80 - (pairRank - 2) * 0.06);
+      if (Math.random() < outChance) {
+        return {
+          handName: 'Groundout',
+          outcome: 'Groundout',
+          chips: 0,
+          mult: 1,
+          score: 0,
+          wasGroundout: true,
+          originalHand: entry.handName,
+          pairRank,
+        };
+      }
+      // Survived the out check — high ranks still get bonus chips
+      if (pairRank >= 10) {
+        const bonus = pairRank - 9;
+        return { ...entry, chips: entry.chips + bonus };
+      }
+      return null;
+    }
+
+    // Two Pair / Three of a Kind: keep existing low-rank penalties only
     if (pairRank >= 2 && pairRank <= 5) {
-      // handIdx: 8 = Pair, 7 = Two Pair, 6 = Three of a Kind
-      const outChance = handIdx === 8 ? 0.4 : handIdx === 7 ? 0.2 : 0.1;
+      const outChance = handIdx === 7 ? 0.2 : 0.1;
       if (Math.random() < outChance) {
         const outType = handIdx === 6 ? 'Flyout' : 'Groundout';
         return {
@@ -297,13 +319,13 @@ export default class CardEngine {
       }
     }
 
-    // High rank: 10-14 → Bonus chips
+    // High rank: 10-14 → Bonus chips (Two Pair / Three of a Kind)
     if (pairRank >= 10) {
-      const bonus = pairRank - 9; // 10→1, J→2, Q→3, K→4, A→5
+      const bonus = pairRank - 9;
       return { ...entry, chips: entry.chips + bonus };
     }
 
-    return null; // 6-9: no change
+    return null;
   }
 
   /** Check if sorted ranks form a straight (handles ace-low) */
