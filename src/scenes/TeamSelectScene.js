@@ -137,7 +137,7 @@ export default class TeamSelectScene extends Phaser.Scene {
 
     // ── NEXT button ──
     const nextY = 620;
-    this.starterLabel = this.add.text(640, nextY - 35,
+    this.starterLabel = this.add.text(640, nextY - 50,
       `Starter: ${team.pitchers[this.selectedPitcherIdx].name}`, {
       fontSize: '14px', fontFamily: 'monospace', color: '#aaaaaa',
     }).setOrigin(0.5);
