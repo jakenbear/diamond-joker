@@ -46,7 +46,6 @@ export default class ShopScene extends Phaser.Scene {
     this.add.rectangle(640, 110, 600, 2, 0x334455);
 
     this._renderShopCards();
-    this._renderBattingOrder();
     this._createDoneButton();
   }
 
@@ -137,17 +136,29 @@ export default class ShopScene extends Phaser.Scene {
     this.pickerElements.push(title);
 
     const roster = this.rosterManager.getRoster();
+    const currentIdx = this.rosterManager.getCurrentBatterIndex();
     const startY = 120;
     const rowH = 58;
 
     roster.forEach((player, i) => {
       const y = startY + i * rowH;
       const canEquip = player.traits.length < 2;
+      const isNext = i === currentIdx;
 
       // Row background
       const rowBg = this.add.rectangle(640, y, 700, 50, canEquip ? 0x1a3a2a : 0x2a1a1a, 0.8)
-        .setStrokeStyle(1, canEquip ? 0x4caf50 : 0x555555)
+        .setStrokeStyle(1, isNext ? 0x69f0ae : (canEquip ? 0x4caf50 : 0x555555))
         .setDepth(11);
+
+      // Due-up arrow
+      if (isNext) {
+        this.add.text(298, y - 8, '\u25B6', {
+          fontSize: '14px', fontFamily: 'monospace', color: '#69f0ae',
+        }).setDepth(12);
+        this.add.text(298, y + 8, 'DUE UP', {
+          fontSize: '8px', fontFamily: 'monospace', color: '#69f0ae',
+        }).setDepth(12);
+      }
 
       // Player name and stats
       const nameStr = `${i + 1}. ${player.name}`;
@@ -157,7 +168,9 @@ export default class ShopScene extends Phaser.Scene {
         : '(no traits)';
 
       this.add.text(320, y - 8, nameStr, {
-        fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+        fontSize: '16px', fontFamily: 'monospace',
+        color: isNext ? '#69f0ae' : '#ffffff',
+        fontStyle: 'bold',
       }).setDepth(12);
       this.pickerElements.push(rowBg);
 
@@ -250,36 +263,6 @@ export default class ShopScene extends Phaser.Scene {
       baseball: this.baseball,
       cardEngine: this.cardEngine,
       purchasesMade: this.purchasesMade,
-    });
-  }
-
-  _renderBattingOrder() {
-    const roster = this.rosterManager.getRoster();
-    const currentIdx = this.rosterManager.getCurrentBatterIndex();
-
-    this.add.text(140, 478, 'BATTING ORDER', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
-    }).setOrigin(0.5);
-
-    const startY = 498;
-    const rowH = 16;
-
-    roster.forEach((player, i) => {
-      const y = startY + i * rowH;
-      const isNext = i === currentIdx;
-
-      const arrow = isNext ? '\u25B6 ' : '  ';
-      const num = `${i + 1}`.padStart(2);
-      const traits = player.traits.length > 0
-        ? ` [${player.traits.map(t => t.name).join(', ')}]`
-        : '';
-
-      const line = `${arrow}${num}. ${player.name}${traits}`;
-      this.add.text(30, y, line, {
-        fontSize: '11px', fontFamily: 'monospace',
-        color: isNext ? '#69f0ae' : '#777777',
-        fontStyle: isNext ? 'bold' : 'normal',
-      });
     });
   }
 
