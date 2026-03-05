@@ -477,13 +477,13 @@ export default class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(2);
 
     // Live hand preview (shown while selecting cards)
-    this.handPreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 65, '', {
+    this.handPreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 88, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffd600',
       align: 'center', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(7).setAlpha(0);
 
     // Live score preview: chips x mult = total (below hand preview, above sort buttons)
-    this.scorePreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 48, '', {
+    this.scorePreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 70, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
     }).setOrigin(0.5).setDepth(8).setAlpha(0);
@@ -568,7 +568,7 @@ export default class GameScene extends Phaser.Scene {
   // ── Sort Buttons ───────────────────────────────────────
 
   _createSortButtons() {
-    const sortY = HAND_Y - CARD_H / 2 - 18;
+    const sortY = HAND_Y - CARD_H / 2 - 50;
     const modes = [
       { label: 'DEFAULT', mode: 'default' },
       { label: 'RANK',    mode: 'rank' },
