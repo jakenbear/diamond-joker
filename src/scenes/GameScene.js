@@ -884,8 +884,9 @@ export default class GameScene extends Phaser.Scene {
 
     let preview = '';
     let color = '#ffd600';
-    const isOut = handName === 'High Card' || handName === 'Strikeout' ||
-                  handName === 'Groundout' || handName === 'Flyout';
+    // Definite outs vs risky hands (Groundout/Flyout from low pair still has a chance)
+    const isDefiniteOut = handName === 'High Card' || handName === 'Strikeout';
+    const isRiskyOut = handName === 'Groundout' || handName === 'Flyout';
 
     if (handName === 'High Card' || handName === 'Strikeout') {
       if (n < 5) {
@@ -898,8 +899,10 @@ export default class GameScene extends Phaser.Scene {
         color = '#ff8a80';
       }
     } else if (handName === 'Groundout' || handName === 'Flyout') {
-      preview = `${result.originalHand || handName} \u2192 ${handName}!`;
-      color = '#ff8a80';
+      // Preview got a random groundout/flyout roll — show the real hand with risk warning
+      const realHand = result.originalHand || handName;
+      preview = `${realHand} (risky — could be ${handName})`;
+      color = '#ffe082';
     } else {
       const desc = result.playedDescription || handName;
       preview = `${desc} \u2192 ${result.outcome}`;
@@ -917,20 +920,28 @@ export default class GameScene extends Phaser.Scene {
 
     // Live chips x mult display
     let scorePreview = '';
-    if (isOut) {
+    if (isDefiniteOut) {
       scorePreview = 'OUT';
       this.scorePreviewText.setColor('#ff5252');
-    } else if (result.chips > 0) {
+    } else if (isRiskyOut || result.chips > 0) {
+      // For risky outs (low pair Groundout/Flyout), look up the original hand's chips/mult
+      let baseChips = result.chips;
+      let baseMult = result.mult;
+      if (isRiskyOut && result.originalHand) {
+        const entry = HAND_TABLE.find(h => h.handName === result.originalHand);
+        if (entry) { baseChips = entry.chips; baseMult = entry.mult; }
+      }
       const batter = this.rosterManager.getCurrentBatter();
       const powerBonus = Math.max(0, batter.power - 5);
       const contactBonus = batter.contact / 10;
-      const totalChips = result.chips + powerBonus;
-      const totalMult = Math.round((result.mult + contactBonus) * 10) / 10;
+      const totalChips = baseChips + powerBonus;
+      const totalMult = Math.round((baseMult + contactBonus) * 10) / 10;
       const total = Math.round(totalChips * totalMult);
 
       const chipsStr = Number.isInteger(totalChips) ? totalChips : totalChips.toFixed(1);
       const multStr = Number.isInteger(totalMult) ? totalMult : totalMult.toFixed(1);
       scorePreview = `${chipsStr} chips x ${multStr} mult = ${total}`;
+      if (isRiskyOut) scorePreview += ' (if hit)';
 
       const tags = [];
       if (powerBonus > 0) tags.push(`+${powerBonus} PWR`);
@@ -1111,6 +1122,8 @@ export default class GameScene extends Phaser.Scene {
     if (this.cardEngine.discardsRemaining <= 0) return;
 
     this.inputLocked = true;
+    this.handPreviewText.setAlpha(0);
+    this.scorePreviewText.setAlpha(0);
 
     const displayIndices = [...this.selectedIndices];
     displayIndices.forEach(idx => {
