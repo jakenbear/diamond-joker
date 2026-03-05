@@ -109,11 +109,20 @@ group('1a. Hand Evaluation');
   assert(r.chips === 2 && r.mult === 2, 'Two Pair chips/mult');
 }
 {
-  // Pair with mid-range rank
-  const pair = makeCards([[8,'H'],[8,'D'],[3,'C'],[5,'S'],[11,'H']]);
-  const r = CardEngine.evaluateHand(pair);
-  assert(r.handName === 'Pair', 'Pair detected');
-  assert(r.chips === 1 && r.mult === 1.5, 'Pair chips/mult');
+  // Pair with Aces (high rank, low groundout chance ~8%)
+  // Retry to account for rank quality groundout chance
+  let found = false;
+  for (let i = 0; i < 50; i++) {
+    const pair = makeCards([[14,'H'],[14,'D'],[3,'C'],[5,'S'],[7,'H']]);
+    const r = CardEngine.evaluateHand(pair);
+    if (r.handName === 'Pair') {
+      // Aces get +5 bonus chips: base 1 + 5 = 6
+      assert(r.chips === 6 && r.mult === 1.5, 'Pair chips/mult (Aces: 6 chips, 1.5 mult)');
+      found = true;
+      break;
+    }
+  }
+  assert(found, 'Pair detected (Aces, within 50 tries)');
 }
 {
   const hc = makeCards([[2,'H'],[5,'D'],[8,'C'],[11,'S'],[13,'H']]);
@@ -122,10 +131,14 @@ group('1a. Hand Evaluation');
   assert(r.chips === 0 && r.mult === 1, 'High Card chips/mult');
 }
 {
-  // 2-card selection → Pair
-  const twoCards = makeCards([[8,'H'],[8,'D']]);
-  const r = CardEngine.evaluateHand(twoCards);
-  assert(r.handName === 'Pair', '2 matching cards → Pair');
+  // 2-card selection → Pair (Aces to minimize groundout chance)
+  let found = false;
+  for (let i = 0; i < 50; i++) {
+    const twoCards = makeCards([[14,'H'],[14,'D']]);
+    const r = CardEngine.evaluateHand(twoCards);
+    if (r.handName === 'Pair') { found = true; break; }
+  }
+  assert(found, '2 matching cards → Pair (within 50 tries)');
 }
 {
   // 1-card selection → High Card
@@ -134,10 +147,18 @@ group('1a. Hand Evaluation');
   assert(r.handName === 'High Card', '1 card → High Card');
 }
 {
-  // playedDescription populated
-  const pair = makeCards([[8,'H'],[8,'D'],[3,'C'],[5,'S'],[11,'H']]);
-  const r = CardEngine.evaluateHand(pair);
-  assert(r.playedDescription === 'Pair of 8s', 'playedDescription populated ("Pair of 8s")');
+  // playedDescription populated (use Aces to minimize groundout chance)
+  let found = false;
+  for (let i = 0; i < 50; i++) {
+    const pair = makeCards([[14,'H'],[14,'D'],[3,'C'],[5,'S'],[7,'H']]);
+    const r = CardEngine.evaluateHand(pair);
+    if (r.handName === 'Pair') {
+      assert(r.playedDescription === 'Pair of As', 'playedDescription populated ("Pair of As")');
+      found = true;
+      break;
+    }
+  }
+  assert(found, 'playedDescription test: got Pair within 50 tries');
 }
 {
   // score = chips * mult
@@ -1141,6 +1162,94 @@ function pickDiscards(hand) {
 }
 
 /**
+ * Average brain — plays like a casual human.
+ * - Looks at the full 5-card hand first (no subset hunting)
+ * - Spots obvious pairs/two-pairs but misses straights ~60% and flushes ~40% of the time
+ * - Uses at most 1 discard, and only if the hand is garbage
+ * - Sometimes plays "good enough" hands without optimizing
+ */
+function averageFindPlay(hand) {
+  // First, evaluate the full 5-card hand (what most players try first)
+  const fullResult = CardEngine.evaluateHand(hand);
+  const fullScore = fullResult.score;
+
+  // If we got Two Pair or better from all 5, just play it
+  if (fullScore >= 4) {
+    return hand.map((_, i) => i);
+  }
+
+  // If full hand is a pair, 70% chance we just play all 5 (don't optimize)
+  if (fullResult.handName === 'Pair' || fullResult.handName === 'Groundout') {
+    if (Math.random() < 0.7) return hand.map((_, i) => i);
+  }
+
+  // Otherwise look for pairs/trips in subsets (but only obvious ones)
+  // Check for pairs by scanning for matching ranks
+  const rankMap = {};
+  for (let i = 0; i < hand.length; i++) {
+    const r = hand[i].rank;
+    if (!rankMap[r]) rankMap[r] = [];
+    rankMap[r].push(i);
+  }
+
+  // Play the biggest group we find
+  let bestGroup = [];
+  for (const indices of Object.values(rankMap)) {
+    if (indices.length > bestGroup.length) bestGroup = indices;
+    else if (indices.length === bestGroup.length && indices.length >= 2) {
+      // Two pairs — play both pairs
+      bestGroup = [...bestGroup, ...indices];
+    }
+  }
+
+  if (bestGroup.length >= 2) return bestGroup;
+
+  // No pairs found — just play all 5 and hope for the best
+  return hand.map((_, i) => i);
+}
+
+function averagePickDiscards(hand) {
+  const fullResult = CardEngine.evaluateHand(hand);
+
+  // If we have a pair or better, don't discard (good enough)
+  if (fullResult.score > 0 && fullResult.handName !== 'Groundout') return [];
+
+  // 30% chance we don't bother discarding even with a bad hand (lazy/impatient)
+  if (Math.random() < 0.3) return [];
+
+  // Keep paired cards, discard the rest (basic strategy)
+  const rankMap = {};
+  for (let i = 0; i < hand.length; i++) {
+    const r = hand[i].rank;
+    if (!rankMap[r]) rankMap[r] = [];
+    rankMap[r].push(i);
+  }
+  const keepers = new Set();
+  for (const indices of Object.values(rankMap)) {
+    if (indices.length >= 2) indices.forEach(i => keepers.add(i));
+  }
+
+  if (keepers.size > 0) {
+    return hand.map((_, i) => i).filter(i => !keepers.has(i));
+  }
+
+  // No pairs — keep 2 highest, discard 3
+  const sorted = hand.map((c, i) => ({ rank: c.rank, idx: i })).sort((a, b) => b.rank - a.rank);
+  const keep = new Set([sorted[0].idx, sorted[1].idx]);
+  return hand.map((_, i) => i).filter(i => !keep.has(i));
+}
+
+function averageAtBat(ce) {
+  // Only use 1 discard max
+  if (ce.discardsRemaining > 0) {
+    const toDiscard = averagePickDiscards(ce.hand);
+    if (toDiscard.length > 0) ce.discard(toDiscard);
+  }
+  const indices = averageFindPlay(ce.hand);
+  return ce.playHand(indices);
+}
+
+/**
  * Full smart at-bat: discard if needed, then pick best play.
  */
 function smartAtBat(ce) {
@@ -1320,6 +1429,86 @@ group('2b. Statistical Sim — smart brain (N=100 games)');
   console.log(`\n  \x1b[1mOutcome breakdown:\x1b[0m`);
   const sorted = Object.entries(outcomeCount).sort((a, b) => b[1] - a[1]);
   for (const [outcome, count] of sorted) {
+    const pct = ((count / totalAtBats) * 100).toFixed(1);
+    console.log(`    ${outcome.padEnd(20)} ${count.toString().padStart(5)}  (${pct}%)`);
+  }
+}
+
+// ── 2c. Statistical Sim — Average Brain ─────────────────
+
+group('2c. Statistical Sim — average brain (N=100 games)');
+
+{
+  const N_GAMES = 100;
+  let crashes = 0;
+  let totalPlayerRuns = 0;
+  let totalOpponentRuns = 0;
+  let wins = 0;
+  let totalChipsEarned = 0;
+  const outcomeCount = {};
+  let totalAtBats = 0;
+
+  for (let g = 0; g < N_GAMES; g++) {
+    try {
+      const canada = TEAMS.find(t => t.id === 'CAN');
+      const opponents = TEAMS.filter(t => t.id !== 'CAN');
+      const opp = opponents[g % opponents.length];
+      const ce = new CardEngine();
+      const bs = new BaseballState();
+      const rm = new RosterManager(canada, 0, opp);
+
+      const traitPool = [...BATTER_TRAITS];
+      for (let i = 0; i < 3 && i < traitPool.length; i++) {
+        rm.equipTrait(i % 9, traitPool[i]);
+      }
+      rm.setPitcherTraits(PITCHER_TRAITS.slice(0, 1));
+
+      let safety = 0;
+      while (!bs.isGameOver() && safety < 500) {
+        safety++;
+
+        if (bs.state === 'SWITCH_SIDE') {
+          bs.switchSide();
+          continue;
+        }
+
+        ce.newAtBat();
+        totalAtBats++;
+
+        const evalResult = averageAtBat(ce);
+        const { result } = rm.applyBatterModifiers(evalResult, bs.getStatus());
+        const final = rm.applyPitcherModifiers(result, bs.getStatus());
+
+        outcomeCount[final.outcome] = (outcomeCount[final.outcome] || 0) + 1;
+        bs.resolveOutcome(final.outcome, final.score);
+        rm.advanceBatter();
+      }
+
+      const res = bs.getResult();
+      if (res) {
+        totalPlayerRuns += res.playerScore;
+        totalOpponentRuns += res.opponentScore;
+        totalChipsEarned += res.totalChips;
+        if (res.won) wins++;
+      }
+    } catch (e) {
+      crashes++;
+      console.log(`  \x1b[31mCRASH in game ${g}: ${e.message}\x1b[0m`);
+      console.log(`  ${e.stack?.split('\n')[1]?.trim()}`);
+    }
+  }
+
+  assert(crashes === 0, `0 crashes in ${N_GAMES} games (avg brain)`);
+
+  console.log(`\n\x1b[1m  ── Statistics (${N_GAMES} games, average brain) ──\x1b[0m`);
+  console.log(`  Avg player runs/game:   ${(totalPlayerRuns / N_GAMES).toFixed(1)}`);
+  console.log(`  Avg opponent runs/game: ${(totalOpponentRuns / N_GAMES).toFixed(1)}`);
+  console.log(`  Player win rate:        ${((wins / N_GAMES) * 100).toFixed(1)}%`);
+  console.log(`  Avg chips earned:       ${(totalChipsEarned / N_GAMES).toFixed(0)}`);
+  console.log(`  Avg at-bats/game:       ${(totalAtBats / N_GAMES).toFixed(1)}`);
+  console.log(`\n  \x1b[1mOutcome breakdown:\x1b[0m`);
+  const sorted2 = Object.entries(outcomeCount).sort((a, b) => b[1] - a[1]);
+  for (const [outcome, count] of sorted2) {
     const pct = ((count / totalAtBats) * 100).toFixed(1);
     console.log(`    ${outcome.padEnd(20)} ${count.toString().padStart(5)}  (${pct}%)`);
   }
