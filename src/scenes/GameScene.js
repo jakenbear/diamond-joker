@@ -105,15 +105,27 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(1);
 
+    // Small "(you)" indicator under player team name
+    this.youIndicator = this.add.text(0, 33, '(you)', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#69f0ae',
+    }).setOrigin(0.5, 0).setDepth(1).setAlpha(0.7);
+
     this._updateScoreboard();
   }
 
   _updateScoreboard() {
     const s = this.baseball.getStatus();
     this.inningText.setText(`INN ${s.inning} ${s.half === 'top' ? '\u25b2' : '\u25bc'}`);
+    const playerTeam = this.rosterManager.getTeam();
+    const playerName = playerTeam ? playerTeam.id : 'YOU';
     const oppTeam = this.rosterManager.getOpponentTeam();
     const oppName = oppTeam ? oppTeam.id : 'OPP';
-    this.scoreText.setText(`YOU ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
+    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
+
+    // Position "(you)" indicator under the player team name
+    const scoreLeft = this.scoreText.x - this.scoreText.width / 2;
+    const playerNameWidth = playerName.length * 13.2; // approximate monospace char width at 22px
+    this.youIndicator.setX(scoreLeft + playerNameWidth / 2);
     this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
 
     const outDots = [];
