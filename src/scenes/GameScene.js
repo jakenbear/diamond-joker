@@ -122,9 +122,14 @@ export default class GameScene extends Phaser.Scene {
     const oppName = oppTeam ? oppTeam.id : 'OPP';
     this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
 
-    // Position "(you)" indicator under the player team name
+    // Position "(you)" indicator under the player team name using actual text bounds
+    this.scoreText.updateText();
     const scoreLeft = this.scoreText.x - this.scoreText.width / 2;
-    const playerNameWidth = playerName.length * 13.2; // approximate monospace char width at 22px
+    const measuredWidth = this.add.text(0, -100, playerName, {
+      fontSize: '22px', fontFamily: 'monospace',
+    });
+    const playerNameWidth = measuredWidth.width;
+    measuredWidth.destroy();
     this.youIndicator.setX(scoreLeft + playerNameWidth / 2);
     this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
 
@@ -327,8 +332,8 @@ export default class GameScene extends Phaser.Scene {
   // ── Stat Bar Helper ────────────────────────────────────
 
   _statBar(val) {
-    const filled = Math.min(val, 10);
-    return '\u2588'.repeat(filled) + '\u2591'.repeat(10 - filled) + ` ${val}`;
+    const filled = Math.round(Math.min(val, 10) * 0.6);
+    return '\u2588'.repeat(filled) + '\u2591'.repeat(6 - filled) + ` ${val}`;
   }
 
   // ── Base Diamond (center) ─────────────────────────────
@@ -1108,6 +1113,7 @@ export default class GameScene extends Phaser.Scene {
       this.cascadeTexts = [];
     }
     this._setSortButtonsVisible(true);
+    this.discardInfo.setAlpha(1);
     this.cardEngine.newAtBat();
 
     // Bonus discards from batter traits (e.g. Batting Gloves)
@@ -1606,6 +1612,7 @@ export default class GameScene extends Phaser.Scene {
     this._setButtonsEnabled(false, false);
     this._clearCards();
     this._setSortButtonsVisible(false);
+    this.discardInfo.setAlpha(0);
 
     const oppTeam = this.rosterManager.getOpponentTeam();
     const oppLabel = oppTeam ? `${oppTeam.logo} ${oppTeam.nickname}` : 'Opponent';
