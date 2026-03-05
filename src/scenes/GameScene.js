@@ -29,6 +29,8 @@ const RARITY_COLORS = {
   rare:     '#ce93d8',
 };
 
+import HAND_TABLE from '../../data/hand_table.js';
+
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super({ key: 'GameScene' });
@@ -48,7 +50,11 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.cardEngine = new CardEngine();
       this.baseball = new BaseballState();
-      this.rosterManager = new RosterManager();
+      // Accept team + pitcher + opponent from TeamSelectScene
+      const team = this._initData.team;
+      const pitcherIdx = this._initData.pitcherIndex || 0;
+      const oppTeam = this._initData.opponentTeam || null;
+      this.rosterManager = new RosterManager(team, pitcherIdx, oppTeam);
       this.traitManager = new TraitManager();
       // Assign pitcher traits at game start
       const pitcherTraits = TraitManager.pickPitcherTraits();
@@ -61,6 +67,8 @@ export default class GameScene extends Phaser.Scene {
     this.baseGraphics = [];
     this.batterTraitSprites = [];
     this.pitcherTraitSprites = [];
+    this.sortMode = 'default'; // 'default' | 'rank' | 'suit'
+    this.dealOrder = [];       // original card indices for default sort
 
     this._createBaseDiamond();
     this._createScoreboard();
@@ -68,6 +76,7 @@ export default class GameScene extends Phaser.Scene {
     this._createPitcherPanel();
     this._createResultDisplay();
     this._createButtons();
+    this._createSortButtons();
     this._createInfoText();
 
     this._updateBatterPanel();
@@ -102,7 +111,9 @@ export default class GameScene extends Phaser.Scene {
   _updateScoreboard() {
     const s = this.baseball.getStatus();
     this.inningText.setText(`INN ${s.inning} ${s.half === 'top' ? '\u25b2' : '\u25bc'}`);
-    this.scoreText.setText(`YOU ${s.playerScore}  -  ${s.opponentScore} OPP`);
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const oppName = oppTeam ? oppTeam.id : 'OPP';
+    this.scoreText.setText(`YOU ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
     this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
 
     const outDots = [];
@@ -120,8 +131,10 @@ export default class GameScene extends Phaser.Scene {
     this.add.rectangle(BATTER_X, 280, PANEL_W, 400, 0x0a1f0d, 0.85)
       .setStrokeStyle(2, 0x2e7d32);
 
-    // "AT BAT" header
-    this.add.text(BATTER_X, 95, 'AT BAT', {
+    // Team + "AT BAT" header
+    const team = this.rosterManager.getTeam();
+    const headerLabel = team ? `${team.logo} AT BAT` : 'AT BAT';
+    this.add.text(BATTER_X, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -161,7 +174,8 @@ export default class GameScene extends Phaser.Scene {
     const idx = this.rosterManager.getCurrentBatterIndex();
 
     this.batterNameText.setText(batter.name);
-    this.batterNumText.setText(`#${idx + 1} in lineup`);
+    const pos = batter.pos ? ` | ${batter.pos}` : '';
+    this.batterNumText.setText(`#${idx + 1} in lineup${pos}`);
 
     this.batterPwrText.setText(`PWR  ${this._statBar(batter.power)}`);
     this.batterCntText.setText(`CNT  ${this._statBar(batter.contact)}`);
@@ -181,13 +195,24 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    // Entrance tween
-    this.tweens.add({
-      targets: this.batterNameText,
-      x: { from: BATTER_X - 40, to: BATTER_X },
-      alpha: { from: 0, to: 1 },
-      duration: 300,
-      ease: 'Quad.easeOut',
+    // Walk-up animation - slide everything in from the left
+    const walkUpTargets = [
+      this.batterNameText, this.batterNumText,
+      this.batterPwrText, this.batterCntText, this.batterSpdText,
+      this.batterTraitLabel,
+    ];
+    walkUpTargets.forEach((t, i) => {
+      const origX = t.x;
+      t.setAlpha(0);
+      t.x = origX - 50;
+      this.tweens.add({
+        targets: t,
+        x: origX,
+        alpha: 1,
+        duration: 300,
+        delay: i * 50,
+        ease: 'Quad.easeOut',
+      });
     });
   }
 
@@ -208,22 +233,27 @@ export default class GameScene extends Phaser.Scene {
       align: 'center', wordWrap: { width: PANEL_W - 20 },
     }).setOrigin(0.5).setDepth(2);
 
+    // Opponent team label
+    this.pitcherTeamText = this.add.text(PITCHER_X, 148, '', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
+    }).setOrigin(0.5).setDepth(2);
+
     // Stats
-    this.pitcherVelText = this.add.text(PITCHER_X - 70, 155, '', {
+    this.pitcherVelText = this.add.text(PITCHER_X - 70, 170, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     }).setDepth(2);
-    this.pitcherCtlText = this.add.text(PITCHER_X - 70, 175, '', {
+    this.pitcherCtlText = this.add.text(PITCHER_X - 70, 190, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     }).setDepth(2);
-    this.pitcherStaText = this.add.text(PITCHER_X - 70, 195, '', {
+    this.pitcherStaText = this.add.text(PITCHER_X - 70, 210, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     }).setDepth(2);
 
     // Divider
-    this.add.rectangle(PITCHER_X, 220, PANEL_W - 30, 1, 0x8b0000, 0.5);
+    this.add.rectangle(PITCHER_X, 235, PANEL_W - 30, 1, 0x8b0000, 0.5);
 
     // "TRAITS" label
-    this.pitcherTraitLabel = this.add.text(PITCHER_X, 232, 'TRAITS', {
+    this.pitcherTraitLabel = this.add.text(PITCHER_X, 247, 'TRAITS', {
       fontSize: '11px', fontFamily: 'monospace', color: '#e53935',
     }).setOrigin(0.5).setDepth(2);
   }
@@ -232,6 +262,8 @@ export default class GameScene extends Phaser.Scene {
     const pitcher = this.rosterManager.getCurrentPitcher();
 
     this.pitcherNameText.setText(pitcher.name);
+    const teamLabel = pitcher.teamLogo ? `${pitcher.teamLogo} ${pitcher.teamName}` : '';
+    this.pitcherTeamText.setText(teamLabel);
     this.pitcherVelText.setText(`VEL  ${this._statBar(pitcher.velocity)}`);
     this.pitcherCtlText.setText(`CTL  ${this._statBar(pitcher.control)}`);
     this.pitcherStaText.setText(`STA  ${this._statBar(pitcher.stamina)}`);
@@ -245,7 +277,7 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.pitcherTraitLabel.setText('TRAITS');
       pitcher.traits.forEach((trait, i) => {
-        const sprites = this._createTraitMiniCard(PITCHER_X, 255 + i * 75, trait, true);
+        const sprites = this._createTraitMiniCard(PITCHER_X, 270 + i * 75, trait, true);
         this.pitcherTraitSprites.push(...sprites);
       });
     }
@@ -345,6 +377,15 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '18px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
     }).setOrigin(0.5).setDepth(2);
+
+    // Live hand preview (shown while selecting cards)
+    this.handPreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 65, '', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ffd600',
+      align: 'center', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(7).setAlpha(0);
+
+    // Score popup container (created dynamically)
+    this.scorePopups = [];
   }
 
   // ── Info Text ─────────────────────────────────────────
@@ -373,6 +414,21 @@ export default class GameScene extends Phaser.Scene {
   _createButtons() {
     this.playBtn = this._makeButton(540, 680, 'PLAY HAND', 0x2e7d32, () => this._onPlay());
     this.discardBtn = this._makeButton(740, 680, 'DISCARD', 0xf57f17, () => this._onDiscard());
+
+    // Hand reference "?" button
+    const helpBg = this.add.rectangle(1240, 680, 40, 40, 0x333333)
+      .setStrokeStyle(1, 0x555555)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(3);
+    const helpTxt = this.add.text(1240, 680, '?', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(4);
+    helpBg.on('pointerover', () => helpBg.setStrokeStyle(1, 0xffd600));
+    helpBg.on('pointerout', () => helpBg.setStrokeStyle(1, 0x555555));
+    helpBg.on('pointerdown', () => this._toggleHandReference());
+
+    this.handRefVisible = false;
+    this.handRefElements = [];
   }
 
   _makeButton(x, y, label, color, callback) {
@@ -402,6 +458,157 @@ export default class GameScene extends Phaser.Scene {
     else this.discardBtn.bg.disableInteractive();
   }
 
+  // ── Sort Buttons ───────────────────────────────────────
+
+  _createSortButtons() {
+    const sortY = HAND_Y - CARD_H / 2 - 40;
+    const modes = [
+      { label: 'DEFAULT', mode: 'default' },
+      { label: 'RANK',    mode: 'rank' },
+      { label: 'SUIT',    mode: 'suit' },
+    ];
+
+    this.sortBtns = [];
+    const totalW = modes.length * 90;
+    const startX = 640 - totalW / 2 + 45;
+
+    modes.forEach((m, i) => {
+      const x = startX + i * 90;
+      const bg = this.add.rectangle(x, sortY, 80, 22, 0x333333, 0.7)
+        .setStrokeStyle(1, 0x555555)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(3);
+      const txt = this.add.text(x, sortY, m.label, {
+        fontSize: '11px', fontFamily: 'monospace', color: '#888888', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(4);
+
+      bg.on('pointerdown', () => {
+        if (this.inputLocked) return;
+        this.sortMode = m.mode;
+        this._updateSortHighlight();
+        this._resortHand();
+      });
+      bg.on('pointerover', () => bg.setAlpha(1));
+      bg.on('pointerout', () => bg.setAlpha(0.7));
+
+      this.sortBtns.push({ bg, txt, mode: m.mode });
+    });
+
+    this._updateSortHighlight();
+  }
+
+  _updateSortHighlight() {
+    this.sortBtns.forEach(btn => {
+      if (btn.mode === this.sortMode) {
+        btn.bg.setStrokeStyle(1, 0xffd600);
+        btn.txt.setColor('#ffd600');
+      } else {
+        btn.bg.setStrokeStyle(1, 0x555555);
+        btn.txt.setColor('#888888');
+      }
+    });
+  }
+
+  _setSortButtonsVisible(visible) {
+    this.sortBtns.forEach(btn => {
+      btn.bg.setVisible(visible);
+      btn.txt.setVisible(visible);
+    });
+  }
+
+  /** Get display order indices based on current sort mode */
+  _getSortedIndices() {
+    const hand = this.cardEngine.hand;
+    const indices = hand.map((_, i) => i);
+
+    if (this.sortMode === 'rank') {
+      indices.sort((a, b) => hand[a].rank - hand[b].rank);
+    } else if (this.sortMode === 'suit') {
+      const suitOrder = { H: 0, D: 1, C: 2, S: 3 };
+      indices.sort((a, b) => {
+        const sd = suitOrder[hand[a].suit] - suitOrder[hand[b].suit];
+        return sd !== 0 ? sd : hand[a].rank - hand[b].rank;
+      });
+    }
+    // 'default' keeps original deal order
+
+    return indices;
+  }
+
+  /** Re-sort cards in place with animation */
+  _resortHand() {
+    if (this.cardSprites.length === 0) return;
+
+    const sortedIndices = this._getSortedIndices();
+    const hand = this.cardEngine.hand;
+
+    // Calculate new x positions for each card based on sorted order
+    const newPositions = {};
+    sortedIndices.forEach((handIdx, displayPos) => {
+      newPositions[handIdx] = HAND_START_X + displayPos * CARD_SPACING;
+    });
+
+    // Map old selected indices to the actual card references
+    const selectedCards = new Set();
+    this.selectedIndices.forEach(displayIdx => {
+      // displayIdx is the current visual position — find which hand index it maps to
+      if (this._displayToHand && this._displayToHand[displayIdx] !== undefined) {
+        selectedCards.add(this._displayToHand[displayIdx]);
+      } else {
+        selectedCards.add(displayIdx);
+      }
+    });
+
+    // Rebuild the display mapping
+    this._displayToHand = {};
+    sortedIndices.forEach((handIdx, displayPos) => {
+      this._displayToHand[displayPos] = handIdx;
+    });
+
+    // Rebuild selectedIndices based on new display positions
+    this.selectedIndices.clear();
+    sortedIndices.forEach((handIdx, displayPos) => {
+      if (selectedCards.has(handIdx)) {
+        this.selectedIndices.add(displayPos);
+      }
+    });
+
+    // Re-render with new order (quick rebuild)
+    this._clearCardsKeepSelection();
+    const savedSelection = new Set(this.selectedIndices);
+
+    this.cardSprites = [];
+    sortedIndices.forEach((handIdx, displayPos) => {
+      const card = hand[handIdx];
+      const x = HAND_START_X + displayPos * CARD_SPACING;
+      this._createCardSpriteImmediate(card, x, HAND_Y, displayPos);
+    });
+
+    // Restore selections
+    savedSelection.forEach(idx => {
+      const cs = this.cardSprites[idx];
+      if (cs) {
+        cs.glow.setAlpha(0.7);
+        const lift = 20;
+        cs.bg.y = cs.y - lift;
+        cs.rankText.y = cs.rankY - lift;
+        cs.suitText.y = cs.suitY - lift;
+        cs.glow.y = cs.y - lift;
+      }
+    });
+    this.selectedIndices = savedSelection;
+  }
+
+  _clearCardsKeepSelection() {
+    this.cardSprites.forEach(cs => {
+      cs.bg.destroy();
+      cs.rankText.destroy();
+      cs.suitText.destroy();
+      if (cs.glow) cs.glow.destroy();
+    });
+    this.cardSprites = [];
+  }
+
   // ── Card Rendering ────────────────────────────────────
 
   _clearCards() {
@@ -413,17 +620,26 @@ export default class GameScene extends Phaser.Scene {
     });
     this.cardSprites = [];
     this.selectedIndices.clear();
+    this._displayToHand = {};
   }
 
   _renderHand() {
     this._clearCards();
 
     const hand = this.cardEngine.hand;
-    for (let i = 0; i < hand.length; i++) {
-      const card = hand[i];
-      const x = HAND_START_X + i * CARD_SPACING;
-      this._createCardSprite(card, x, HAND_Y, i);
-    }
+    const sortedIndices = this._getSortedIndices();
+
+    // Build display-to-hand mapping
+    this._displayToHand = {};
+    sortedIndices.forEach((handIdx, displayPos) => {
+      this._displayToHand[displayPos] = handIdx;
+    });
+
+    sortedIndices.forEach((handIdx, displayPos) => {
+      const card = hand[handIdx];
+      const x = HAND_START_X + displayPos * CARD_SPACING;
+      this._createCardSprite(card, x, HAND_Y, displayPos);
+    });
   }
 
   _createCardSprite(card, x, y, index) {
@@ -472,6 +688,34 @@ export default class GameScene extends Phaser.Scene {
     this.cardSprites.push({ bg, rankText, suitText, glow, x, y, rankY, suitY });
   }
 
+  /** Create card sprite without deal-in animation (used for re-sorting) */
+  _createCardSpriteImmediate(card, x, y, index) {
+    const suitColor = SUIT_COLORS[card.suit];
+    const suitSym = SUIT_SYMBOLS[card.suit];
+    const rankStr = RANK_NAMES[card.rank] || card.rank.toString();
+
+    const glow = this.add.rectangle(x, y, CARD_W + 8, CARD_H + 8, 0xffd600, 0).setDepth(4);
+    const bg = this.add.rectangle(x, y, CARD_W, CARD_H, 0xfafafa)
+      .setStrokeStyle(2, 0x333333)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(5);
+    const rankText = this.add.text(x, y - 20, rankStr, {
+      fontSize: '32px', fontFamily: 'serif', color: suitColor, fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(6);
+    const suitText = this.add.text(x, y + 25, suitSym, {
+      fontSize: '36px', fontFamily: 'serif', color: suitColor,
+    }).setOrigin(0.5).setDepth(6);
+
+    bg.on('pointerdown', () => {
+      if (this.inputLocked) return;
+      this._toggleSelect(index);
+    });
+
+    const rankY = y - 20;
+    const suitY = y + 25;
+    this.cardSprites.push({ bg, rankText, suitText, glow, x, y, rankY, suitY });
+  }
+
   _toggleSelect(index) {
     const cs = this.cardSprites[index];
     const lift = 20;
@@ -479,18 +723,214 @@ export default class GameScene extends Phaser.Scene {
     if (this.selectedIndices.has(index)) {
       this.selectedIndices.delete(index);
       cs.glow.setAlpha(0);
-      this.tweens.add({ targets: cs.bg,       y: cs.y,      duration: 120, ease: 'Back.easeOut' });
-      this.tweens.add({ targets: cs.rankText,  y: cs.rankY,  duration: 120, ease: 'Back.easeOut' });
-      this.tweens.add({ targets: cs.suitText,  y: cs.suitY,  duration: 120, ease: 'Back.easeOut' });
-      this.tweens.add({ targets: cs.glow,      y: cs.y,      duration: 120, ease: 'Back.easeOut' });
+      cs.bg.setStrokeStyle(2, 0x333333);
+      const targets = [cs.bg, cs.rankText, cs.suitText, cs.glow];
+      this.tweens.add({ targets, y: '-=0', duration: 1 }); // kill existing tweens
+      this.tweens.add({ targets: cs.bg,       y: cs.y,      duration: 150, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: cs.rankText,  y: cs.rankY,  duration: 150, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: cs.suitText,  y: cs.suitY,  duration: 150, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: cs.glow,      y: cs.y,      duration: 150, ease: 'Back.easeOut' });
     } else {
       this.selectedIndices.add(index);
       cs.glow.setAlpha(0.7);
-      this.tweens.add({ targets: cs.bg,       y: cs.y - lift,      duration: 120, ease: 'Back.easeOut' });
-      this.tweens.add({ targets: cs.rankText,  y: cs.rankY - lift,  duration: 120, ease: 'Back.easeOut' });
-      this.tweens.add({ targets: cs.suitText,  y: cs.suitY - lift,  duration: 120, ease: 'Back.easeOut' });
-      this.tweens.add({ targets: cs.glow,      y: cs.y - lift,      duration: 120, ease: 'Back.easeOut' });
+      cs.bg.setStrokeStyle(2, 0xffd600);
+      // Bounce up with slight scale pop
+      const allParts = [cs.bg, cs.rankText, cs.suitText, cs.glow];
+      this.tweens.add({ targets: cs.bg,       y: cs.y - lift,      duration: 150, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: cs.rankText,  y: cs.rankY - lift,  duration: 150, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: cs.suitText,  y: cs.suitY - lift,  duration: 150, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: cs.glow,      y: cs.y - lift,      duration: 150, ease: 'Back.easeOut' });
+      // Quick scale pop on the card
+      this.tweens.add({
+        targets: allParts, scaleX: 1.08, scaleY: 1.08,
+        duration: 80, yoyo: true, ease: 'Quad.easeOut',
+      });
     }
+
+    this._updateHandPreview();
+  }
+
+  /** Live hand preview - shows what poker hand the selected cards form */
+  _updateHandPreview() {
+    if (this.selectedIndices.size === 0) {
+      this.handPreviewText.setAlpha(0);
+      return;
+    }
+
+    // Map display indices to actual hand cards
+    const cards = [...this.selectedIndices]
+      .map(di => this._displayToHand[di] !== undefined ? this._displayToHand[di] : di)
+      .map(hi => this.cardEngine.hand[hi])
+      .filter(Boolean);
+
+    if (cards.length === 0) {
+      this.handPreviewText.setAlpha(0);
+      return;
+    }
+
+    // Evaluate without modifiers for a clean preview
+    const result = CardEngine.evaluateHand(cards);
+    const handName = result.handName;
+    const n = cards.length;
+
+    let preview = '';
+    let color = '#ffd600';
+
+    if (handName === 'High Card' || handName === 'Strikeout') {
+      if (n < 5) {
+        // Check if they're building toward something
+        const hint = this._getHandHint(cards);
+        preview = hint || 'High Card (Strikeout)';
+        color = hint ? '#ffe082' : '#ff8a80';
+      } else {
+        preview = 'High Card (Strikeout)';
+        color = '#ff8a80';
+      }
+    } else if (handName === 'Groundout' || handName === 'Flyout') {
+      preview = `${result.originalHand || handName} \u2192 ${handName}!`;
+      color = '#ff8a80';
+    } else {
+      const desc = result.playedDescription || handName;
+      preview = `${desc} \u2192 ${result.outcome}`;
+      // Color by hand strength
+      const strength = ['Royal Flush','Straight Flush','Four of a Kind','Full House','Flush','Straight','Three of a Kind','Two Pair','Pair'];
+      const idx = strength.indexOf(handName);
+      if (idx <= 2) color = '#ff6e40';     // orange-red for big hands
+      else if (idx <= 5) color = '#ffd600'; // gold
+      else color = '#81c784';               // green for small hands
+    }
+
+    this.handPreviewText.setText(preview);
+    this.handPreviewText.setColor(color);
+    this.handPreviewText.setAlpha(1);
+  }
+
+  /** Hint at what the player might be building toward */
+  _getHandHint(cards) {
+    const ranks = cards.map(c => c.rank);
+    const suits = cards.map(c => c.suit);
+
+    // Check for pair building
+    const freq = {};
+    for (const r of ranks) freq[r] = (freq[r] || 0) + 1;
+    const hasPair = Object.values(freq).some(v => v >= 2);
+    if (hasPair) return null; // already a pair, evaluateHand handles it
+
+    // Check flush potential
+    const suitCounts = {};
+    for (const s of suits) suitCounts[s] = (suitCounts[s] || 0) + 1;
+    const maxSuit = Math.max(...Object.values(suitCounts));
+    if (maxSuit >= 3 && cards.length < 5) return `${maxSuit}/5 to a Flush...`;
+
+    // Check straight potential
+    const sorted = [...new Set(ranks)].sort((a, b) => a - b);
+    if (sorted.length >= 3) {
+      let maxRun = 1, run = 1;
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i] === sorted[i-1] + 1) { run++; maxRun = Math.max(maxRun, run); }
+        else run = 1;
+      }
+      if (maxRun >= 3 && cards.length < 5) return `${maxRun}/5 to a Straight...`;
+    }
+
+    return null;
+  }
+
+  /** Show a score popup that floats up and fades */
+  _showScorePopup(text, color, x, y) {
+    const popup = this.add.text(x, y, text, {
+      fontSize: '32px', fontFamily: 'monospace', color, fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(15).setAlpha(0);
+
+    this.tweens.add({
+      targets: popup,
+      alpha: { from: 0, to: 1 },
+      y: y - 60,
+      scale: { from: 1.5, to: 1 },
+      duration: 400,
+      ease: 'Back.easeOut',
+    });
+
+    this.tweens.add({
+      targets: popup,
+      alpha: 0,
+      y: y - 100,
+      duration: 500,
+      delay: 800,
+      onComplete: () => popup.destroy(),
+    });
+  }
+
+  /** Toggle hand reference overlay */
+  _toggleHandReference() {
+    if (this.handRefVisible) {
+      this.handRefElements.forEach(el => el.destroy());
+      this.handRefElements = [];
+      this.handRefVisible = false;
+      return;
+    }
+
+    this.handRefVisible = true;
+    const els = this.handRefElements;
+
+    // Overlay background
+    const overlay = this.add.rectangle(640, 360, 460, 440, 0x0a1f0d, 0.95)
+      .setStrokeStyle(2, 0x4caf50).setDepth(20)
+      .setInteractive(); // block clicks through
+    els.push(overlay);
+
+    const title = this.add.text(640, 165, 'HAND RANKINGS', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(21);
+    els.push(title);
+
+    const subtitle = this.add.text(640, 190, 'Poker Hand \u2192 Baseball Outcome', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#888888',
+    }).setOrigin(0.5).setDepth(21);
+    els.push(subtitle);
+
+    HAND_TABLE.forEach((h, i) => {
+      const y = 215 + i * 32;
+      const handColor = i <= 2 ? '#ff6e40' : i <= 5 ? '#ffd600' : i <= 8 ? '#81c784' : '#ff8a80';
+
+      const name = this.add.text(440, y, h.handName, {
+        fontSize: '14px', fontFamily: 'monospace', color: handColor, fontStyle: 'bold',
+      }).setDepth(21);
+      els.push(name);
+
+      const arrow = this.add.text(610, y, '\u2192', {
+        fontSize: '14px', fontFamily: 'monospace', color: '#555555',
+      }).setDepth(21);
+      els.push(arrow);
+
+      const outcome = this.add.text(635, y, h.outcome, {
+        fontSize: '14px', fontFamily: 'monospace', color: '#bbbbbb',
+      }).setDepth(21);
+      els.push(outcome);
+
+      const stats = this.add.text(810, y, `${h.chips}c x${h.mult}`, {
+        fontSize: '12px', fontFamily: 'monospace', color: '#666666',
+      }).setDepth(21);
+      els.push(stats);
+    });
+
+    // Note about straights/flushes
+    const note = this.add.text(640, 540, 'Straights & Flushes need exactly 5 cards', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#666666',
+    }).setOrigin(0.5).setDepth(21);
+    els.push(note);
+
+    // Close instruction
+    const close = this.add.text(640, 560, '[ click ? to close ]', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#444444',
+    }).setOrigin(0.5).setDepth(21);
+    els.push(close);
+
+    // Animate in
+    els.forEach(el => {
+      el.setAlpha(0);
+      this.tweens.add({ targets: el, alpha: el === overlay ? 0.95 : 1, duration: 200 });
+    });
   }
 
   // ── Game Flow ─────────────────────────────────────────
@@ -498,7 +938,11 @@ export default class GameScene extends Phaser.Scene {
   _startAtBat() {
     this.resultText.setText('');
     this.handNameText.setText('');
+    this._setSortButtonsVisible(true);
     this.cardEngine.newAtBat();
+    this.dealOrder = this.cardEngine.hand.map((_, i) => i);
+    this.sortMode = 'default';
+    this._updateSortHighlight();
     this._renderHand();
     this._updateScoreboard();
     this._updateInfoText();
@@ -512,8 +956,8 @@ export default class GameScene extends Phaser.Scene {
 
     this.inputLocked = true;
 
-    const indices = [...this.selectedIndices];
-    indices.forEach(idx => {
+    const displayIndices = [...this.selectedIndices];
+    displayIndices.forEach(idx => {
       const cs = this.cardSprites[idx];
       this.tweens.add({
         targets: [cs.bg, cs.rankText, cs.suitText, cs.glow],
@@ -525,7 +969,12 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.time.delayedCall(250, () => {
-      this.cardEngine.discard(indices);
+      // Map display indices → actual hand indices for CardEngine
+      const handIndices = displayIndices
+        .map(di => this._displayToHand[di] !== undefined ? this._displayToHand[di] : di);
+      this.cardEngine.discard(handIndices);
+      // Reset deal order for new hand composition
+      this.dealOrder = this.cardEngine.hand.map((_, i) => i);
       this._renderHand();
       this._updateInfoText();
       this._setButtonsEnabled(true, this.cardEngine.discardsRemaining > 0);
@@ -539,7 +988,10 @@ export default class GameScene extends Phaser.Scene {
     this.inputLocked = true;
     this._setButtonsEnabled(false, false);
 
-    const selectedArr = [...this.selectedIndices].sort((a, b) => a - b);
+    // Map display indices → actual hand indices
+    const selectedArr = [...this.selectedIndices]
+      .map(di => this._displayToHand[di] !== undefined ? this._displayToHand[di] : di)
+      .sort((a, b) => a - b);
     const batter = this.rosterManager.getCurrentBatter();
     const pitcher = this.rosterManager.getCurrentPitcher();
     const gameState = this.baseball.getStatus();
@@ -664,17 +1116,36 @@ export default class GameScene extends Phaser.Scene {
       });
     });
 
-    // Animate cards (immediately)
+    // Hide hand preview
+    this.handPreviewText.setAlpha(0);
+
+    // Animate cards with juice based on outcome
+    const isOut = handResult.outcome === 'Strikeout' || handResult.outcome === 'Groundout' || handResult.outcome === 'Flyout';
     this.cardSprites.forEach((cs, i) => {
+      const parts = [cs.bg, cs.rankText, cs.suitText, cs.glow];
       if (this.selectedIndices.has(i)) {
-        this.tweens.add({
-          targets: [cs.bg, cs.rankText, cs.suitText, cs.glow],
-          x: 640, y: 360, alpha: 0, scale: 0.5,
-          duration: 350, delay: i * 40, ease: 'Quad.easeIn',
-        });
+        if (isOut) {
+          // Outs: cards shake then fall
+          this.tweens.add({
+            targets: parts, x: '+=4', duration: 40, yoyo: true, repeat: 3,
+          });
+          this.tweens.add({
+            targets: parts,
+            y: '+=80', alpha: 0, angle: Phaser.Math.Between(-15, 15),
+            duration: 400, delay: 200, ease: 'Quad.easeIn',
+          });
+        } else {
+          // Hits: cards fly to center with energy
+          this.tweens.add({
+            targets: parts,
+            x: 640, y: 300, alpha: 0, scale: 0.3,
+            duration: 350, delay: i * 50, ease: 'Quad.easeIn',
+          });
+        }
       } else {
+        // Unselected cards fade down
         this.tweens.add({
-          targets: [cs.bg, cs.rankText, cs.suitText, cs.glow],
+          targets: parts,
           y: '+=40', alpha: 0,
           duration: 250, delay: 150, ease: 'Quad.easeIn',
         });
@@ -685,19 +1156,23 @@ export default class GameScene extends Phaser.Scene {
     this.time.delayedCall(900 + pitcherDelay, () => {
       const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score);
 
-      let extraBaseRun = 0;
+      let extraBase = { scored: 0, advanced: false };
       if (handResult.extraBaseChance && handResult.outcome !== 'Strikeout' && handResult.outcome !== 'Groundout' && handResult.outcome !== 'Flyout') {
-        extraBaseRun = this.baseball.tryExtraBase(handResult.extraBaseChance);
+        extraBase = this.baseball.tryExtraBase(handResult.extraBaseChance);
       }
 
       this._clearCards();
 
       let desc = outcome.description;
       if (sacrificeFlyRun > 0) desc += ` Sac fly scores a run!`;
-      if (extraBaseRun > 0) desc += ` Speed! Extra run!`;
+      if (extraBase.advanced) {
+        desc += extraBase.scored > 0 ? ' Speed! Extra run!' : ' Speed! Runner advances!';
+      }
 
       this.resultText.setText(desc);
-      this.handNameText.setText(`${handResult.handName} \u2022 ${handResult.chips} chips x${handResult.mult}`);
+      const chipsDisplay = Number.isInteger(handResult.chips) ? handResult.chips : handResult.chips.toFixed(1);
+      const multDisplay = Number.isInteger(handResult.mult) ? handResult.mult : handResult.mult.toFixed(1);
+      this.handNameText.setText(`${handResult.handName} \u2022 ${chipsDisplay} chips x${multDisplay}`);
 
       if (handResult.outcome === 'Strikeout' || handResult.outcome === 'Groundout' || handResult.outcome === 'Flyout') {
         this.resultText.setColor('#ff8a80');
@@ -717,6 +1192,14 @@ export default class GameScene extends Phaser.Scene {
       });
 
       this._updateScoreboard();
+
+      // Score popup for runs
+      const totalRuns = outcome.runsScored + sacrificeFlyRun + extraBase.scored;
+      if (totalRuns > 0) {
+        const popupColor = totalRuns >= 4 ? '#ff6e40' : totalRuns >= 2 ? '#ffd600' : '#69f0ae';
+        const popupText = totalRuns >= 4 ? `+${totalRuns} RUNS!!!` : `+${totalRuns} RUN${totalRuns > 1 ? 'S' : ''}!`;
+        this._showScorePopup(popupText, popupColor, 640, 260);
+      }
 
       // Advance batter
       this.rosterManager.advanceBatter();
@@ -742,26 +1225,71 @@ export default class GameScene extends Phaser.Scene {
     this.inputLocked = true;
     this._setButtonsEnabled(false, false);
     this._clearCards();
+    this._setSortButtonsVisible(false);
+
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const oppLabel = oppTeam ? `${oppTeam.logo} ${oppTeam.nickname}` : 'Opponent';
+    const myPitcher = this.rosterManager.getMyPitcher();
 
     this.resultText.setColor('#ffffff');
-    this.resultText.setText('Opponent batting...');
-    this.handNameText.setText('');
+    this.resultText.setText(`${oppLabel} batting...`);
+    this.handNameText.setText(`${myPitcher.name} pitching`);
+    this.handNameText.setColor('#81c784');
 
-    let dots = 0;
-    const dotTimer = this.time.addEvent({
-      delay: 300, repeat: 3,
-      callback: () => {
-        dots++;
-        this.resultText.setText('Opponent batting' + '.'.repeat(dots));
-      },
+    // Run the sim
+    const sim = this.rosterManager.simOpponentHalfInning(this.baseball.getStatus().inning);
+
+    // Show play-by-play log one entry at a time
+    const logY = 420;
+    const logElements = [];
+
+    // Clear area for log display
+    const logBg = this.add.rectangle(640, logY + sim.log.length * 12, 500, sim.log.length * 26 + 20, 0x000000, 0.5)
+      .setDepth(8);
+    logElements.push(logBg);
+
+    sim.log.forEach((entry, i) => {
+      this.time.delayedCall(400 + i * 500, () => {
+        const icon = entry.isOut ? '\u274c' : '\u2705';
+        let text = `${icon} ${entry.batter} - ${entry.outcome}`;
+        if (!entry.isOut && entry.scored > 0) {
+          text += ` (${entry.scored} run${entry.scored > 1 ? 's' : ''})`;
+        }
+
+        const color = entry.isOut ? '#999999' : (entry.scored > 0 ? '#ff8a80' : '#ffe082');
+        const logLine = this.add.text(640, logY + i * 26, text, {
+          fontSize: '14px', fontFamily: 'monospace', color,
+        }).setOrigin(0.5).setDepth(9).setAlpha(0);
+        logElements.push(logLine);
+
+        this.tweens.add({
+          targets: logLine,
+          alpha: 1, y: logLine.y - 5,
+          duration: 200,
+        });
+      });
     });
 
-    this.time.delayedCall(1400, () => {
-      dotTimer.destroy();
-      const switchResult = this.baseball.switchSide();
+    // After all log entries shown, show summary + advance
+    const totalDelay = 400 + sim.log.length * 500 + 800;
 
-      this.resultText.setText(switchResult.description);
-      this.resultText.setColor(switchResult.opponentRuns > 0 ? '#ff8a80' : '#69f0ae');
+    this.time.delayedCall(totalDelay, () => {
+      // Pass sim runs to switchSide
+      const switchResult = this.baseball.switchSide(sim.runs);
+
+      // Clean up log
+      logElements.forEach(el => {
+        this.tweens.add({ targets: el, alpha: 0, duration: 300 });
+      });
+      this.time.delayedCall(350, () => logElements.forEach(el => el.destroy()));
+
+      // Show summary
+      const summary = sim.runs === 0
+        ? `${myPitcher.name} shuts them down!`
+        : `${oppLabel} score${sim.runs === 1 ? 's' : ''} ${sim.runs} run${sim.runs !== 1 ? 's' : ''}`;
+      this.resultText.setText(summary);
+      this.resultText.setColor(sim.runs > 0 ? '#ff8a80' : '#69f0ae');
+      this.handNameText.setText('');
 
       this.tweens.add({
         targets: this.scoreText,
@@ -795,35 +1323,180 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _showInningTransition() {
+    this._setSortButtonsVisible(false);
     const s = this.baseball.getStatus();
+    const elements = [];
+
     const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0).setDepth(10);
-    const inningLabel = this.add.text(640, 330, `Inning ${s.inning}`, {
-      fontSize: '52px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    elements.push(overlay);
+
+    // "Inning X" header
+    const inningLabel = this.add.text(640, 160, `Inning ${s.inning}`, {
+      fontSize: '44px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
+    elements.push(inningLabel);
 
-    const scoreLabel = this.add.text(640, 390, `${s.playerScore} - ${s.opponentScore}`, {
-      fontSize: '28px', fontFamily: 'monospace', color: '#ffffff',
-    }).setOrigin(0.5).setDepth(11).setAlpha(0);
+    // Box score
+    const boxElements = this._createBoxScore(640, 320, s, 11);
+    elements.push(...boxElements);
 
-    this.tweens.add({ targets: overlay, alpha: 0.85, duration: 300 });
-    this.tweens.add({ targets: [inningLabel, scoreLabel], alpha: 1, duration: 300, delay: 150 });
-
-    this.time.delayedCall(1500, () => {
-      this.tweens.add({
-        targets: [overlay, inningLabel, scoreLabel],
-        alpha: 0, duration: 400,
-        onComplete: () => {
-          overlay.destroy();
-          inningLabel.destroy();
-          scoreLabel.destroy();
-          this._startAtBat();
-        },
-      });
+    // Animate in
+    this.tweens.add({ targets: overlay, alpha: 0.9, duration: 300 });
+    this.tweens.add({
+      targets: [inningLabel, ...boxElements],
+      alpha: 1, duration: 300, delay: 150,
     });
+
+    // Dismiss after delay
+    this.time.delayedCall(2800, () => {
+      this.tweens.add({
+        targets: elements,
+        alpha: 0, duration: 400,
+        onComplete: () => elements.forEach(el => el.destroy()),
+      });
+      this.time.delayedCall(450, () => this._startAtBat());
+    });
+  }
+
+  /**
+   * Create a classic baseball box score display.
+   * Returns array of Phaser game objects.
+   */
+  _createBoxScore(cx, cy, status, depth) {
+    const elements = [];
+    const yourTeam = this.rosterManager.getTeam();
+    const oppTeam = this.rosterManager.getOpponentTeam();
+
+    const yourName = yourTeam ? yourTeam.id : 'YOU';
+    const oppName = oppTeam ? oppTeam.id : 'OPP';
+
+    const totalInnings = 9;
+    const playedInnings = status.playerRunsByInning.length;
+
+    // Layout
+    const cellW = 36;
+    const cellH = 32;
+    const nameColW = 70;
+    const totalColW = 44;
+    const gridW = nameColW + totalInnings * cellW + totalColW;
+    const gridH = cellH * 3; // header + 2 team rows
+    const startX = cx - gridW / 2;
+    const startY = cy - gridH / 2;
+
+    // Background
+    const bg = this.add.rectangle(cx, cy, gridW + 8, gridH + 8, 0x0a1f0d)
+      .setStrokeStyle(2, 0x4caf50).setDepth(depth).setAlpha(0);
+    elements.push(bg);
+
+    // Header row: TEAM | 1 | 2 | 3 ... | 9 | R
+    const headerY = startY + cellH / 2;
+
+    const teamHeader = this.add.text(startX + nameColW / 2, headerY, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#4caf50',
+    }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+    elements.push(teamHeader);
+
+    for (let i = 0; i < totalInnings; i++) {
+      const x = startX + nameColW + i * cellW + cellW / 2;
+      const isCurrent = (i + 1) === status.inning;
+      const color = isCurrent ? '#ffd600' : '#4caf50';
+      const inningNum = this.add.text(x, headerY, `${i + 1}`, {
+        fontSize: '13px', fontFamily: 'monospace', color,
+        fontStyle: isCurrent ? 'bold' : 'normal',
+      }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+      elements.push(inningNum);
+
+      // Highlight current inning column
+      if (isCurrent) {
+        const highlight = this.add.rectangle(x, cy, cellW, gridH, 0xffd600, 0.08)
+          .setDepth(depth).setAlpha(0);
+        elements.push(highlight);
+      }
+    }
+
+    // "R" total column header
+    const rHeader = this.add.text(startX + nameColW + totalInnings * cellW + totalColW / 2, headerY, 'R', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+    elements.push(rHeader);
+
+    // Divider line under header
+    const divider1 = this.add.rectangle(cx, startY + cellH, gridW - 4, 1, 0x4caf50, 0.5)
+      .setDepth(depth + 1).setAlpha(0);
+    elements.push(divider1);
+
+    // Your team row
+    const yourY = startY + cellH + cellH / 2;
+    const yourNameTxt = this.add.text(startX + nameColW / 2, yourY, yourName, {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+    elements.push(yourNameTxt);
+
+    for (let i = 0; i < totalInnings; i++) {
+      const x = startX + nameColW + i * cellW + cellW / 2;
+      let val = '';
+      if (i < playedInnings) {
+        val = `${status.playerRunsByInning[i]}`;
+      } else if (i === playedInnings) {
+        // Current inning in progress
+        val = `${status.currentInningPlayerRuns}`;
+      }
+      const color = i < playedInnings ? '#cccccc' : (i === playedInnings ? '#ffd600' : '#333333');
+      const cell = this.add.text(x, yourY, val || '-', {
+        fontSize: '14px', fontFamily: 'monospace', color,
+        fontStyle: i === playedInnings ? 'bold' : 'normal',
+      }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+      elements.push(cell);
+    }
+
+    // Your total
+    const yourTotal = this.add.text(
+      startX + nameColW + totalInnings * cellW + totalColW / 2, yourY,
+      `${status.playerScore}`, {
+      fontSize: '15px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+    elements.push(yourTotal);
+
+    // Divider between teams
+    const divider2 = this.add.rectangle(cx, startY + cellH * 2, gridW - 4, 1, 0x333333, 0.5)
+      .setDepth(depth + 1).setAlpha(0);
+    elements.push(divider2);
+
+    // Opponent team row
+    const oppY = startY + cellH * 2 + cellH / 2;
+    const oppNameTxt = this.add.text(startX + nameColW / 2, oppY, oppName, {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ff8a80', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+    elements.push(oppNameTxt);
+
+    for (let i = 0; i < totalInnings; i++) {
+      const x = startX + nameColW + i * cellW + cellW / 2;
+      let val = '';
+      if (i < status.opponentRunsByInning.length) {
+        val = `${status.opponentRunsByInning[i]}`;
+      }
+      const color = i < status.opponentRunsByInning.length ? '#cccccc' : '#333333';
+      const cell = this.add.text(x, oppY, val || '-', {
+        fontSize: '14px', fontFamily: 'monospace', color,
+      }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+      elements.push(cell);
+    }
+
+    // Opponent total
+    const oppTotal = this.add.text(
+      startX + nameColW + totalInnings * cellW + totalColW / 2, oppY,
+      `${status.opponentScore}`, {
+      fontSize: '15px', fontFamily: 'monospace', color: '#ff8a80', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(depth + 1).setAlpha(0);
+    elements.push(oppTotal);
+
+    return elements;
   }
 
   _endGame() {
     const result = this.baseball.getResult();
+    result.yourTeam = this.rosterManager.getTeam();
+    result.opponentTeam = this.rosterManager.getOpponentTeam();
     this.scene.start('GameOverScene', result);
   }
 }

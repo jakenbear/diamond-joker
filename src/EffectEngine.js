@@ -159,7 +159,7 @@ const POST_HANDLERS = {
   /** Add to multiplier (can be negative) */
   add_mult(result, effect, gameState) {
     if (!checkCondition(effect.condition, result, gameState)) return result;
-    return { ...result, mult: Math.max(1, result.mult + effect.value) };
+    return { ...result, mult: Math.round(Math.max(1, result.mult + effect.value) * 10) / 10 };
   },
 
   /** Add to chips (can be negative) */

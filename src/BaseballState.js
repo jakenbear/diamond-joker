@@ -36,6 +36,10 @@ export default class BaseballState {
     this.lastResult = null;
     this.totalChips = 0;
     this.shopVisited = new Set(); // Track which innings we've shown shop for
+    // Per-inning run tracking for box score (index 0 = inning 1)
+    this.playerRunsByInning = [];
+    this.opponentRunsByInning = [];
+    this._currentInningPlayerRuns = 0;
   }
 
   /** Get total accumulated chips (currency for shop) */
@@ -102,6 +106,7 @@ export default class BaseballState {
 
       if (this.half === 'top') {
         this.playerScore += runsScored;
+        this._currentInningPlayerRuns += runsScored;
       } else {
         this.opponentScore += runsScored;
       }
@@ -132,6 +137,7 @@ export default class BaseballState {
     if (!this.bases[2]) return 0;
     this.bases[2] = false;
     this.playerScore += 1;
+    this._currentInningPlayerRuns += 1;
     return 1;
   }
 
@@ -195,15 +201,16 @@ export default class BaseballState {
           this.bases[i] = false;
           if (i + 1 >= 3) {
             this.playerScore += 1;
-            return 1;
+            this._currentInningPlayerRuns += 1;
+            return { scored: 1, advanced: true };
           } else {
             this.bases[i + 1] = true;
           }
-          return 0;
+          return { scored: 0, advanced: true };
         }
       }
     }
-    return 0;
+    return { scored: 0, advanced: false };
   }
 
   /**
@@ -211,12 +218,22 @@ export default class BaseballState {
    * If it was top half, opponent now bats (auto-resolved).
    * If it was bottom half, advance to next inning.
    */
-  switchSide() {
+  /**
+   * @param {number|null} simRuns - If provided, use this instead of auto-generating
+   */
+  switchSide(simRuns = null) {
     if (this.half === 'top') {
       this.half = 'bottom';
-      // Opponent's at-bat: auto-generate runs
-      const opponentRuns = this._generateOpponentRuns();
+
+      // Record player's runs for this inning
+      this.playerRunsByInning.push(this._currentInningPlayerRuns);
+      this._currentInningPlayerRuns = 0;
+
+      const opponentRuns = simRuns !== null ? simRuns : this._generateOpponentRuns();
       this.opponentScore += opponentRuns;
+
+      // Record opponent's runs for this inning
+      this.opponentRunsByInning.push(opponentRuns);
 
       this.half = 'top';
       this.inning++;
@@ -278,6 +295,9 @@ export default class BaseballState {
       opponentScore: this.opponentScore,
       state: this.state,
       totalChips: this.totalChips,
+      playerRunsByInning: [...this.playerRunsByInning],
+      opponentRunsByInning: [...this.opponentRunsByInning],
+      currentInningPlayerRuns: this._currentInningPlayerRuns,
     };
   }
 
@@ -295,6 +315,8 @@ export default class BaseballState {
       won: this.playerScore > this.opponentScore,
       innings: this.inning,
       totalChips: this.totalChips,
+      playerRunsByInning: [...this.playerRunsByInning],
+      opponentRunsByInning: [...this.opponentRunsByInning],
     };
   }
 }

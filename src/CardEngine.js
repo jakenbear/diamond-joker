@@ -183,12 +183,12 @@ export default class CardEngine {
     // Add a readable description of what was played
     entry.playedDescription = CardEngine._describePlay(evalCards, entry.handName);
 
-    entry.score = entry.chips * entry.mult;
+    entry.score = Math.round(entry.chips * entry.mult);
 
     // Apply post-modifier (trait cards that change the outcome)
     if (postModifier && gameState) {
       const modified = postModifier(entry, gameState);
-      modified.score = modified.chips * modified.mult;
+      modified.score = Math.round(modified.chips * modified.mult);
       return modified;
     }
 

@@ -1,6 +1,8 @@
 /**
  * main.js - Phaser config + bootstrap
  */
+import TitleScene from './scenes/TitleScene.js';
+import TeamSelectScene from './scenes/TeamSelectScene.js';
 import GameScene from './scenes/GameScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
 import ShopScene from './scenes/ShopScene.js';
@@ -11,7 +13,7 @@ const config = {
   height: 720,
   backgroundColor: 0x1b5e20,
   parent: document.body,
-  scene: [GameScene, GameOverScene, ShopScene],
+  scene: [TitleScene, TeamSelectScene, GameScene, GameOverScene, ShopScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

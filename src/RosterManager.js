@@ -1,45 +1,64 @@
 /**
  * RosterManager.js - Player roster + pitcher management.
- * All player/pitcher DATA lives in data/players.js and data/pitchers.js.
+ * Manages your team (batting) and opponent team (their batters face your pitcher).
  */
-import PLAYER_POOL from '../data/players.js';
-import PITCHER_POOL from '../data/pitchers.js';
+import TEAMS from '../data/teams.js';
 
 const MAX_TRAITS_PER_PLAYER = 2;
 const MAX_PITCHER_TRAITS = 2;
 
 export default class RosterManager {
-  constructor() {
-    this.roster = [];
-    this.currentBatterIndex = 0;
-    this.pitcher = null;
-    this._pickRoster();
-    this._pickPitcher();
-  }
-
-  _pickRoster() {
-    const pool = [...PLAYER_POOL];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    this.roster = pool.slice(0, 9).map((p, i) => ({
+  /**
+   * @param {Object} team - Your team object from TEAMS
+   * @param {number} pitcherIndex - Your starting pitcher index
+   * @param {Object} opponentTeam - Opponent team object from TEAMS
+   */
+  constructor(team, pitcherIndex = 0, opponentTeam = null) {
+    this.team = team;
+    this.roster = team.batters.map((p, i) => ({
       ...p,
       traits: [],
       lineupIndex: i,
     }));
+    this.currentBatterIndex = 0;
+
+    // Your pitcher (pitches against opponent batters)
+    this.myPitcher = { ...team.pitchers[pitcherIndex] };
+
+    // Opponent team
+    this.opponentTeam = opponentTeam;
+    if (opponentTeam) {
+      this.opponentRoster = opponentTeam.batters.map((p, i) => ({
+        ...p,
+        lineupIndex: i,
+      }));
+      // Opponent's ace pitches against you
+      this.pitcher = {
+        ...opponentTeam.pitchers[0],
+        teamName: opponentTeam.name,
+        teamLogo: opponentTeam.logo,
+        traits: [],
+      };
+      this.opponentBatterIndex = 0;
+    } else {
+      this.opponentRoster = [];
+      this.pitcher = { name: 'Unknown', velocity: 5, control: 5, stamina: 5, traits: [] };
+      this.opponentBatterIndex = 0;
+    }
   }
 
-  _pickPitcher() {
-    const idx = Math.floor(Math.random() * PITCHER_POOL.length);
-    this.pitcher = {
-      ...PITCHER_POOL[idx],
-      traits: [],
-    };
-  }
+  // ── Your batting lineup ─────────────────────────────────
 
   getCurrentPitcher() {
-    return this.pitcher;
+    return this.pitcher; // opponent's pitcher (faces you)
+  }
+
+  getMyPitcher() {
+    return this.myPitcher; // your pitcher (faces opponent batters)
+  }
+
+  getOpponentTeam() {
+    return this.opponentTeam;
   }
 
   setPitcherTraits(traits) {
@@ -78,33 +97,202 @@ export default class RosterManager {
     result.chips += powerBonus;
 
     const contactBonus = batter.contact / 10;
-    result.mult += contactBonus;
+    result.mult = Math.round((result.mult + contactBonus) * 10) / 10;
 
-    result.score = result.chips * result.mult;
+    result.score = Math.round(result.chips * result.mult);
     result.extraBaseChance = batter.speed * 0.05;
 
     return result;
   }
 
-  applyPitcherModifiers(evalResult, _gameState) {
+  applyPitcherModifiers(evalResult, gameState) {
     const pitcher = this.pitcher;
     const result = { ...evalResult };
 
+    // Pitcher fatigue: effectiveness drops after inning 5 based on stamina
+    const inning = gameState ? gameState.inning : 1;
+    const fatigue = this._getPitcherFatigue(pitcher, inning);
+
     if (result.outcome === 'Single' || result.outcome === 'Double') {
-      const velPenalty = Math.max(0, pitcher.velocity - 6);
+      const velPenalty = Math.max(0, (pitcher.velocity * fatigue) - 6);
       result.chips = Math.max(0, result.chips - Math.floor(velPenalty / 2));
     }
 
-    const controlPenalty = pitcher.control * 0.05;
-    result.mult = Math.max(1, result.mult - controlPenalty);
+    const controlPenalty = (pitcher.control * fatigue) * 0.05;
+    result.mult = Math.round(Math.max(1, result.mult - controlPenalty) * 10) / 10;
 
-    result.score = result.chips * result.mult;
+    result.score = Math.round(result.chips * result.mult);
     return result;
+  }
+
+  /**
+   * Calculate pitcher fatigue multiplier (1.0 = fresh, lower = tired).
+   * Stamina determines when fatigue kicks in.
+   */
+  _getPitcherFatigue(pitcher, inning) {
+    // Fatigue starts after inning (stamina - 1). High stamina = lasts longer.
+    const fatigueStart = Math.max(3, pitcher.stamina - 1);
+    if (inning <= fatigueStart) return 1.0;
+    // Lose ~5% effectiveness per inning past the fatigue threshold
+    const fatigueInnings = inning - fatigueStart;
+    return Math.max(0.5, 1.0 - fatigueInnings * 0.08);
+  }
+
+  // ── Opponent half-inning sim ────────────────────────────
+
+  /**
+   * Simulate the opponent's half-inning.
+   * Your pitcher faces their batters until 3 outs.
+   * Returns { runs, log[] } where log is play-by-play entries.
+   */
+  /**
+   * @param {number} inning - current inning for fatigue calculation
+   */
+  simOpponentHalfInning(inning = 1) {
+    const pitcher = this.myPitcher;
+    const fatigue = this._getPitcherFatigue(pitcher, inning);
+    let outs = 0;
+    let runs = 0;
+    const bases = [false, false, false]; // 1st, 2nd, 3rd
+    const log = [];
+
+    while (outs < 3) {
+      const batter = this.opponentRoster[this.opponentBatterIndex];
+      const result = this._simAtBat(pitcher, batter, fatigue);
+
+      if (result.isOut) {
+        outs++;
+        log.push({
+          batter: batter.name,
+          pos: batter.pos,
+          outcome: result.outcome,
+          isOut: true,
+        });
+      } else {
+        // Advance runners
+        const scored = this._advanceRunners(bases, result.basesGained, batter.speed);
+        runs += scored;
+        log.push({
+          batter: batter.name,
+          pos: batter.pos,
+          outcome: result.outcome,
+          isOut: false,
+          scored,
+        });
+      }
+
+      this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
+    }
+
+    return { runs, log };
+  }
+
+  /**
+   * Simulate a single at-bat: pitcher stats vs batter stats.
+   * Returns { outcome, isOut, basesGained }
+   */
+  _simAtBat(pitcher, batter, fatigue = 1.0) {
+    // Pitcher strength: velocity + control, reduced by fatigue
+    // Batter strength: power + contact (higher = better at hitting)
+    const pitchStrength = (pitcher.velocity * 0.6 + pitcher.control * 0.4) * fatigue;
+    const batStrength = batter.contact * 0.6 + batter.power * 0.4;
+
+    // Base probability of a hit: batter vs pitcher matchup
+    // Scale from ~0.15 (weak batter vs strong pitcher) to ~0.45 (strong vs weak)
+    const matchup = batStrength - pitchStrength;
+    const hitChance = Math.min(0.50, Math.max(0.12, 0.28 + matchup * 0.025));
+
+    const roll = Math.random();
+
+    if (roll > hitChance) {
+      // Out - type based on pitcher style
+      const outRoll = Math.random();
+      if (pitcher.velocity >= 8 && outRoll < 0.4) {
+        return { outcome: 'Strikeout', isOut: true, basesGained: 0 };
+      } else if (outRoll < 0.6) {
+        return { outcome: 'Groundout', isOut: true, basesGained: 0 };
+      } else {
+        return { outcome: 'Flyout', isOut: true, basesGained: 0 };
+      }
+    }
+
+    // Hit - type based on batter power
+    const hitRoll = Math.random();
+    const powerFactor = batter.power / 10;
+
+    if (hitRoll < 0.01 + powerFactor * 0.03) {
+      // Home run: ~1-4% chance on a hit
+      return { outcome: 'Home Run', isOut: false, basesGained: 4 };
+    } else if (hitRoll < 0.05 + powerFactor * 0.08) {
+      // Triple: ~4-13%
+      return { outcome: 'Triple', isOut: false, basesGained: 3 };
+    } else if (hitRoll < 0.20 + powerFactor * 0.12) {
+      // Double: ~15-32%
+      return { outcome: 'Double', isOut: false, basesGained: 2 };
+    } else {
+      return { outcome: 'Single', isOut: false, basesGained: 1 };
+    }
+  }
+
+  /**
+   * Advance runners on bases. Returns number of runs scored.
+   */
+  _advanceRunners(bases, basesGained, batterSpeed) {
+    let scored = 0;
+
+    if (basesGained >= 4) {
+      // Home run: everyone scores
+      scored += bases.filter(b => b).length + 1;
+      bases[0] = bases[1] = bases[2] = false;
+      return scored;
+    }
+
+    // Move runners forward by basesGained
+    for (let i = 2; i >= 0; i--) {
+      if (bases[i]) {
+        bases[i] = false;
+        const newBase = i + basesGained;
+        if (newBase >= 3) {
+          scored++;
+        } else {
+          bases[newBase] = true;
+        }
+      }
+    }
+
+    // Place batter on base
+    if (basesGained >= 3) {
+      scored++; // Triple+ means batter also scored (shouldn't happen with basesGained=3 but safety)
+    }
+    if (basesGained === 3) {
+      bases[2] = true; // batter on 3rd
+    } else if (basesGained === 2) {
+      bases[1] = true; // batter on 2nd
+    } else if (basesGained === 1) {
+      bases[0] = true; // batter on 1st
+    }
+
+    // Speed bonus: small chance runner advances extra
+    if (batterSpeed >= 7 && Math.random() < batterSpeed * 0.03) {
+      for (let i = 1; i >= 0; i--) {
+        if (bases[i] && !bases[i + 1]) {
+          bases[i] = false;
+          bases[i + 1] = true;
+          break;
+        }
+      }
+    }
+
+    return scored;
   }
 
   getRoster() {
     return this.roster;
   }
+
+  getTeam() {
+    return this.team;
+  }
 }
 
-export { MAX_TRAITS_PER_PLAYER, MAX_PITCHER_TRAITS };
+export { TEAMS, MAX_TRAITS_PER_PLAYER, MAX_PITCHER_TRAITS };
