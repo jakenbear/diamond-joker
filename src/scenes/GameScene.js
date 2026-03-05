@@ -498,7 +498,7 @@ export default class GameScene extends Phaser.Scene {
   // ── Info Text ─────────────────────────────────────────
 
   _createInfoText() {
-    this.discardInfo = this.add.text(640, 340, '', {
+    this.discardInfo = this.add.text(640, 365, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#b2dfdb',
     }).setOrigin(0.5).setDepth(7);
 
