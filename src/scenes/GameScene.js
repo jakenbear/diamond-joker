@@ -1547,24 +1547,25 @@ export default class GameScene extends Phaser.Scene {
     return steps.length * stepDelay + 350;
   }
 
-  /** Flash chip earnings next to chip balance */
+  /** Flash chip earnings below chip balance */
   _showChipEarnings(amount) {
     const chipBal = this.chipBalanceText;
-    const popup = this.add.text(chipBal.x + chipBal.width / 2 + 10, chipBal.y, `+${amount}`, {
+    const startY = chipBal.y + 18;
+    const popup = this.add.text(chipBal.x, startY, `+${amount}`, {
       fontSize: '20px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
-    }).setOrigin(0, 0.5).setDepth(15).setAlpha(0);
+    }).setOrigin(0.5, 0).setDepth(15).setAlpha(0);
 
     this.tweens.add({
       targets: popup,
       alpha: { from: 0, to: 1 },
-      y: popup.y - 30,
+      y: startY + 10,
       duration: 400,
       ease: 'Quad.easeOut',
     });
     this.tweens.add({
       targets: popup,
       alpha: 0,
-      y: popup.y - 60,
+      y: startY + 30,
       duration: 400,
       delay: 600,
       onComplete: () => popup.destroy(),
