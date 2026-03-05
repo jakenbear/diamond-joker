@@ -24,6 +24,15 @@
  *   { type: 'bases_loaded' }
  *   { type: 'outcome_is', value: 'Strikeout' }
  *   { type: 'hand_is', value: 'Pair' }
+ *   { type: 'losing_by', value: N }
+ *   { type: 'first_batter_of_inning' }
+ *
+ * Additional post-eval effect types:
+ *   convert_high_card  — turn High Card outs into weak singles  { newHandName, chips, mult, condition? }
+ *   add_discard        — grant extra discards this at-bat       { value, condition? }
+ *
+ * Additional pre-eval effect types:
+ *   upgrade_lowest     — chance to boost lowest card rank        { chance, amount }
  */
 export default [
   // ── Pre-eval ──────────────────────────────────────────
@@ -139,5 +148,105 @@ export default [
     rarity: 'rare',
     phase: 'post',
     effect: { type: 'add_mult', value: 10, condition: { type: 'bases_loaded' } },
+  },
+
+  // ── New traits ──────────────────────────────────────────
+
+  {
+    id: 'batting_gloves',
+    name: 'Batting Gloves',
+    description: '+1 discard per at-bat',
+    price: 35,
+    rarity: 'uncommon',
+    phase: 'post',
+    effect: { type: 'add_discard', value: 1 },
+  },
+  {
+    id: 'rally_cap',
+    name: 'Rally Cap',
+    description: '+4 mult when losing by 2+ runs',
+    price: 30,
+    rarity: 'uncommon',
+    phase: 'post',
+    effect: { type: 'add_mult', value: 4, condition: { type: 'losing_by', value: 2 } },
+  },
+  {
+    id: 'pinch_hitter',
+    name: 'Pinch Hitter',
+    description: '20% chance to boost lowest card by 3 ranks',
+    price: 25,
+    rarity: 'uncommon',
+    phase: 'pre',
+    effect: { type: 'upgrade_lowest', chance: 0.2, amount: 3 },
+  },
+  {
+    id: 'bunt_single',
+    name: 'Bunt Single',
+    description: 'High Card becomes a weak single instead of an out',
+    price: 20,
+    rarity: 'common',
+    phase: 'post',
+    effect: { type: 'convert_high_card', newHandName: 'Bunt Single', chips: 1, mult: 1 },
+  },
+  {
+    id: 'cleanup_crew',
+    name: 'Cleanup Crew',
+    description: '+3 chips on Three of a Kind or better',
+    price: 25,
+    rarity: 'common',
+    phase: 'post',
+    effect: {
+      type: 'add_chips', value: 3,
+      condition: { type: 'hand_in', values: ['Three of a Kind', 'Full House', 'Four of a Kind', 'Flush', 'Straight', 'Straight Flush', 'Royal Flush'] },
+    },
+  },
+  {
+    id: 'walk_machine',
+    name: 'Walk Machine',
+    description: 'Strikeouts with 0 outs become walks (runner on 1st)',
+    price: 40,
+    rarity: 'rare',
+    phase: 'post',
+    effect: {
+      type: 'prevent_outcome',
+      from: 'Strikeout',
+      toOutcome: 'Walk',
+      toHand: 'Walk',
+      chips: 0, mult: 1,
+      condition: { type: 'outs_eq', value: 0 },
+    },
+  },
+  {
+    id: 'dugout_fire',
+    name: 'Dugout Fire',
+    description: '+2 mult per out this inning',
+    price: 30,
+    rarity: 'uncommon',
+    phase: 'post',
+    effect: {
+      type: 'compound',
+      effects: [
+        { type: 'add_mult', value: 2, condition: { type: 'outs_eq', value: 1 } },
+        { type: 'add_mult', value: 4, condition: { type: 'outs_eq', value: 2 } },
+      ],
+    },
+  },
+  {
+    id: 'leadoff_king',
+    name: 'Lead-Off King',
+    description: '+3 mult as first batter of the inning',
+    price: 20,
+    rarity: 'common',
+    phase: 'post',
+    effect: { type: 'add_mult', value: 3, condition: { type: 'first_batter_of_inning' } },
+  },
+  {
+    id: 'extra_innings',
+    name: 'Extra Innings',
+    description: '+6 mult in innings 8-9',
+    price: 35,
+    rarity: 'rare',
+    phase: 'post',
+    effect: { type: 'add_mult', value: 6, condition: { type: 'inning_range', min: 8, max: 9 } },
   },
 ];

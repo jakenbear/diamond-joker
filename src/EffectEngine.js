@@ -45,6 +45,12 @@ function checkCondition(cond, evalResult, gameState) {
     case 'chips_gte':
       return evalResult.chips >= cond.value;
 
+    case 'losing_by':
+      return gameState.opponentScore - gameState.playerScore >= cond.value;
+
+    case 'first_batter_of_inning':
+      return gameState.atBatsThisInning === 0;
+
     case 'and':
       return cond.conditions.every(c => checkCondition(c, evalResult, gameState));
 
@@ -113,6 +119,19 @@ const PRE_HANDLERS = {
       });
     }
     return cards;
+  },
+
+  /** Chance to upgrade lowest card's rank */
+  upgrade_lowest(cards, effect) {
+    if (Math.random() > (effect.chance || 0.2)) return cards;
+    let minIdx = 0;
+    for (let i = 1; i < cards.length; i++) {
+      if (cards[i].rank < cards[minIdx].rank) minIdx = i;
+    }
+    return cards.map((c, i) => {
+      if (i === minIdx) return { ...c, rank: Math.min(14, c.rank + (effect.amount || 3)) };
+      return c;
+    });
   },
 
   /** Chance to reduce highest card's rank */
@@ -189,8 +208,9 @@ const POST_HANDLERS = {
   },
 
   /** Convert a bad outcome to something else */
-  prevent_outcome(result, effect, _gameState) {
+  prevent_outcome(result, effect, gameState) {
     if (result.outcome !== effect.from) return result;
+    if (!checkCondition(effect.condition, result, gameState)) return result;
     return {
       ...result,
       outcome: effect.toOutcome,
@@ -217,6 +237,26 @@ const POST_HANDLERS = {
       mult: 1,
       wasGroundout: true,
     };
+  },
+
+  /** Convert High Card strikeouts to a weak Single */
+  convert_high_card(result, effect, gameState) {
+    // Only apply to actual High Card hands (not failed pairs turned into outs)
+    if (result.handName !== 'High Card') return result;
+    if (!checkCondition(effect.condition, result, gameState)) return result;
+    return {
+      ...result,
+      outcome: 'Single',
+      handName: effect.newHandName || 'Bunt Single',
+      chips: effect.chips || 1,
+      mult: effect.mult || 1,
+    };
+  },
+
+  /** Set extra_discard flag for GameScene to grant bonus discards */
+  add_discard(result, effect, gameState) {
+    if (!checkCondition(effect.condition, result, gameState)) return result;
+    return { ...result, extraDiscards: (result.extraDiscards || 0) + (effect.value || 1) };
   },
 
   /** Apply multiple effects in sequence */

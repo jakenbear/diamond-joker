@@ -18,6 +18,7 @@ const OUTCOME_EFFECTS = {
   'Inside-the-Park HR': { basesToMove: 4, isOut: false },
   'Walk-Off':           { basesToMove: 4, isOut: false },
   'Perfect Game':       { basesToMove: 4, isOut: false },
+  'Walk':               { basesToMove: 1, isOut: false },
 };
 
 export default class BaseballState {
@@ -40,6 +41,7 @@ export default class BaseballState {
     this.playerRunsByInning = [];
     this.opponentRunsByInning = [];
     this._currentInningPlayerRuns = 0;
+    this._atBatsThisInning = 0;  // Track at-bats for first_batter_of_inning
   }
 
   /** Get total accumulated chips (currency for shop) */
@@ -56,14 +58,22 @@ export default class BaseballState {
 
   /**
    * Check if shop should appear after the current inning transition.
-   * Shop shows after innings 3 and 6.
+   * Shop shows after every inning (except the last).
    */
   shouldShowShop() {
-    const shopInnings = [4, 7]; // After inning 3 → start of 4, after inning 6 → start of 7
-    if (shopInnings.includes(this.inning) && !this.shopVisited.has(this.inning)) {
-      return true;
-    }
-    return false;
+    if (this.inning > 9) return false;
+    if (this.shopVisited.has(this.inning)) return false;
+    return true;
+  }
+
+  /**
+   * Get max purchases allowed for this shop visit.
+   * Innings 1-3: 1 buy, 4-6: 2 buys, 7-9: 3 buys.
+   */
+  getShopBuyLimit() {
+    if (this.inning <= 3) return 1;
+    if (this.inning <= 6) return 2;
+    return 3;
   }
 
   /** Mark the current inning's shop as visited */
@@ -82,6 +92,8 @@ export default class BaseballState {
     if (!effect) {
       return { runsScored: 0, description: 'Unknown outcome', state: this.state };
     }
+
+    this._atBatsThisInning++;
 
     // Accumulate chips from hand score
     this.totalChips += Math.floor(handScore);
@@ -237,6 +249,7 @@ export default class BaseballState {
 
       this.half = 'top';
       this.inning++;
+      this._atBatsThisInning = 0;
 
       // Check game over after 9 innings
       if (this.inning > 9 && this.playerScore !== this.opponentScore) {
@@ -298,6 +311,7 @@ export default class BaseballState {
       playerRunsByInning: [...this.playerRunsByInning],
       opponentRunsByInning: [...this.opponentRunsByInning],
       currentInningPlayerRuns: this._currentInningPlayerRuns,
+      atBatsThisInning: this._atBatsThisInning,
     };
   }
 

@@ -19,9 +19,11 @@ export default class ShopScene extends Phaser.Scene {
     this.traitManager = data.traitManager;
     this.baseball = data.baseball;
     this.cardEngine = data.cardEngine;
+    this.purchasesMade = data.purchasesMade || 0;
   }
 
   create() {
+    this.buyLimit = this.baseball.getShopBuyLimit();
     this.shopCards = this.traitManager.getShopSelection(3);
     this.selectedCard = null;
     this.uiElements = [];
@@ -33,8 +35,10 @@ export default class ShopScene extends Phaser.Scene {
       fontSize: '42px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    // Chip balance
-    this.chipText = this.add.text(640, 85, `Chips: ${this.baseball.getTotalChips()}`, {
+    // Chip balance + buy limit
+    const buysLeft = this.buyLimit - this.purchasesMade;
+    this.chipText = this.add.text(640, 85,
+      `Chips: ${this.baseball.getTotalChips()}  |  Buys left: ${buysLeft}`, {
       fontSize: '22px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5);
 
@@ -42,22 +46,23 @@ export default class ShopScene extends Phaser.Scene {
     this.add.rectangle(640, 110, 600, 2, 0x334455);
 
     this._renderShopCards();
-    this._createSkipButton();
+    this._createDoneButton();
   }
 
   _renderShopCards() {
     const startX = 640 - (this.shopCards.length - 1) * 170;
+    const buysLeft = this.buyLimit - this.purchasesMade;
 
     this.shopCards.forEach((card, i) => {
       const x = startX + i * 340;
       const y = 300;
-      this._createTraitCard(card, x, y, i);
+      this._createTraitCard(card, x, y, buysLeft);
     });
   }
 
-  _createTraitCard(trait, x, y, _index) {
+  _createTraitCard(trait, x, y, buysLeft) {
     const colors = RARITY_COLORS[trait.rarity] || RARITY_COLORS.common;
-    const canAfford = this.baseball.getTotalChips() >= trait.price;
+    const canAfford = this.baseball.getTotalChips() >= trait.price && buysLeft > 0;
 
     // Card border (rarity color)
     const border = this.add.rectangle(x, y, 260, 300, colors.border, 0.3)
@@ -91,7 +96,8 @@ export default class ShopScene extends Phaser.Scene {
 
     // Price
     const priceColor = canAfford ? '#ffd600' : '#ff5252';
-    this.add.text(x, y + 80, `${trait.price} chips`, {
+    const priceNote = buysLeft <= 0 ? '(no buys left)' : `${trait.price} chips`;
+    this.add.text(x, y + 80, priceNote, {
       fontSize: '18px', fontFamily: 'monospace', color: priceColor, fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -192,6 +198,7 @@ export default class ShopScene extends Phaser.Scene {
     // Equip trait
     this.rosterManager.equipTrait(playerIndex, trait);
     this.traitManager.markOwned(trait.id);
+    this.purchasesMade++;
 
     // Show confirmation flash
     this._closeRosterPicker();
@@ -214,37 +221,48 @@ export default class ShopScene extends Phaser.Scene {
     this.time.delayedCall(1200, () => {
       confirmOverlay.destroy();
       confirmText.destroy();
-      this._exitShop();
+      // If at buy limit, auto-exit. Otherwise refresh shop.
+      if (this.purchasesMade >= this.buyLimit) {
+        this._exitShop();
+      } else {
+        // Restart scene to refresh cards and counts
+        this.scene.restart({
+          rosterManager: this.rosterManager,
+          traitManager: this.traitManager,
+          baseball: this.baseball,
+          cardEngine: this.cardEngine,
+          purchasesMade: this.purchasesMade,
+        });
+      }
     });
   }
 
   _closeRosterPicker() {
-    // Destroy all picker elements by clearing and restarting the scene render
-    // Simplest approach: restart the scene
     if (this.pickerOverlay) {
       this.pickerOverlay.destroy();
       this.pickerOverlay = null;
     }
-    // Just go back to the shop by restarting the scene
+    // Restart scene to refresh
     this.scene.restart({
       rosterManager: this.rosterManager,
       traitManager: this.traitManager,
       baseball: this.baseball,
       cardEngine: this.cardEngine,
+      purchasesMade: this.purchasesMade,
     });
   }
 
-  _createSkipButton() {
-    const skipBg = this.add.rectangle(640, 640, 200, 50, 0x555555, 0.9)
+  _createDoneButton() {
+    const doneBg = this.add.rectangle(640, 640, 200, 50, 0x37474f, 0.9)
       .setInteractive({ useHandCursor: true })
-      .setStrokeStyle(2, 0x777777);
-    const skipTxt = this.add.text(640, 640, 'SKIP', {
+      .setStrokeStyle(2, 0x546e7a);
+    this.add.text(640, 640, 'DONE', {
       fontSize: '22px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    skipBg.on('pointerover', () => skipBg.setAlpha(1));
-    skipBg.on('pointerout', () => skipBg.setAlpha(0.9));
-    skipBg.on('pointerdown', () => this._exitShop());
+    doneBg.on('pointerover', () => doneBg.setAlpha(1));
+    doneBg.on('pointerout', () => doneBg.setAlpha(0.9));
+    doneBg.on('pointerdown', () => this._exitShop());
   }
 
   _exitShop() {

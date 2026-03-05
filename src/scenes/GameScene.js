@@ -942,6 +942,16 @@ export default class GameScene extends Phaser.Scene {
     this.handPreviewText.setText('').setAlpha(0);
     this._setSortButtonsVisible(true);
     this.cardEngine.newAtBat();
+
+    // Bonus discards from batter traits (e.g. Batting Gloves)
+    const batter = this.rosterManager.getCurrentBatter();
+    const bonusDiscards = batter.traits
+      .filter(t => t.effect && t.effect.type === 'add_discard')
+      .reduce((sum, t) => sum + (t.effect.value || 1), 0);
+    if (bonusDiscards > 0) {
+      this.cardEngine.discardsRemaining += bonusDiscards;
+    }
+
     this.dealOrder = this.cardEngine.hand.map((_, i) => i);
     this.sortMode = 'default';
     this._updateSortHighlight();
