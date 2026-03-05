@@ -938,6 +938,8 @@ export default class GameScene extends Phaser.Scene {
   _startAtBat() {
     this.resultText.setText('');
     this.handNameText.setText('');
+    this.selectedIndices.clear();
+    this.handPreviewText.setText('').setAlpha(0);
     this._setSortButtonsVisible(true);
     this.cardEngine.newAtBat();
     this.dealOrder = this.cardEngine.hand.map((_, i) => i);
