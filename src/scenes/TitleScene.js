@@ -13,15 +13,15 @@ export default class TitleScene extends Phaser.Scene {
     const diamond = this.add.graphics();
     diamond.lineStyle(3, 0xffd600, 0.3);
     diamond.beginPath();
-    diamond.moveTo(640, 90);
-    diamond.lineTo(760, 210);
-    diamond.lineTo(640, 330);
-    diamond.lineTo(520, 210);
+    diamond.moveTo(640, 120);
+    diamond.lineTo(760, 240);
+    diamond.lineTo(640, 360);
+    diamond.lineTo(520, 240);
     diamond.closePath();
     diamond.strokePath();
 
     // Logo emoji
-    const logo = this.add.text(640, 130, '🃏', {
+    const logo = this.add.text(640, 160, '🃏', {
       fontSize: '80px',
     }).setOrigin(0.5).setAlpha(0);
 
