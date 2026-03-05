@@ -568,7 +568,7 @@ export default class GameScene extends Phaser.Scene {
   // ── Sort Buttons ───────────────────────────────────────
 
   _createSortButtons() {
-    const sortY = HAND_Y - CARD_H / 2 - 40;
+    const sortY = HAND_Y - CARD_H / 2 - 18;
     const modes = [
       { label: 'DEFAULT', mode: 'default' },
       { label: 'RANK',    mode: 'rank' },
