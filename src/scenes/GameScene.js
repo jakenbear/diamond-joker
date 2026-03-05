@@ -1691,14 +1691,21 @@ export default class GameScene extends Phaser.Scene {
         align: 'center', wordWrap: { width: CARD_W - 10 },
       }).setOrigin(0.5).setDepth(6);
 
-      // Hover effects
+      // Hover effects — shift each element by -8 from its own position
+      const nameY = y - 45, costY = y - 15, descY = y + 15;
       bg.on('pointerover', () => {
         bg.setStrokeStyle(3, 0xffd600);
-        this.tweens.add({ targets: [bg, nameText, costText, descText], y: y - 8, duration: 100 });
+        this.tweens.add({ targets: bg, y: y - 8, duration: 100 });
+        this.tweens.add({ targets: nameText, y: nameY - 8, duration: 100 });
+        this.tweens.add({ targets: costText, y: costY - 8, duration: 100 });
+        this.tweens.add({ targets: descText, y: descY - 8, duration: 100 });
       });
       bg.on('pointerout', () => {
         bg.setStrokeStyle(2, 0xffffff);
-        this.tweens.add({ targets: [bg, nameText, costText, descText], y: y, duration: 100 });
+        this.tweens.add({ targets: bg, y: y, duration: 100 });
+        this.tweens.add({ targets: nameText, y: nameY, duration: 100 });
+        this.tweens.add({ targets: costText, y: costY, duration: 100 });
+        this.tweens.add({ targets: descText, y: descY, duration: 100 });
       });
       bg.on('pointerdown', () => this._onPitchSelected(key));
 
