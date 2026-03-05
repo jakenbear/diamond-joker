@@ -349,23 +349,23 @@ export default class TeamSelectScene extends Phaser.Scene {
     const banner = this.add.rectangle(x, y - CARD_H / 2 + 30, CARD_W - 4, 58, team.colorHex, 0.25);
     this.elements.push(banner);
 
-    const logo = this.add.text(x, y - 80, team.logo, { fontSize: '56px' }).setOrigin(0.5);
+    const logo = this.add.text(x, y - 115, team.logo, { fontSize: '56px' }).setOrigin(0.5);
     this.elements.push(logo);
 
-    const name = this.add.text(x, y - 25, team.name.toUpperCase(), {
+    const name = this.add.text(x, y - 55, team.name.toUpperCase(), {
       fontSize: '26px', fontFamily: 'monospace', color: team.color, fontStyle: 'bold',
     }).setOrigin(0.5);
     this.elements.push(name);
 
-    const nick = this.add.text(x, y + 5, team.nickname, {
+    const nick = this.add.text(x, y - 28, team.nickname, {
       fontSize: '16px', fontFamily: 'monospace', color: '#aaaaaa',
     }).setOrigin(0.5);
     this.elements.push(nick);
 
-    const div = this.add.rectangle(x, y + 30, CARD_W - 40, 1, team.colorHex, 0.4);
+    const div = this.add.rectangle(x, y + 5, CARD_W - 40, 1, team.colorHex, 0.4);
     this.elements.push(div);
 
-    const style = this.add.text(x, y + 55, team.style, {
+    const style = this.add.text(x, y + 30, team.style, {
       fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
       wordWrap: { width: CARD_W - 30 }, align: 'center',
     }).setOrigin(0.5);
@@ -375,13 +375,13 @@ export default class TeamSelectScene extends Phaser.Scene {
     const avgCon = (team.batters.reduce((s, b) => s + b.contact, 0) / 9).toFixed(1);
     const avgSpd = (team.batters.reduce((s, b) => s + b.speed, 0) / 9).toFixed(1);
 
-    const stats = this.add.text(x, y + 95,
+    const stats = this.add.text(x, y + 70,
       `PWR ${avgPow}  CNT ${avgCon}  SPD ${avgSpd}`, {
       fontSize: '11px', fontFamily: 'monospace', color: '#999999',
     }).setOrigin(0.5);
     this.elements.push(stats);
 
-    const pCount = this.add.text(x, y + 120, `${team.pitchers.length} pitchers`, {
+    const pCount = this.add.text(x, y + 95, `${team.pitchers.length} pitchers`, {
       fontSize: '11px', fontFamily: 'monospace', color: '#777777',
     }).setOrigin(0.5);
     this.elements.push(pCount);
