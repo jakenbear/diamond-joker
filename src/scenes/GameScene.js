@@ -167,13 +167,13 @@ export default class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(2);
 
     // Stats
-    this.batterPwrText = this.add.text(BATTER_X - 70, 175, '', {
+    this.batterPwrText = this.add.text(BATTER_X - 55, 175, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     }).setDepth(2);
-    this.batterCntText = this.add.text(BATTER_X - 70, 195, '', {
+    this.batterCntText = this.add.text(BATTER_X - 55, 195, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     }).setDepth(2);
-    this.batterSpdText = this.add.text(BATTER_X - 70, 215, '', {
+    this.batterSpdText = this.add.text(BATTER_X - 55, 215, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     }).setDepth(2);
 
@@ -256,13 +256,13 @@ export default class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(2);
 
     // Stats
-    this.pitcherVelText = this.add.text(PITCHER_X - 70, 170, '', {
+    this.pitcherVelText = this.add.text(PITCHER_X - 55, 170, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     }).setDepth(2);
-    this.pitcherCtlText = this.add.text(PITCHER_X - 70, 190, '', {
+    this.pitcherCtlText = this.add.text(PITCHER_X - 55, 190, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     }).setDepth(2);
-    this.pitcherStaText = this.add.text(PITCHER_X - 70, 210, '', {
+    this.pitcherStaText = this.add.text(PITCHER_X - 55, 210, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     }).setDepth(2);
 
@@ -332,8 +332,9 @@ export default class GameScene extends Phaser.Scene {
   // ── Stat Bar Helper ────────────────────────────────────
 
   _statBar(val) {
-    const filled = Math.round(Math.min(val, 10) * 0.6);
-    return '\u2588'.repeat(filled) + '\u2591'.repeat(6 - filled) + ` ${val}`;
+    const max = 5;
+    const filled = Math.round(Math.min(val, 10) / 10 * max);
+    return '\u2588'.repeat(filled) + '\u2591'.repeat(max - filled) + ` ${val}`;
   }
 
   // ── Base Diamond (center) ─────────────────────────────
