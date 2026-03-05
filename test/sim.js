@@ -624,6 +624,21 @@ group('1c-extra. Deck Exhaustion');
   }
   assert(ok, 'Heavy discard scenario (10 at-bats) → no crash');
 }
+{
+  // Discard with nearly empty deck reshuffles and refills hand to 5
+  const ce = new CardEngine();
+  // Drain deck to exactly 3 cards remaining
+  while (ce.deck.length > 3) {
+    ce.hand = [];
+    ce.draw(5);
+    ce.playHand([0, 1, 2, 3, 4]);
+  }
+  ce.hand = [];
+  ce.draw(5); // draws only 3 from deck (deck now 0), hand has 3
+  // Now discard 2 — needs to reshuffle discard pile to draw replacements
+  const result = ce.discard([0, 1]);
+  assert(result.length === 5, `Discard with empty deck refills hand to 5 (got ${result.length})`);
+}
 
 // ── 1d-extra. Batter Cycling ─────────────────────────────
 

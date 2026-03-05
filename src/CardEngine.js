@@ -71,9 +71,15 @@ export default class CardEngine {
       }
     }
 
-    // Draw replacements
+    // Draw replacements, reshuffling discard pile into deck if needed
     const needed = 5 - this.hand.length;
     this.draw(needed);
+    if (this.hand.length < 5 && this.discardPile.length > 0) {
+      this.deck.push(...this.discardPile);
+      this.discardPile = [];
+      this.shuffle();
+      this.draw(5 - this.hand.length);
+    }
     return this.hand;
   }
 
