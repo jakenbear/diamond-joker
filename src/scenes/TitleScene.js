@@ -21,9 +21,9 @@ export default class TitleScene extends Phaser.Scene {
     diamond.strokePath();
 
     // Logo emoji
-    const logo = this.add.text(640, 200, '🃏', {
+    const logo = this.add.text(640, 180, '🃏', {
       fontSize: '80px',
-    }).setOrigin(0.5).setAlpha(0);
+    }).setOrigin(0.5).setAlpha(0).setDepth(2);
 
     this.tweens.add({
       targets: logo,
