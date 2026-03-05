@@ -13,15 +13,15 @@ export default class TitleScene extends Phaser.Scene {
     const diamond = this.add.graphics();
     diamond.lineStyle(3, 0xffd600, 0.3);
     diamond.beginPath();
-    diamond.moveTo(640, 140);
-    diamond.lineTo(760, 260);
-    diamond.lineTo(640, 380);
-    diamond.lineTo(520, 260);
+    diamond.moveTo(640, 90);
+    diamond.lineTo(760, 210);
+    diamond.lineTo(640, 330);
+    diamond.lineTo(520, 210);
     diamond.closePath();
     diamond.strokePath();
 
     // Logo emoji
-    const logo = this.add.text(640, 180, '🃏', {
+    const logo = this.add.text(640, 130, '🃏', {
       fontSize: '80px',
     }).setOrigin(0.5).setAlpha(0);
 
@@ -34,20 +34,20 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // Title
-    const title = this.add.text(640, 290, 'DIAMOND JOKER', {
+    const title = this.add.text(640, 240, 'DIAMOND JOKER', {
       fontSize: '64px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setAlpha(0);
 
     this.tweens.add({
       targets: title,
       alpha: 1,
-      y: { from: 310, to: 290 },
+      y: { from: 260, to: 240 },
       duration: 500,
       delay: 200,
     });
 
     // Subtitle
-    const sub = this.add.text(640, 345, 'A Card-Based Baseball Game', {
+    const sub = this.add.text(640, 295, 'A Card-Based Baseball Game', {
       fontSize: '18px', fontFamily: 'monospace', color: '#81c784',
     }).setOrigin(0.5).setAlpha(0);
 
@@ -59,12 +59,12 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // Decorative line
-    this.add.rectangle(640, 380, 500, 2, 0x4caf50, 0.4);
+    this.add.rectangle(640, 330, 500, 2, 0x4caf50, 0.4);
 
     // PLAY BALL button
     const btnW = 280;
     const btnH = 64;
-    const btnY = 460;
+    const btnY = 410;
 
     const btnBg = this.add.rectangle(640, btnY, btnW, btnH, 0x2e7d32)
       .setStrokeStyle(2, 0x4caf50)
@@ -96,7 +96,7 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // Pulsing hint
-    const hint = this.add.text(640, 530, '[ click to start ]', {
+    const hint = this.add.text(640, 480, '[ click to start ]', {
       fontSize: '14px', fontFamily: 'monospace', color: '#555555',
     }).setOrigin(0.5).setAlpha(0);
 
@@ -110,7 +110,7 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // Version / credit
-    this.add.text(640, 690, 'v0.2 - Phase 2', {
+    this.add.text(640, 640, 'v0.2 - Phase 2', {
       fontSize: '12px', fontFamily: 'monospace', color: '#444444',
     }).setOrigin(0.5);
   }
