@@ -323,13 +323,18 @@ export default class GameScene extends Phaser.Scene {
 
   _createBaseDiamond() {
     this.baseGraphics = [];
+    this.runners = [null, null, null]; // runner dots for 1st, 2nd, 3rd
+    this._prevBases = [false, false, false]; // track previous state for animations
     const cx = 640, cy = 175;
-    const r = 50;
+    const r = 65;
+    this.baseDiamondCenter = { x: cx, y: cy };
+    this.baseDiamondRadius = r;
     this.basePositions = [
       { x: cx + r, y: cy },       // 1st base
       { x: cx, y: cy - r },       // 2nd base
       { x: cx - r, y: cy },       // 3rd base
     ];
+    this.homePosition = { x: cx, y: cy + r };
 
     const gfx = this.add.graphics();
     gfx.lineStyle(2, 0xffffff, 0.4);
@@ -341,28 +346,121 @@ export default class GameScene extends Phaser.Scene {
     gfx.closePath();
     gfx.strokePath();
 
-    this.add.circle(cx, cy + r, 6, 0xffffff, 0.6);
+    // Home plate — pentagon
+    const hp = this.add.graphics();
+    hp.fillStyle(0xffffff, 0.6);
+    hp.beginPath();
+    const hs = 8;
+    hp.moveTo(cx - hs, cy + r - hs * 0.4);
+    hp.lineTo(cx + hs, cy + r - hs * 0.4);
+    hp.lineTo(cx + hs, cy + r + hs * 0.2);
+    hp.lineTo(cx, cy + r + hs * 0.8);
+    hp.lineTo(cx - hs, cy + r + hs * 0.2);
+    hp.closePath();
+    hp.fillPath();
 
+    // Square bases (rotated 45deg) for 1st, 2nd, 3rd
     for (let i = 0; i < 3; i++) {
       const bp = this.basePositions[i];
-      const base = this.add.circle(bp.x, bp.y, 8, 0x666666);
-      this.baseGraphics.push(base);
+      const baseGfx = this.add.graphics();
+      const bs = 14;
+      baseGfx.fillStyle(0x666666, 1);
+      baseGfx.beginPath();
+      baseGfx.moveTo(bp.x, bp.y - bs / 2);
+      baseGfx.lineTo(bp.x + bs / 2, bp.y);
+      baseGfx.lineTo(bp.x, bp.y + bs / 2);
+      baseGfx.lineTo(bp.x - bs / 2, bp.y);
+      baseGfx.closePath();
+      baseGfx.fillPath();
+      this.baseGraphics.push(baseGfx);
     }
   }
 
   _updateBases(bases) {
+    const cx = this.baseDiamondCenter.x;
+    const cy = this.baseDiamondCenter.y;
+    const r = this.baseDiamondRadius;
+    const bs = 14;
+
     for (let i = 0; i < 3; i++) {
+      const bp = this.basePositions[i];
       const occupied = bases[i];
-      this.baseGraphics[i].setFillStyle(occupied ? 0xffd600 : 0x666666);
-      if (occupied) {
+      const wasOccupied = this._prevBases[i];
+
+      // Redraw base with correct color
+      this.baseGraphics[i].clear();
+      this.baseGraphics[i].fillStyle(occupied ? 0xffd600 : 0x666666, 1);
+      this.baseGraphics[i].beginPath();
+      this.baseGraphics[i].moveTo(bp.x, bp.y - bs / 2);
+      this.baseGraphics[i].lineTo(bp.x + bs / 2, bp.y);
+      this.baseGraphics[i].lineTo(bp.x, bp.y + bs / 2);
+      this.baseGraphics[i].lineTo(bp.x - bs / 2, bp.y);
+      this.baseGraphics[i].closePath();
+      this.baseGraphics[i].fillPath();
+
+      // Runner dots
+      if (occupied && !wasOccupied) {
+        // Runner arriving — animate from previous base or home
+        const fromPos = i === 0 ? this.homePosition : this.basePositions[i - 1];
+        if (this.runners[i]) this.runners[i].destroy();
+        const runner = this.add.circle(fromPos.x, fromPos.y, 10, 0xffd600).setDepth(3);
+        this.runners[i] = runner;
+        // Pulse glow
         this.tweens.add({
-          targets: this.baseGraphics[i],
-          scale: { from: 1.4, to: 1 },
-          duration: 300,
-          ease: 'Back.easeOut',
+          targets: runner,
+          alpha: { from: 1, to: 0.6 },
+          duration: 600,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
         });
+        // Tween along basepath
+        this.tweens.add({
+          targets: runner,
+          x: bp.x,
+          y: bp.y,
+          duration: 350,
+          ease: 'Quad.easeInOut',
+        });
+      } else if (!occupied && wasOccupied) {
+        // Runner left — animate to next base or home
+        if (this.runners[i]) {
+          const toPos = i === 2 ? this.homePosition : this.basePositions[i + 1];
+          const runnerRef = this.runners[i];
+          this.tweens.add({
+            targets: runnerRef,
+            x: toPos.x,
+            y: toPos.y,
+            alpha: 0,
+            duration: 350,
+            ease: 'Quad.easeIn',
+            onComplete: () => runnerRef.destroy(),
+          });
+          this.runners[i] = null;
+        }
+      } else if (occupied && wasOccupied) {
+        // Runner stayed — ensure dot is at correct position
+        if (!this.runners[i]) {
+          const runner = this.add.circle(bp.x, bp.y, 10, 0xffd600).setDepth(3);
+          this.runners[i] = runner;
+          this.tweens.add({
+            targets: runner,
+            alpha: { from: 1, to: 0.6 },
+            duration: 600,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+          });
+        }
+      } else {
+        // No runner, clean up
+        if (this.runners[i]) {
+          this.runners[i].destroy();
+          this.runners[i] = null;
+        }
       }
     }
+    this._prevBases = [...bases];
   }
 
   // ── Result Display (center) ───────────────────────────
@@ -383,6 +481,15 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffd600',
       align: 'center', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(7).setAlpha(0);
+
+    // Live score preview: chips x mult = total (below hand preview)
+    this.scorePreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 40, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#aaaaaa',
+      align: 'center',
+    }).setOrigin(0.5).setDepth(7).setAlpha(0);
+
+    // Cascade text lines (reused each resolve)
+    this.cascadeTexts = [];
 
     // Score popup container (created dynamically)
     this.scorePopups = [];
@@ -754,6 +861,7 @@ export default class GameScene extends Phaser.Scene {
   _updateHandPreview() {
     if (this.selectedIndices.size === 0) {
       this.handPreviewText.setAlpha(0);
+      this.scorePreviewText.setAlpha(0);
       return;
     }
 
@@ -765,6 +873,7 @@ export default class GameScene extends Phaser.Scene {
 
     if (cards.length === 0) {
       this.handPreviewText.setAlpha(0);
+      this.scorePreviewText.setAlpha(0);
       return;
     }
 
@@ -775,6 +884,8 @@ export default class GameScene extends Phaser.Scene {
 
     let preview = '';
     let color = '#ffd600';
+    const isOut = handName === 'High Card' || handName === 'Strikeout' ||
+                  handName === 'Groundout' || handName === 'Flyout';
 
     if (handName === 'High Card' || handName === 'Strikeout') {
       if (n < 5) {
@@ -803,6 +914,33 @@ export default class GameScene extends Phaser.Scene {
     this.handPreviewText.setText(preview);
     this.handPreviewText.setColor(color);
     this.handPreviewText.setAlpha(1);
+
+    // Live chips x mult display
+    let scorePreview = '';
+    if (isOut) {
+      scorePreview = 'OUT';
+      this.scorePreviewText.setColor('#ff5252');
+    } else if (result.chips > 0) {
+      const batter = this.rosterManager.getCurrentBatter();
+      const powerBonus = Math.max(0, batter.power - 5);
+      const contactBonus = batter.contact / 10;
+      const totalChips = result.chips + powerBonus;
+      const totalMult = Math.round((result.mult + contactBonus) * 10) / 10;
+      const total = Math.round(totalChips * totalMult);
+
+      const chipsStr = Number.isInteger(totalChips) ? totalChips : totalChips.toFixed(1);
+      const multStr = Number.isInteger(totalMult) ? totalMult : totalMult.toFixed(1);
+      scorePreview = `${chipsStr} chips x ${multStr} mult = ${total}`;
+
+      const tags = [];
+      if (powerBonus > 0) tags.push(`+${powerBonus} PWR`);
+      if (contactBonus > 0) tags.push(`+${contactBonus.toFixed(1)} CNT`);
+      if (tags.length > 0) scorePreview += `  ${tags.join(' ')}`;
+
+      this.scorePreviewText.setColor('#aaaaaa');
+    }
+    this.scorePreviewText.setText(scorePreview);
+    this.scorePreviewText.setAlpha(scorePreview ? 1 : 0);
   }
 
   /** Hint at what the player might be building toward */
@@ -940,6 +1078,12 @@ export default class GameScene extends Phaser.Scene {
     this.handNameText.setText('');
     this.selectedIndices.clear();
     this.handPreviewText.setText('').setAlpha(0);
+    this.scorePreviewText.setText('').setAlpha(0);
+    // Clean up any leftover cascade texts
+    if (this.cascadeTexts) {
+      this.cascadeTexts.forEach(t => t.destroy());
+      this.cascadeTexts = [];
+    }
     this._setSortButtonsVisible(true);
     this.cardEngine.newAtBat();
 
@@ -1019,7 +1163,6 @@ export default class GameScene extends Phaser.Scene {
     let pitcherPreMessage = '';
     if (pitcherPreMod) {
       const modifiedCards = pitcherPreMod([...originalCards.map(c => ({ ...c }))]);
-      // Compare to detect changes
       const changes = [];
       for (let i = 0; i < originalCards.length; i++) {
         if (modifiedCards[i] && modifiedCards[i].rank !== originalCards[i].rank) {
@@ -1046,18 +1189,27 @@ export default class GameScene extends Phaser.Scene {
 
     // Detect pitcher post-modifier effects (we'll track after eval)
     let pitcherPostMessage = '';
+    let pitcherPostPenalty = { chips: 0, mult: 0 };
 
-    // Wrap pitcher post to detect changes
+    // Track batter post-modifier effects
+    let batterPostMessage = '';
+
+    // Wrap post-mods to detect changes from both pitcher and batter
     const trackingPostMod = (batterPostMod || pitcherPostMod) ? (result, gs) => {
       let r = result;
       if (pitcherPostMod) {
         const before = { ...r };
         r = pitcherPostMod(r, gs);
-        // Detect meaningful changes
         const effects = [];
         if (r.outcome !== before.outcome) effects.push(`${before.outcome}\u2192${r.outcome}`);
-        if (r.mult < before.mult) effects.push(`-${(before.mult - r.mult).toFixed(1)} mult`);
-        if (r.chips < before.chips) effects.push(`-${before.chips - r.chips} chips`);
+        if (r.mult < before.mult) {
+          pitcherPostPenalty.mult = before.mult - r.mult;
+          effects.push(`-${(before.mult - r.mult).toFixed(1)} mult`);
+        }
+        if (r.chips < before.chips) {
+          pitcherPostPenalty.chips = before.chips - r.chips;
+          effects.push(`-${before.chips - r.chips} chips`);
+        }
         if (r.mult > before.mult) effects.push(`+${(r.mult - before.mult).toFixed(1)} mult`);
         if (effects.length > 0) {
           const traitNames = pitcher.traits
@@ -1066,7 +1218,22 @@ export default class GameScene extends Phaser.Scene {
           pitcherPostMessage = `${traitNames}: ${effects.join(', ')}`;
         }
       }
-      if (batterPostMod) r = batterPostMod(r, gs);
+      if (batterPostMod) {
+        const before = { ...r };
+        r = batterPostMod(r, gs);
+        // Detect batter trait changes
+        const effects = [];
+        if (r.outcome !== before.outcome) effects.push(`${before.outcome}\u2192${r.outcome}`);
+        if (r.mult > before.mult) effects.push(`+${(r.mult - before.mult).toFixed(1)} mult`);
+        if (r.chips > before.chips) effects.push(`+${r.chips - before.chips} chips`);
+        if (r.mult < before.mult) effects.push(`${(r.mult - before.mult).toFixed(1)} mult`);
+        if (effects.length > 0) {
+          const traitNames = batter.traits
+            .filter(t => t.phase === 'batter_post')
+            .map(t => t.name).join('/');
+          batterPostMessage = `${traitNames}: ${effects.join(', ')}`;
+        }
+      }
       return r;
     } : null;
 
@@ -1080,8 +1247,10 @@ export default class GameScene extends Phaser.Scene {
     // Play selected cards with combined modifiers
     let handResult = this.cardEngine.playHand(selectedArr, combinedPreMod, trackingPostMod, gameState);
 
-    // Apply stat modifiers
-    handResult = this.rosterManager.applyBatterModifiers(handResult, gameState);
+    // Apply stat modifiers (now returns { result, bonuses })
+    const batterMod = this.rosterManager.applyBatterModifiers(handResult, gameState);
+    handResult = batterMod.result;
+    const batterBonuses = batterMod.bonuses;
     handResult = this.rosterManager.applyPitcherModifiers(handResult, gameState);
 
     // Sacrifice fly
@@ -1090,7 +1259,9 @@ export default class GameScene extends Phaser.Scene {
       sacrificeFlyRun = this.baseball.processSacrificeFly();
     }
 
-    // ── Phase 0: Show pitcher trait activation if any ──
+    const isOut = handResult.outcome === 'Strikeout' || handResult.outcome === 'Groundout' || handResult.outcome === 'Flyout';
+
+    // ── Phase 0: Show pitcher pre-trait activation if any ──
     let pitcherDelay = 0;
     if (pitcherPreMessage) {
       this.handNameText.setText(`\u26be ${pitcherPreMessage}`);
@@ -1104,7 +1275,7 @@ export default class GameScene extends Phaser.Scene {
       pitcherDelay = 700;
     }
 
-    // ── Phase 1: Announce the hand (after pitcher trait display) ──
+    // ── Phase 1: Announce the hand (T=pitcherDelay) ──
     this.time.delayedCall(pitcherDelay, () => {
       const announcement = handResult.playedDescription || handResult.handName;
       this.resultText.setText(announcement);
@@ -1128,16 +1299,15 @@ export default class GameScene extends Phaser.Scene {
       });
     });
 
-    // Hide hand preview
+    // Hide hand preview + score preview
     this.handPreviewText.setAlpha(0);
+    this.scorePreviewText.setAlpha(0);
 
     // Animate cards with juice based on outcome
-    const isOut = handResult.outcome === 'Strikeout' || handResult.outcome === 'Groundout' || handResult.outcome === 'Flyout';
     this.cardSprites.forEach((cs, i) => {
       const parts = [cs.bg, cs.rankText, cs.suitText, cs.glow];
       if (this.selectedIndices.has(i)) {
         if (isOut) {
-          // Outs: cards shake then fall
           this.tweens.add({
             targets: parts, x: '+=4', duration: 40, yoyo: true, repeat: 3,
           });
@@ -1147,7 +1317,6 @@ export default class GameScene extends Phaser.Scene {
             duration: 400, delay: 200, ease: 'Quad.easeIn',
           });
         } else {
-          // Hits: cards fly to center with energy
           this.tweens.add({
             targets: parts,
             x: 640, y: 300, alpha: 0, scale: 0.3,
@@ -1155,7 +1324,6 @@ export default class GameScene extends Phaser.Scene {
           });
         }
       } else {
-        // Unselected cards fade down
         this.tweens.add({
           targets: parts,
           y: '+=40', alpha: 0,
@@ -1164,12 +1332,28 @@ export default class GameScene extends Phaser.Scene {
       }
     });
 
-    // ── Phase 2: Resolve (extra delay if pitcher trait showed) ──
-    this.time.delayedCall(900 + pitcherDelay, () => {
+    // ── Phase 1.5: Batter trait callout (T=pitcherDelay+500) ──
+    let batterTraitDelay = 0;
+    if (batterPostMessage) {
+      batterTraitDelay = 500;
+      this.time.delayedCall(pitcherDelay + 500, () => {
+        this.handNameText.setText(`\u26be ${batterPostMessage}`);
+        this.handNameText.setColor('#69f0ae'); // Green for batter traits
+        this.tweens.add({
+          targets: this.handNameText,
+          alpha: { from: 0, to: 1 },
+          duration: 200,
+        });
+      });
+    }
+
+    // ── Phase 2: Resolve with cascade ──
+    const resolveStart = 900 + pitcherDelay + batterTraitDelay;
+    this.time.delayedCall(resolveStart, () => {
       const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score);
 
       let extraBase = { scored: 0, advanced: false };
-      if (handResult.extraBaseChance && handResult.outcome !== 'Strikeout' && handResult.outcome !== 'Groundout' && handResult.outcome !== 'Flyout') {
+      if (handResult.extraBaseChance && !isOut) {
         extraBase = this.baseball.tryExtraBase(handResult.extraBaseChance);
       }
 
@@ -1181,55 +1365,195 @@ export default class GameScene extends Phaser.Scene {
         desc += extraBase.scored > 0 ? ' Speed! Extra run!' : ' Speed! Runner advances!';
       }
 
+      // Show outcome text
       this.resultText.setText(desc);
-      const chipsDisplay = Number.isInteger(handResult.chips) ? handResult.chips : handResult.chips.toFixed(1);
-      const multDisplay = Number.isInteger(handResult.mult) ? handResult.mult : handResult.mult.toFixed(1);
-      this.handNameText.setText(`${handResult.handName} \u2022 ${chipsDisplay} chips x${multDisplay}`);
-
-      if (handResult.outcome === 'Strikeout' || handResult.outcome === 'Groundout' || handResult.outcome === 'Flyout') {
-        this.resultText.setColor('#ff8a80');
-      } else {
-        this.resultText.setColor('#69f0ae');
-      }
-
+      this.resultText.setColor(isOut ? '#ff8a80' : '#69f0ae');
       this.tweens.add({
         targets: this.resultText,
         scale: { from: 0.5, to: 1 }, alpha: { from: 0, to: 1 },
         duration: 400, ease: 'Back.easeOut',
       });
-      this.tweens.add({
-        targets: this.handNameText,
-        alpha: { from: 0, to: 1 },
-        duration: 300, delay: 200,
-      });
 
       this._updateScoreboard();
 
-      // Score popup for runs
-      const totalRuns = outcome.runsScored + sacrificeFlyRun + extraBase.scored;
-      if (totalRuns > 0) {
-        const popupColor = totalRuns >= 4 ? '#ff6e40' : totalRuns >= 2 ? '#ffd600' : '#69f0ae';
-        const popupText = totalRuns >= 4 ? `+${totalRuns} RUNS!!!` : `+${totalRuns} RUN${totalRuns > 1 ? 'S' : ''}!`;
-        this._showScorePopup(popupText, popupColor, 640, 260);
+      // For outs, skip cascade — just show outcome and move on
+      if (isOut) {
+        this.handNameText.setText('');
+
+        this.rosterManager.advanceBatter();
+        this.time.delayedCall(600, () => this._updateBatterPanel());
+        this.time.delayedCall(1500, () => {
+          if (this.baseball.isGameOver()) { this._endGame(); return; }
+          if (this.baseball.state === 'SWITCH_SIDE') { this._doOpponentHalf(); return; }
+          this._startAtBat();
+        });
+        return;
       }
+
+      // ── Scoring Cascade for hits ──
+      this.handNameText.setText('');
+      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage);
+
+      // Score popup for runs (after cascade)
+      const totalRuns = outcome.runsScored + sacrificeFlyRun + extraBase.scored;
+      this.time.delayedCall(cascadeDelay, () => {
+        if (totalRuns > 0) {
+          const popupColor = totalRuns >= 4 ? '#ff6e40' : totalRuns >= 2 ? '#ffd600' : '#69f0ae';
+          const popupText = totalRuns >= 4 ? `+${totalRuns} RUNS!!!` : `+${totalRuns} RUN${totalRuns > 1 ? 'S' : ''}!`;
+          this._showScorePopup(popupText, popupColor, 640, 260);
+        }
+
+        // Chip earnings flash
+        if (handResult.score > 0) {
+          this._showChipEarnings(handResult.score);
+        }
+      });
 
       // Advance batter
       this.rosterManager.advanceBatter();
-      this.time.delayedCall(600, () => {
-        this._updateBatterPanel();
-      });
+      this.time.delayedCall(cascadeDelay + 200, () => this._updateBatterPanel());
 
-      this.time.delayedCall(1500, () => {
-        if (this.baseball.isGameOver()) {
-          this._endGame();
-          return;
-        }
-        if (this.baseball.state === 'SWITCH_SIDE') {
-          this._doOpponentHalf();
-          return;
-        }
+      this.time.delayedCall(cascadeDelay + 1200, () => {
+        if (this.baseball.isGameOver()) { this._endGame(); return; }
+        if (this.baseball.state === 'SWITCH_SIDE') { this._doOpponentHalf(); return; }
         this._startAtBat();
       });
+    });
+  }
+
+  /** Show scoring cascade: base hand → power → contact → trait → pitcher → final */
+  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg) {
+    const steps = [];
+    const stepDelay = 350;
+    const baseY = 370;
+    let runningChips = handResult.chips - bonuses.powerChips + pitcherPenalty.chips;
+    let runningMult = handResult.mult - bonuses.contactMult + pitcherPenalty.mult;
+
+    // Ensure running values don't go below the base hand values
+    const baseChips = runningChips;
+    const baseMult = Math.round(runningMult * 10) / 10;
+
+    // Step 1: Base hand
+    steps.push({
+      text: `${handResult.handName} \u2192 ${baseChips} chip${baseChips !== 1 ? 's' : ''} x ${baseMult.toFixed(1)}`,
+      color: '#ffd600',
+    });
+
+    // Step 2: Power bonus (if any)
+    if (bonuses.powerChips > 0) {
+      runningChips += bonuses.powerChips;
+      const batter = this.rosterManager.getCurrentBatter();
+      steps.push({
+        text: `+${bonuses.powerChips} chips (PWR ${batter.power})`,
+        color: '#ff8a65',
+      });
+    }
+
+    // Step 3: Contact bonus (if any)
+    if (bonuses.contactMult > 0) {
+      runningMult = Math.round((runningMult + bonuses.contactMult) * 10) / 10;
+      const batter = this.rosterManager.getCurrentBatter();
+      steps.push({
+        text: `+${bonuses.contactMult.toFixed(1)}x (CNT ${batter.contact})`,
+        color: '#64b5f6',
+      });
+    }
+
+    // Step 4: Batter trait bonuses (if any)
+    if (batterTraitMsg) {
+      steps.push({
+        text: batterTraitMsg,
+        color: '#69f0ae',
+      });
+    }
+
+    // Step 5: Pitcher penalty (if any)
+    if (pitcherPenalty.chips > 0 || pitcherPenalty.mult > 0) {
+      const parts = [];
+      if (pitcherPenalty.mult > 0) {
+        runningMult = Math.round((runningMult - pitcherPenalty.mult) * 10) / 10;
+        parts.push(`-${pitcherPenalty.mult.toFixed(1)}x`);
+      }
+      if (pitcherPenalty.chips > 0) {
+        runningChips -= pitcherPenalty.chips;
+        parts.push(`-${pitcherPenalty.chips} chips`);
+      }
+      steps.push({
+        text: `${parts.join(' ')} (Pitcher)`,
+        color: '#ff5252',
+      });
+    }
+
+    // Step 6: Final score
+    steps.push({
+      text: `= ${handResult.score}`,
+      color: '#ffffff',
+      isFinal: true,
+    });
+
+    // Clean up old cascade texts
+    this.cascadeTexts.forEach(t => t.destroy());
+    this.cascadeTexts = [];
+
+    // Animate each step
+    steps.forEach((step, i) => {
+      this.time.delayedCall(i * stepDelay, () => {
+        const y = baseY + i * 24;
+        const fontSize = step.isFinal ? '22px' : '13px';
+        const txt = this.add.text(620, y, step.text, {
+          fontSize, fontFamily: 'monospace', color: step.color,
+          fontStyle: step.isFinal ? 'bold' : 'normal',
+        }).setOrigin(0, 0.5).setDepth(10).setAlpha(0);
+        this.cascadeTexts.push(txt);
+
+        // Slide in from left + fade in
+        txt.x -= 20;
+        this.tweens.add({
+          targets: txt,
+          alpha: 1,
+          x: '+=20',
+          duration: 200,
+          ease: 'Quad.easeOut',
+        });
+
+        // Final score gets a scale pop
+        if (step.isFinal) {
+          this.tweens.add({
+            targets: txt,
+            scale: { from: 1.5, to: 1 },
+            duration: 300,
+            delay: 50,
+            ease: 'Back.easeOut',
+          });
+        }
+      });
+    });
+
+    // Return total cascade duration
+    return steps.length * stepDelay + 350;
+  }
+
+  /** Flash chip earnings next to chip balance */
+  _showChipEarnings(amount) {
+    const chipBal = this.chipBalanceText;
+    const popup = this.add.text(chipBal.x + chipBal.width / 2 + 10, chipBal.y, `+${amount}`, {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0, 0.5).setDepth(15).setAlpha(0);
+
+    this.tweens.add({
+      targets: popup,
+      alpha: { from: 0, to: 1 },
+      y: popup.y - 30,
+      duration: 400,
+      ease: 'Quad.easeOut',
+    });
+    this.tweens.add({
+      targets: popup,
+      alpha: 0,
+      y: popup.y - 60,
+      duration: 400,
+      delay: 600,
+      onComplete: () => popup.destroy(),
     });
   }
 

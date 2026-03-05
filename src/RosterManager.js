@@ -89,20 +89,23 @@ export default class RosterManager {
   applyBatterModifiers(evalResult, gameState) {
     const batter = this.getCurrentBatter();
     const result = { ...evalResult };
+    const bonuses = { powerChips: 0, contactMult: 0 };
 
     const isHit = result.outcome !== 'Strikeout' && result.outcome !== 'Groundout' && result.outcome !== 'Flyout';
-    if (!isHit) return result;
+    if (!isHit) return { result, bonuses };
 
     const powerBonus = Math.max(0, batter.power - 5);
+    bonuses.powerChips = powerBonus;
     result.chips += powerBonus;
 
     const contactBonus = batter.contact / 10;
+    bonuses.contactMult = contactBonus;
     result.mult = Math.round((result.mult + contactBonus) * 10) / 10;
 
     result.score = Math.round(result.chips * result.mult);
     result.extraBaseChance = batter.speed * 0.05;
 
-    return result;
+    return { result, bonuses };
   }
 
   applyPitcherModifiers(evalResult, gameState) {
