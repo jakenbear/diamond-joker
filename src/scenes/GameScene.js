@@ -482,11 +482,11 @@ export default class GameScene extends Phaser.Scene {
       align: 'center', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(7).setAlpha(0);
 
-    // Live score preview: chips x mult = total (below hand preview)
-    this.scorePreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 40, '', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#aaaaaa',
+    // Live score preview: chips x mult = total (below hand preview, above sort buttons)
+    this.scorePreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 48, '', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
-    }).setOrigin(0.5).setDepth(7).setAlpha(0);
+    }).setOrigin(0.5).setDepth(8).setAlpha(0);
 
     // Cascade text lines (reused each resolve)
     this.cascadeTexts = [];
