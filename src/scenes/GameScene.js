@@ -52,6 +52,16 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     this.load.image('card_back', 'assets/cards/back1.png');
+
+    // Set nearest-neighbor filtering on card textures only (keeps text smooth)
+    this.load.on('complete', () => {
+      for (const s of suits) {
+        for (const r of ranks) {
+          this.textures.get(`card_${s}${r}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+      }
+      this.textures.get('card_back').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    });
   }
 
   create() {
