@@ -682,7 +682,7 @@ export default class PitchingScene extends Phaser.Scene {
     let countStr = '';
     if (result.outcome === 'Strikeout') {
       const fakeBalls = [0, 0, 1, 1, 2, 2, 3][Math.floor(Math.random() * 7)];
-      countStr = ` ${fakeBalls}-2`;
+      countStr = ` ${fakeBalls}-3`;
     }
     if (result.isOut) {
       this._addGameLog(`${oppBatterLast}: ${result.outcome}${countStr} ${pitchShort}`, '#999999');

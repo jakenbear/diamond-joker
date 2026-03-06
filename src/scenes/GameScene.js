@@ -1780,7 +1780,7 @@ export default class GameScene extends Phaser.Scene {
       let logCount;
       if (handResult.outcome === 'Strikeout') {
         const fakeBalls = [0, 0, 1, 1, 2, 2, 3][Math.floor(Math.random() * 7)];
-        logCount = `${fakeBalls}-2`;
+        logCount = `${fakeBalls}-3`;
       } else {
         logCount = `${count.balls}-${count.strikes}`;
       }
