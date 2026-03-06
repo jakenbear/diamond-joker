@@ -219,29 +219,33 @@ export default class PitchingScene extends Phaser.Scene {
       align: 'center', wordWrap: { width: PANEL_W - 20 },
     }).setOrigin(0.5);
 
-    this.myPitcherVelText = this.add.text(x - 55, 155, '', {
+    this.myPitcherRoleText = this.add.text(x, 148, '', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
+    }).setOrigin(0.5);
+
+    this.myPitcherVelText = this.add.text(x - 55, 175, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     });
-    this.myPitcherCtlText = this.add.text(x - 55, 175, '', {
+    this.myPitcherCtlText = this.add.text(x - 55, 195, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     });
-    this.myPitcherStaText = this.add.text(x - 55, 195, '', {
+    this.myPitcherStaText = this.add.text(x - 55, 215, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     });
 
-    this.add.rectangle(x, 220, PANEL_W - 30, 1, 0x2e7d32, 0.5);
+    this.add.rectangle(x, 240, PANEL_W - 30, 1, 0x2e7d32, 0.5);
 
-    this.staminaBarLabel = this.add.text(x, 238, '', {
+    this.staminaBarLabel = this.add.text(x, 252, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.staminaBarBg = this.add.rectangle(x, 260, PANEL_W - 40, 12, 0x1a3a1a)
+    this.staminaBarBg = this.add.rectangle(x, 272, PANEL_W - 40, 12, 0x1a3a1a)
       .setStrokeStyle(1, 0x2e7d32);
     this.staminaBarFill = this.add.rectangle(
-      x - (PANEL_W - 40) / 2, 260, PANEL_W - 40, 10, 0x69f0ae
+      x - (PANEL_W - 40) / 2, 272, PANEL_W - 40, 10, 0x69f0ae
     ).setOrigin(0, 0.5);
 
-    this.pitchCountText = this.add.text(x, 285, '', {
+    this.pitchCountText = this.add.text(x, 295, '', {
       fontSize: '11px', fontFamily: 'monospace', color: '#b0bec5',
     }).setOrigin(0.5);
   }
@@ -252,6 +256,9 @@ export default class PitchingScene extends Phaser.Scene {
     const staminaPct = Math.round(stamina * 100);
 
     this.myPitcherNameText.setText(pitcher.name);
+    const team = this.rosterManager.getTeam();
+    const teamLabel = team ? `${team.logo} ${team.nickname}` : 'Starter';
+    this.myPitcherRoleText.setText(teamLabel);
     this.myPitcherVelText.setText(`VEL  ${this._statBar(pitcher.velocity)}`);
     this.myPitcherCtlText.setText(`CTL  ${this._statBar(pitcher.control)}`);
     this.myPitcherStaText.setText(`STA  ${this._statBar(pitcher.stamina)}`);
@@ -289,17 +296,17 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
     }).setOrigin(0.5);
 
-    this.oppBatterPwrText = this.add.text(x - 55, 175, '', {
+    this.oppBatterPwrText = this.add.text(x - 55, 170, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     });
-    this.oppBatterCntText = this.add.text(x - 55, 195, '', {
+    this.oppBatterCntText = this.add.text(x - 55, 190, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     });
-    this.oppBatterSpdText = this.add.text(x - 55, 215, '', {
+    this.oppBatterSpdText = this.add.text(x - 55, 210, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     });
 
-    this.add.rectangle(x, 240, PANEL_W - 30, 1, 0x8b0000, 0.5);
+    this.add.rectangle(x, 235, PANEL_W - 30, 1, 0x8b0000, 0.5);
 
     this.dueUpText = this.add.text(x, 260, '', {
       fontSize: '10px', fontFamily: 'monospace', color: '#b0bec5',
