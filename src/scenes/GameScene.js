@@ -215,6 +215,8 @@ export default class GameScene extends Phaser.Scene {
   // ── Batter Panel (left) ────────────────────────────────
 
   _createBatterPanel() {
+    const panelLeft = BATTER_X - PANEL_W / 2;
+    const textW = PANEL_W - 20;
     // Dark panel background
     this.add.rectangle(BATTER_X, 280, PANEL_W, 400, 0x0a1f0d, 0.85)
       .setStrokeStyle(2, 0x2e7d32);
@@ -224,28 +226,33 @@ export default class GameScene extends Phaser.Scene {
     const headerLabel = team ? `${team.logo} AT BAT` : 'AT BAT';
     this.add.text(BATTER_X, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
     // Player name
     this.batterNameText = this.add.text(BATTER_X, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
-      align: 'center', wordWrap: { width: PANEL_W - 20 },
+      align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5).setDepth(2);
 
     // Lineup number
     this.batterNumText = this.add.text(BATTER_X, 148, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5).setDepth(2);
 
     // Stats
-    this.batterPwrText = this.add.text(BATTER_X - 55, 175, '', {
+    this.batterPwrText = this.add.text(panelLeft + 10, 175, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
+      fixedWidth: textW,
     }).setDepth(2);
-    this.batterCntText = this.add.text(BATTER_X - 55, 195, '', {
+    this.batterCntText = this.add.text(panelLeft + 10, 195, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
+      fixedWidth: textW,
     }).setDepth(2);
-    this.batterSpdText = this.add.text(BATTER_X - 55, 215, '', {
+    this.batterSpdText = this.add.text(panelLeft + 10, 215, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+      fixedWidth: textW,
     }).setDepth(2);
 
     // Divider
@@ -254,6 +261,7 @@ export default class GameScene extends Phaser.Scene {
     // "TRAITS" label
     this.batterTraitLabel = this.add.text(BATTER_X, 252, 'TRAITS', {
       fontSize: '11px', fontFamily: 'monospace', color: '#4caf50',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5).setDepth(2);
   }
 
@@ -307,34 +315,41 @@ export default class GameScene extends Phaser.Scene {
   // ── Pitcher Panel (right) ─────────────────────────────
 
   _createPitcherPanel() {
+    const panelLeft = PITCHER_X - PANEL_W / 2;
+    const textW = PANEL_W - 20;
     this.add.rectangle(PITCHER_X, 280, PANEL_W, 400, 0x1a0a0d, 0.85)
       .setStrokeStyle(2, 0x8b0000);
 
     // "PITCHING" header
     this.add.text(PITCHER_X, 95, 'PITCHING', {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
     // Pitcher name
     this.pitcherNameText = this.add.text(PITCHER_X, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
-      align: 'center', wordWrap: { width: PANEL_W - 20 },
+      align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5).setDepth(2);
 
     // Opponent team label
     this.pitcherTeamText = this.add.text(PITCHER_X, 148, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5).setDepth(2);
 
     // Stats
-    this.pitcherVelText = this.add.text(PITCHER_X - 55, 170, '', {
+    this.pitcherVelText = this.add.text(panelLeft + 10, 170, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
+      fixedWidth: textW,
     }).setDepth(2);
-    this.pitcherCtlText = this.add.text(PITCHER_X - 55, 190, '', {
+    this.pitcherCtlText = this.add.text(panelLeft + 10, 190, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
+      fixedWidth: textW,
     }).setDepth(2);
-    this.pitcherStaText = this.add.text(PITCHER_X - 55, 210, '', {
+    this.pitcherStaText = this.add.text(panelLeft + 10, 210, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+      fixedWidth: textW,
     }).setDepth(2);
 
     // Divider
@@ -343,6 +358,7 @@ export default class GameScene extends Phaser.Scene {
     // "TRAITS" label
     this.pitcherTraitLabel = this.add.text(PITCHER_X, 247, 'TRAITS', {
       fontSize: '11px', fontFamily: 'monospace', color: '#e53935',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5).setDepth(2);
   }
 

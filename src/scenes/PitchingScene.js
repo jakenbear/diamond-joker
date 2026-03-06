@@ -264,6 +264,8 @@ export default class PitchingScene extends Phaser.Scene {
 
   _createPitcherPanel() {
     const x = PITCHER_PANEL_X;
+    const panelLeft = x - PANEL_W / 2;
+    const textW = PANEL_W - 20; // max text width with 10px padding each side
     this.add.rectangle(x, 280, PANEL_W, 400, 0x0a1f0d, 0.85)
       .setStrokeStyle(2, 0x2e7d32);
 
@@ -271,25 +273,30 @@ export default class PitchingScene extends Phaser.Scene {
     const headerLabel = team ? `${team.logo} PITCHING` : 'PITCHING';
     this.add.text(x, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
     this.myPitcherNameText = this.add.text(x, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
-      align: 'center', wordWrap: { width: PANEL_W - 20 },
+      align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5);
 
     this.myPitcherRoleText = this.add.text(x, 148, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
-    this.myPitcherVelText = this.add.text(x - 55, 175, '', {
+    this.myPitcherVelText = this.add.text(panelLeft + 10, 175, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
+      fixedWidth: textW,
     });
-    this.myPitcherCtlText = this.add.text(x - 55, 195, '', {
+    this.myPitcherCtlText = this.add.text(panelLeft + 10, 195, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
+      fixedWidth: textW,
     });
-    this.myPitcherStaText = this.add.text(x - 55, 215, '', {
+    this.myPitcherStaText = this.add.text(panelLeft + 10, 215, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+      fixedWidth: textW,
     });
 
     this.add.rectangle(x, 240, PANEL_W - 30, 1, 0x2e7d32, 0.5);
@@ -337,6 +344,8 @@ export default class PitchingScene extends Phaser.Scene {
 
   _createBatterPanel() {
     const x = BATTER_PANEL_X;
+    const panelLeft = x - PANEL_W / 2;
+    const textW = PANEL_W - 20; // max text width with 10px padding each side
     this.add.rectangle(x, 280, PANEL_W, 400, 0x1a0a0d, 0.85)
       .setStrokeStyle(2, 0x8b0000);
 
@@ -344,32 +353,37 @@ export default class PitchingScene extends Phaser.Scene {
     const headerLabel = oppTeam ? `${oppTeam.logo} AT BAT` : 'AT BAT';
     this.add.text(x, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
     this.oppBatterNameText = this.add.text(x, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
-      align: 'center', wordWrap: { width: PANEL_W - 20 },
+      align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5);
 
     this.oppBatterNumText = this.add.text(x, 148, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
+      fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
-    this.oppBatterPwrText = this.add.text(x - 55, 170, '', {
+    this.oppBatterPwrText = this.add.text(panelLeft + 10, 170, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
+      fixedWidth: textW,
     });
-    this.oppBatterCntText = this.add.text(x - 55, 190, '', {
+    this.oppBatterCntText = this.add.text(panelLeft + 10, 190, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
+      fixedWidth: textW,
     });
-    this.oppBatterSpdText = this.add.text(x - 55, 210, '', {
+    this.oppBatterSpdText = this.add.text(panelLeft + 10, 210, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+      fixedWidth: textW,
     });
 
     this.add.rectangle(x, 235, PANEL_W - 30, 1, 0x8b0000, 0.5);
 
     this.dueUpText = this.add.text(x, 260, '', {
       fontSize: '10px', fontFamily: 'monospace', color: '#b0bec5',
-      align: 'center', wordWrap: { width: PANEL_W - 20 },
+      align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5);
   }
 
