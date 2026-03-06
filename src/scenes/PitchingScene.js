@@ -6,6 +6,7 @@
  * transitions back to GameScene (or ShopScene / GameOverScene).
  */
 import { PITCH_TYPES } from '../RosterManager.js';
+import SoundManager from '../SoundManager.js';
 
 const CARD_W = 100;
 const CARD_H = 140;
@@ -590,6 +591,7 @@ export default class PitchingScene extends Phaser.Scene {
 
   _onPitchSelected(pitchType) {
     this._destroyPitchButtons();
+    SoundManager.pitchSelect();
 
     const ps = this._pitchState;
     const inning = this.baseball.getStatus().inning;
@@ -597,7 +599,14 @@ export default class PitchingScene extends Phaser.Scene {
 
     if (result.isOut) {
       ps.outs++;
+      if (result.outcome === 'Strikeout') SoundManager.strikeout();
+      else SoundManager.out();
+    } else if (result.walked) {
+      SoundManager.walk();
+    } else {
+      SoundManager.hit();
     }
+    if (result.scored > 0) SoundManager.runScored();
     ps.runs += result.scored || 0;
 
     // Game log entry

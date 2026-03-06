@@ -9,6 +9,7 @@ import RosterManager, { PITCH_TYPES } from '../RosterManager.js';
 import TraitManager from '../TraitManager.js';
 import CountManager from '../CountManager.js';
 import SituationalEngine from '../SituationalEngine.js';
+import SoundManager from '../SoundManager.js';
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const CARD_ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
@@ -958,6 +959,7 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.selectedIndices.has(index)) {
       this.selectedIndices.delete(index);
+      SoundManager.cardDeselect();
       cs.glow.setAlpha(0);
       const targets = [cs.bg, cs.rankText, cs.suitText, cs.glow];
       this.tweens.add({ targets, y: '-=0', duration: 1 }); // kill existing tweens
@@ -967,6 +969,7 @@ export default class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: cs.glow,      y: cs.y,      duration: 150, ease: 'Back.easeOut' });
     } else {
       this.selectedIndices.add(index);
+      SoundManager.cardSelect();
       cs.glow.setAlpha(0.7);
       // Bounce up with slight scale pop
       this.tweens.add({ targets: cs.bg,       y: cs.y - lift,      duration: 150, ease: 'Back.easeOut' });
@@ -1296,6 +1299,7 @@ export default class GameScene extends Phaser.Scene {
   _onDiscard() {
     if (this.selectedIndices.size === 0) return;
     if (this.cardEngine.discardsRemaining <= 0) return;
+    SoundManager.discard();
 
     this.inputLocked = true;
     this.handPreviewText.setAlpha(0);
@@ -1452,6 +1456,7 @@ export default class GameScene extends Phaser.Scene {
 
   _onPlay() {
     if (this.selectedIndices.size === 0) return;
+    SoundManager.playHand();
 
     this.inputLocked = true;
     this._setButtonsEnabled(false, false);
@@ -1777,13 +1782,24 @@ export default class GameScene extends Phaser.Scene {
         duration: 400, ease: 'Back.easeOut',
       });
 
-      // Screen shake on extra-base hits
+      // Screen shake + sound on extra-base hits
       const xbh = ['Home Run', 'Triple', 'Double'];
       if (xbh.includes(handResult.outcome)) {
         const intensity = handResult.outcome === 'Home Run' ? 0.006 : 0.003;
         const duration = handResult.outcome === 'Home Run' ? 300 : 200;
         this.cameras.main.shake(duration, intensity);
+        if (handResult.outcome === 'Home Run') SoundManager.homeRun();
+        else SoundManager.extraBaseHit();
+      } else if (isOut) {
+        if (handResult.outcome === 'Strikeout') SoundManager.strikeout();
+        else SoundManager.out();
+      } else {
+        SoundManager.hit();
       }
+
+      // Run scored chime
+      const runsForSound = (outcome.runsScored || 0) + sacrificeFlyRun + extraBase.scored;
+      if (runsForSound > 0) SoundManager.runScored();
 
       this._updateScoreboard();
 
