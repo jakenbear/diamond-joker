@@ -14,7 +14,7 @@ const CARD_SPACING = 120;
 const HAND_Y = 560;
 const PANEL_W = 210;
 const PITCHER_PANEL_X = 115;   // same as GameScene BATTER_X
-const BATTER_PANEL_X = 1165;   // symmetric with PITCHER_PANEL_X (1280 - 115)
+const BATTER_PANEL_X = 1150;   // slightly inward to prevent right-edge clipping
 
 export default class PitchingScene extends Phaser.Scene {
   constructor() {
