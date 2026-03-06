@@ -10,9 +10,9 @@ import TraitManager from '../TraitManager.js';
 import CountManager from '../CountManager.js';
 import SituationalEngine from '../SituationalEngine.js';
 
-const SUIT_SYMBOLS = { H: '\u2665', D: '\u2666', C: '\u2663', S: '\u2660' };
-const SUIT_COLORS = { H: '#e53935', D: '#e53935', C: '#212121', S: '#212121' };
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+const CARD_ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
+const CARD_ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
 
 const CARD_W = 100;
 const CARD_H = 140;
@@ -40,6 +40,18 @@ export default class GameScene extends Phaser.Scene {
 
   init(data) {
     this._initData = data || {};
+  }
+
+  preload() {
+    if (this.textures.exists('card_ha')) return; // already loaded
+    const suits = ['h', 'd', 'c', 's'];
+    const ranks = ['2','3','4','5','6','7','8','9','10','a','j','q','k'];
+    for (const s of suits) {
+      for (const r of ranks) {
+        this.load.image(`card_${s}${r}`, `assets/cards/${s}${r}.png`);
+      }
+    }
+    this.load.image('card_back', 'assets/cards/back1.png');
   }
 
   create() {
@@ -860,26 +872,26 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  _cardTextureKey(card) {
+    return `card_${CARD_ASSET_SUITS[card.suit]}${CARD_ASSET_RANKS[card.rank]}`;
+  }
+
   _createCardSprite(card, x, y, index) {
-    const suitColor = SUIT_COLORS[card.suit];
-    const suitSym = SUIT_SYMBOLS[card.suit];
-    const rankStr = RANK_NAMES[card.rank] || card.rank.toString();
+    const key = this._cardTextureKey(card);
+    const scaleX = CARD_W / 32;
+    const scaleY = CARD_H / 42;
 
     const glow = this.add.rectangle(x, y, CARD_W + 8, CARD_H + 8, 0xffd600, 0)
       .setDepth(4);
 
-    const bg = this.add.rectangle(x, y, CARD_W, CARD_H, 0xfafafa)
-      .setStrokeStyle(2, 0x333333)
+    const bg = this.add.image(x, y, key)
+      .setScale(scaleX, scaleY)
       .setInteractive({ useHandCursor: true })
       .setDepth(5);
 
-    const rankText = this.add.text(x, y - 20, rankStr, {
-      fontSize: '32px', fontFamily: 'serif', color: suitColor, fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(6);
-
-    const suitText = this.add.text(x, y + 25, suitSym, {
-      fontSize: '36px', fontFamily: 'serif', color: suitColor,
-    }).setOrigin(0.5).setDepth(6);
+    // Invisible position trackers — keep the same cardSprites interface
+    const rankText = this.add.rectangle(x, y - 20, 1, 1, 0x000000, 0).setDepth(6);
+    const suitText = this.add.rectangle(x, y + 25, 1, 1, 0x000000, 0).setDepth(6);
 
     bg.on('pointerdown', () => {
       if (this.inputLocked) return;
@@ -908,21 +920,17 @@ export default class GameScene extends Phaser.Scene {
 
   /** Create card sprite without deal-in animation (used for re-sorting) */
   _createCardSpriteImmediate(card, x, y, index) {
-    const suitColor = SUIT_COLORS[card.suit];
-    const suitSym = SUIT_SYMBOLS[card.suit];
-    const rankStr = RANK_NAMES[card.rank] || card.rank.toString();
+    const key = this._cardTextureKey(card);
+    const scaleX = CARD_W / 32;
+    const scaleY = CARD_H / 42;
 
     const glow = this.add.rectangle(x, y, CARD_W + 8, CARD_H + 8, 0xffd600, 0).setDepth(4);
-    const bg = this.add.rectangle(x, y, CARD_W, CARD_H, 0xfafafa)
-      .setStrokeStyle(2, 0x333333)
+    const bg = this.add.image(x, y, key)
+      .setScale(scaleX, scaleY)
       .setInteractive({ useHandCursor: true })
       .setDepth(5);
-    const rankText = this.add.text(x, y - 20, rankStr, {
-      fontSize: '32px', fontFamily: 'serif', color: suitColor, fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(6);
-    const suitText = this.add.text(x, y + 25, suitSym, {
-      fontSize: '36px', fontFamily: 'serif', color: suitColor,
-    }).setOrigin(0.5).setDepth(6);
+    const rankText = this.add.rectangle(x, y - 20, 1, 1, 0x000000, 0).setDepth(6);
+    const suitText = this.add.rectangle(x, y + 25, 1, 1, 0x000000, 0).setDepth(6);
 
     bg.on('pointerdown', () => {
       if (this.inputLocked) return;
@@ -941,7 +949,6 @@ export default class GameScene extends Phaser.Scene {
     if (this.selectedIndices.has(index)) {
       this.selectedIndices.delete(index);
       cs.glow.setAlpha(0);
-      cs.bg.setStrokeStyle(2, 0x333333);
       const targets = [cs.bg, cs.rankText, cs.suitText, cs.glow];
       this.tweens.add({ targets, y: '-=0', duration: 1 }); // kill existing tweens
       this.tweens.add({ targets: cs.bg,       y: cs.y,      duration: 150, ease: 'Back.easeOut' });
@@ -951,16 +958,19 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.selectedIndices.add(index);
       cs.glow.setAlpha(0.7);
-      cs.bg.setStrokeStyle(2, 0xffd600);
       // Bounce up with slight scale pop
-      const allParts = [cs.bg, cs.rankText, cs.suitText, cs.glow];
       this.tweens.add({ targets: cs.bg,       y: cs.y - lift,      duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.rankText,  y: cs.rankY - lift,  duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.suitText,  y: cs.suitY - lift,  duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.glow,      y: cs.y - lift,      duration: 150, ease: 'Back.easeOut' });
       // Quick scale pop on the card
+      const popTargets = [cs.rankText, cs.suitText, cs.glow];
       this.tweens.add({
-        targets: allParts, scaleX: 1.08, scaleY: 1.08,
+        targets: popTargets, scaleX: 1.08, scaleY: 1.08,
+        duration: 80, yoyo: true, ease: 'Quad.easeOut',
+      });
+      this.tweens.add({
+        targets: cs.bg, scaleX: cs.bg.scaleX * 1.08, scaleY: cs.bg.scaleY * 1.08,
         duration: 80, yoyo: true, ease: 'Quad.easeOut',
       });
     }
@@ -2085,6 +2095,16 @@ export default class GameScene extends Phaser.Scene {
       });
       this.time.delayedCall(450, () => this._startAtBat());
     });
+  }
+
+  _shortHandName(name) {
+    const abbrev = {
+      'High Card': 'HC', 'Pair': 'Pr', 'Two Pair': '2P',
+      'Three of a Kind': '3K', 'Straight': 'St', 'Flush': 'Fl',
+      'Full House': 'FH', 'Four of a Kind': '4K',
+      'Straight Flush': 'SF', 'Royal Flush': 'RF',
+    };
+    return abbrev[name] || name.slice(0, 3);
   }
 
   /**
