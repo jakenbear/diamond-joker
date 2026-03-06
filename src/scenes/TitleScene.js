@@ -20,21 +20,36 @@ export default class TitleScene extends Phaser.Scene {
     diamond.closePath();
     diamond.strokePath();
 
-    // Logo emoji
-    const logo = this.add.text(640, 210, '🃏', {
-      fontSize: '80px',
+    // Logo: baseball + ace of spades
+    const ball = this.add.text(610, 225, '\u26be', {
+      fontSize: '45px', padding: { top: 5 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(2);
+
+    const ace = this.add.text(670, 220, 'A\u2660', {
+      fontSize: '50px', fontFamily: 'serif', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5).setAlpha(0).setDepth(2);
 
     this.tweens.add({
-      targets: logo,
+      targets: ball,
       alpha: 1,
+      x: { from: 580, to: 610 },
       scale: { from: 0.5, to: 1 },
       duration: 600,
       ease: 'Back.easeOut',
     });
 
+    this.tweens.add({
+      targets: ace,
+      alpha: 1,
+      x: { from: 700, to: 670 },
+      scale: { from: 0.5, to: 1 },
+      duration: 600,
+      delay: 100,
+      ease: 'Back.easeOut',
+    });
+
     // Title
-    const title = this.add.text(640, 290, 'DIAMOND JOKER', {
+    const title = this.add.text(640, 290, 'ACES & BASES', {
       fontSize: '64px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setAlpha(0);
 
@@ -47,7 +62,7 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // Subtitle
-    const sub = this.add.text(640, 345, 'A Card-Based Baseball Game', {
+    const sub = this.add.text(640, 345, 'Poker Hands. Baseball Outcomes.', {
       fontSize: '18px', fontFamily: 'monospace', color: '#81c784',
     }).setOrigin(0.5).setAlpha(0);
 
@@ -110,7 +125,7 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // Version / credit
-    this.add.text(640, 690, 'v0.2 - Phase 2', {
+    this.add.text(640, 690, 'v0.3', {
       fontSize: '12px', fontFamily: 'monospace', color: '#444444',
     }).setOrigin(0.5);
   }

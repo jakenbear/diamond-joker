@@ -7,29 +7,24 @@
  */
 
 import HAND_TABLE from '../data/hand_table.js';
-
-const SUITS = ['H', 'D', 'C', 'S'];
-const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]; // 11=J, 12=Q, 13=K, 14=A
+import DECKS from '../data/decks.js';
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 
 export default class CardEngine {
-  constructor() {
+  constructor(deckId = 'standard') {
+    this.deckConfig = DECKS[deckId] || DECKS.standard;
     this.deck = [];
     this.hand = [];
     this.discardPile = [];
-    this.discardsRemaining = 2;
+    this.discardsRemaining = this.deckConfig.discards;
+    this.handSize = this.deckConfig.handSize;
     this._buildDeck();
     this.shuffle();
   }
 
   _buildDeck() {
-    this.deck = [];
-    for (const suit of SUITS) {
-      for (const rank of RANKS) {
-        this.deck.push({ rank, suit, id: `${rank}${suit}` });
-      }
-    }
+    this.deck = this.deckConfig.build();
   }
 
   /** Fisher-Yates shuffle */
@@ -47,7 +42,7 @@ export default class CardEngine {
     this.shuffle();
     this.hand = [];
     this.discardPile = [];
-    this.discardsRemaining = 2;
+    this.discardsRemaining = this.deckConfig.discards;
   }
 
   /** Draw n cards from deck into hand */
@@ -72,13 +67,13 @@ export default class CardEngine {
     }
 
     // Draw replacements, reshuffling discard pile into deck if needed
-    const needed = 5 - this.hand.length;
+    const needed = this.handSize - this.hand.length;
     this.draw(needed);
-    if (this.hand.length < 5 && this.discardPile.length > 0) {
+    if (this.hand.length < this.handSize && this.discardPile.length > 0) {
       this.deck.push(...this.discardPile);
       this.discardPile = [];
       this.shuffle();
-      this.draw(5 - this.hand.length);
+      this.draw(this.handSize - this.hand.length);
     }
     return this.hand;
   }
@@ -91,7 +86,7 @@ export default class CardEngine {
    * @param {Function|null} postModifier - (evalResult, gameState) => modifiedResult
    * @param {Object|null} gameState - current game state for post-modifier
    */
-  playHand(selectedIndices = null, preModifier = null, postModifier = null, gameState = null) {
+  playHand(selectedIndices = null, preModifier = null, postModifier = null, gameState = null, strikeCount = 0) {
     // If no selection provided, play all cards (backwards compat)
     const indices = selectedIndices || this.hand.map((_, i) => i);
     const playedCards = indices.map(i => this.hand[i]).filter(Boolean);
@@ -100,23 +95,23 @@ export default class CardEngine {
       return { ...HAND_TABLE[9], score: 0 };
     }
 
-    const result = CardEngine.evaluateHand(playedCards, preModifier, postModifier, gameState);
+    const result = CardEngine.evaluateHand(playedCards, preModifier, postModifier, gameState, strikeCount);
 
     // All cards (played and unplayed) go to discard - at-bat is over
     this.discardPile.push(...this.hand);
     this.hand = [];
-    this.discardsRemaining = 2;
+    this.discardsRemaining = this.deckConfig.discards;
     return result;
   }
 
-  /** Draw a fresh 5-card hand for a new at-bat */
+  /** Draw a fresh hand for a new at-bat */
   newAtBat() {
-    if (this.deck.length < 5) {
+    if (this.deck.length < this.handSize) {
       this.resetDeck();
     }
     this.hand = [];
-    this.discardsRemaining = 2;
-    this.draw(5);
+    this.discardsRemaining = this.deckConfig.discards;
+    this.draw(this.handSize);
     return this.hand;
   }
 
@@ -124,7 +119,7 @@ export default class CardEngine {
    * Evaluate 1-5 selected cards as a poker hand.
    * Straights and flushes require exactly 5 cards.
    */
-  static evaluateHand(cards, preModifier = null, postModifier = null, gameState = null) {
+  static evaluateHand(cards, preModifier = null, postModifier = null, gameState = null, strikeCount = 0) {
     if (!cards || cards.length === 0) {
       return { ...HAND_TABLE[9], score: 0 };
     }
@@ -180,7 +175,7 @@ export default class CardEngine {
 
     // ── Rank-scaled quality for Pair, Two Pair, Three of a Kind ──
     if (handIdx === 8 || handIdx === 7 || handIdx === 6) {
-      const qualityResult = CardEngine._applyRankQuality(entry, pairRank, handIdx);
+      const qualityResult = CardEngine._applyRankQuality(entry, pairRank, handIdx, strikeCount);
       if (qualityResult) {
         entry = qualityResult;
       }
@@ -278,10 +273,11 @@ export default class CardEngine {
    *   Two Pair:        20% groundout
    *   Three of a Kind: 10% flyout
    */
-  static _applyRankQuality(entry, pairRank, handIdx) {
+  static _applyRankQuality(entry, pairRank, handIdx, strikeCount = 0) {
     // Pairs: rank-scaled out chance (all ranks, not just low)
     if (handIdx === 8) {
-      const outChance = Math.max(0.05, 0.80 - (pairRank - 2) * 0.06);
+      const twoStrikePenalty = strikeCount >= 2 ? 0.10 : 0;
+      const outChance = Math.max(0.05, 0.80 - (pairRank - 2) * 0.06 + twoStrikePenalty);
       if (Math.random() < outChance) {
         return {
           handName: 'Groundout',
@@ -345,4 +341,4 @@ export default class CardEngine {
   }
 }
 
-export { HAND_TABLE, SUITS, RANKS };
+export { HAND_TABLE };

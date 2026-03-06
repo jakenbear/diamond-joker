@@ -19,6 +19,7 @@ export default class ShopScene extends Phaser.Scene {
     this.traitManager = data.traitManager;
     this.baseball = data.baseball;
     this.cardEngine = data.cardEngine;
+    this.gameLogEntries = data.gameLogEntries || [];
     this.purchasesMade = data.purchasesMade || 0;
   }
 
@@ -286,6 +287,7 @@ export default class ShopScene extends Phaser.Scene {
       traitManager: this.traitManager,
       baseball: this.baseball,
       cardEngine: this.cardEngine,
+      gameLogEntries: this.gameLogEntries,
       fromShop: true,
     });
   }

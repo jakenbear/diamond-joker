@@ -32,6 +32,14 @@ const PITCH_TYPES = {
     staminaCost: 0.02,
     description: 'Cheapest on stamina, limits extra-base hits',
   },
+  slider: {
+    name: 'Slider',
+    hitChanceMod: -0.02,
+    kBonusMult: 1.05,
+    xbhMult: 0.5,
+    staminaCost: 0.03,
+    description: 'Groundball pitch — weak contact if they hit',
+  },
   ibb: {
     name: 'Intentional Walk',
     hitChanceMod: 0,
@@ -60,6 +68,11 @@ export default class RosterManager {
     // Your pitcher (pitches against opponent batters)
     this.myPitcher = { ...team.pitchers[pitcherIndex] };
     this.myPitcherStamina = 1.0;
+
+    // Bullpen: all pitchers except the starter
+    this.bullpen = team.pitchers
+      .filter((_, i) => i !== pitcherIndex)
+      .map(p => ({ ...p, used: false }));
 
     // Opponent team
     this.opponentTeam = opponentTeam;
@@ -99,6 +112,25 @@ export default class RosterManager {
 
   getMyPitcherStamina() {
     return this.myPitcherStamina;
+  }
+
+  /** Get available (unused) bullpen pitchers */
+  getAvailableBullpen() {
+    return this.bullpen.filter(p => !p.used);
+  }
+
+  /**
+   * Swap in a reliever from the bullpen.
+   * @param {number} index - Index into the bullpen array
+   * @returns {Object} The new active pitcher
+   */
+  swapPitcher(index) {
+    const reliever = this.bullpen[index];
+    if (!reliever || reliever.used) return this.myPitcher;
+    reliever.used = true;
+    this.myPitcher = { ...reliever };
+    this.myPitcherStamina = 1.0;
+    return this.myPitcher;
   }
 
   /**

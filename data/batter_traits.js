@@ -203,18 +203,11 @@ export default [
   {
     id: 'walk_machine',
     name: 'Walk Machine',
-    description: 'Strikeouts with 0 outs become walks (runner on 1st)',
+    description: 'Every at-bat starts with 1 ball (1-0 count)',
     price: 40,
     rarity: 'rare',
     phase: 'post',
-    effect: {
-      type: 'prevent_outcome',
-      from: 'Strikeout',
-      toOutcome: 'Walk',
-      toHand: 'Walk',
-      chips: 0, mult: 1,
-      condition: { type: 'outs_eq', value: 0 },
-    },
+    effect: { type: 'start_with_ball', value: 1 },
   },
   {
     id: 'dugout_fire',

@@ -1,0 +1,541 @@
+/**
+ * PitchingScene.js - Opponent's half-inning (player pitches)
+ * Extracted from GameScene to keep each scene focused.
+ *
+ * Receives game managers via scene data. When the half-inning ends,
+ * transitions back to GameScene (or ShopScene / GameOverScene).
+ */
+import { PITCH_TYPES } from '../RosterManager.js';
+
+const CARD_W = 100;
+const CARD_H = 140;
+const CARD_SPACING = 120;
+const HAND_Y = 560;
+
+export default class PitchingScene extends Phaser.Scene {
+  constructor() {
+    super({ key: 'PitchingScene' });
+  }
+
+  init(data) {
+    this.rosterManager = data.rosterManager;
+    this.baseball = data.baseball;
+    this.traitManager = data.traitManager;
+    this.cardEngine = data.cardEngine;
+    this.gameLogEntries = data.gameLogEntries || [];
+  }
+
+  create() {
+    // Background
+    this.add.rectangle(640, 360, 1280, 720, 0x0d3311);
+
+    // Clean up on exit
+    this.events.once('shutdown', () => {
+      this.time.removeAllEvents();
+      this.tweens.killAll();
+    });
+
+    this._createScoreboard();
+    this._createBaseDiamond();
+    this._createResultDisplay();
+    this._createGameLog();
+
+    this._startPitching();
+  }
+
+  // ── Scoreboard (minimal) ────────────────────────────────
+
+  _createScoreboard() {
+    this.add.rectangle(640, 25, 1280, 50, 0x0d3311).setDepth(7);
+
+    const yourTeam = this.rosterManager.getTeam();
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const yourLabel = yourTeam ? `${yourTeam.logo} ${yourTeam.id}` : 'YOU';
+    const oppLabel = oppTeam ? `${oppTeam.logo} ${oppTeam.id}` : 'OPP';
+
+    this.add.text(460, 25, yourLabel, {
+      fontSize: '14px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(8);
+
+    this.scoreText = this.add.text(560, 25, '', {
+      fontSize: '18px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(8);
+
+    this.add.text(660, 25, oppLabel, {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ff8a80', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(8);
+
+    const s = this.baseball.getStatus();
+    this.inningText = this.add.text(810, 25, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#b0bec5',
+    }).setOrigin(0.5).setDepth(8);
+
+    this._updateScoreboard();
+  }
+
+  _updateScoreboard() {
+    const s = this.baseball.getStatus();
+    this.scoreText.setText(`${s.playerScore} - ${s.opponentScore}`);
+    const half = s.half === 'top' ? '▲' : '▼';
+    this.inningText.setText(`${half} ${s.inning}`);
+  }
+
+  // ── Base Diamond ────────────────────────────────────────
+
+  _createBaseDiamond() {
+    const cx = 640, cy = 280;
+    const size = 55;
+    const g = this.add.graphics().setDepth(2);
+    g.lineStyle(2, 0x4caf50, 0.6);
+    g.beginPath();
+    g.moveTo(cx, cy - size);
+    g.lineTo(cx + size, cy);
+    g.lineTo(cx, cy + size);
+    g.lineTo(cx - size, cy);
+    g.closePath();
+    g.strokePath();
+
+    // Base positions: 1st (right), 2nd (top), 3rd (left)
+    this.basePositions = [
+      { x: cx + size, y: cy },
+      { x: cx, y: cy - size },
+      { x: cx - size, y: cy },
+    ];
+    this.runners = [null, null, null];
+  }
+
+  _updateBases(bases) {
+    for (let i = 0; i < 3; i++) {
+      const bp = this.basePositions[i];
+      if (bases[i] && !this.runners[i]) {
+        const dot = this.add.circle(bp.x, bp.y + 10, 7, 0xffd600).setDepth(3).setAlpha(0);
+        this.tweens.add({ targets: dot, alpha: 1, y: bp.y, duration: 200 });
+        this.runners[i] = dot;
+      } else if (!bases[i] && this.runners[i]) {
+        const runnerRef = this.runners[i];
+        this.tweens.add({
+          targets: runnerRef, alpha: 0, y: bp.y - 10, duration: 200,
+          onComplete: () => runnerRef.destroy(),
+        });
+        this.runners[i] = null;
+      }
+    }
+  }
+
+  // ── Result Display ──────────────────────────────────────
+
+  _createResultDisplay() {
+    this.resultText = this.add.text(640, 370, '', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      align: 'center', wordWrap: { width: 600 },
+    }).setOrigin(0.5).setDepth(3);
+
+    this.handNameText = this.add.text(640, 400, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+      align: 'center', wordWrap: { width: 600 },
+    }).setOrigin(0.5).setDepth(3);
+  }
+
+  // ── Game Log ────────────────────────────────────────────
+
+  _createGameLog() {
+    const logX = 10, logY = 495, logW = 220, logH = 210;
+
+    this.add.rectangle(logX + logW / 2, logY + logH / 2, logW, logH, 0x0a1f0d, 0.8)
+      .setStrokeStyle(1, 0x2e7d32, 0.5).setDepth(0);
+    this.add.text(logX + 8, logY + 4, 'GAME LOG', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setDepth(1);
+
+    this.gameLogText = this.add.text(logX + 8, logY + 18, '', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#b0bec5',
+      wordWrap: { width: logW - 16 }, lineSpacing: 2,
+    }).setDepth(1);
+
+    const mask = this.add.rectangle(logX + logW / 2, logY + logH / 2 + 8, logW, logH - 16, 0xffffff)
+      .setVisible(false);
+    this.gameLogText.setMask(mask.createGeometryMask());
+
+    // Render existing entries
+    this._refreshGameLog();
+  }
+
+  _addGameLog(entry, color = '#b0bec5') {
+    const s = this.baseball.getStatus();
+    const prefix = `${s.inning}${s.half === 'top' ? '\u25b2' : '\u25bc'}`;
+    this.gameLogEntries.push({ text: `${prefix} ${entry}`, color });
+    if (this.gameLogEntries.length > 40) this.gameLogEntries.shift();
+    this._refreshGameLog();
+  }
+
+  _refreshGameLog() {
+    const visible = this.gameLogEntries.slice(-15);
+    this.gameLogText.setText(visible.map(e => e.text).join('\n'));
+  }
+
+  // ── Pitching Flow ───────────────────────────────────────
+
+  _startPitching() {
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const oppLabel = oppTeam ? `${oppTeam.logo} ${oppTeam.nickname}` : 'Opponent';
+    const myPitcher = this.rosterManager.getMyPitcher();
+
+    this._pitchState = {
+      outs: 0,
+      runs: 0,
+      bases: [false, false, false],
+      oppLabel,
+      myPitcher,
+      logElements: [],
+      logIndex: 0,
+    };
+
+    this.resultText.setColor('#ffffff');
+    this.resultText.setText(`${oppLabel} batting...`);
+    this.handNameText.setText(`${myPitcher.name} pitching`);
+    this.handNameText.setColor('#81c784');
+
+    this._updateBases(this._pitchState.bases);
+    this._showPitchSelection();
+  }
+
+  _showPitchSelection() {
+    const ps = this._pitchState;
+    const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
+    const stamina = this.rosterManager.getMyPitcherStamina();
+    const staminaPct = Math.round(stamina * 100);
+    const staminaColor = staminaPct > 50 ? '#69f0ae' : staminaPct > 25 ? '#ffd600' : '#ff5252';
+
+    this.resultText.setText(`${batter.name} (${batter.pos}) — CON ${batter.contact} / POW ${batter.power}`);
+    this.resultText.setColor('#ffffff');
+    this.handNameText.setText(`Stamina: ${staminaPct}%  |  ${ps.outs} out${ps.outs !== 1 ? 's' : ''}  |  ${ps.runs} run${ps.runs !== 1 ? 's' : ''}`);
+    this.handNameText.setColor(staminaColor);
+
+    this._createPitchButtons();
+  }
+
+  _createPitchButtons() {
+    this._destroyPitchButtons();
+    this._pitchButtons = [];
+
+    const keys = ['fastball', 'breaking', 'slider', 'changeup', 'ibb'];
+    const colors = [0xe53935, 0x1e88e5, 0xfb8c00, 0x43a047, 0x757575];
+    const stamina = this.rosterManager.getMyPitcherStamina();
+
+    const pitchSpacing = keys.length > 4 ? 105 : CARD_SPACING;
+    const pitchStartX = 640 - ((keys.length - 1) * pitchSpacing) / 2;
+
+    keys.forEach((key, i) => {
+      const pitch = PITCH_TYPES[key];
+      const x = pitchStartX + i * pitchSpacing;
+      const y = HAND_Y;
+
+      const bg = this.add.rectangle(x, y, CARD_W, CARD_H, colors[i], 0.9)
+        .setDepth(5).setStrokeStyle(2, 0xffffff)
+        .setInteractive({ useHandCursor: true });
+
+      const nameText = this.add.text(x, y - 45, pitch.name, {
+        fontSize: '13px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+        align: 'center', wordWrap: { width: CARD_W - 10 },
+      }).setOrigin(0.5).setDepth(6);
+
+      const costPct = Math.round(pitch.staminaCost * 100);
+      const costLabel = key === 'ibb' ? 'FREE' : `-${costPct}%`;
+      const costText = this.add.text(x, y - 15, costLabel, {
+        fontSize: '11px', fontFamily: 'monospace', color: '#ffd600',
+      }).setOrigin(0.5).setDepth(6);
+
+      const descText = this.add.text(x, y + 15, this._pitchShortDesc(key), {
+        fontSize: '9px', fontFamily: 'monospace', color: '#cccccc',
+        align: 'center', wordWrap: { width: CARD_W - 10 },
+      }).setOrigin(0.5).setDepth(6);
+
+      const nameY = y - 45, costY = y - 15, descY = y + 15;
+      bg.on('pointerover', () => {
+        bg.setStrokeStyle(3, 0xffd600);
+        this.tweens.add({ targets: bg, y: y - 8, duration: 100 });
+        this.tweens.add({ targets: nameText, y: nameY - 8, duration: 100 });
+        this.tweens.add({ targets: costText, y: costY - 8, duration: 100 });
+        this.tweens.add({ targets: descText, y: descY - 8, duration: 100 });
+      });
+      bg.on('pointerout', () => {
+        bg.setStrokeStyle(2, 0xffffff);
+        this.tweens.add({ targets: bg, y: y, duration: 100 });
+        this.tweens.add({ targets: nameText, y: nameY, duration: 100 });
+        this.tweens.add({ targets: costText, y: costY, duration: 100 });
+        this.tweens.add({ targets: descText, y: descY, duration: 100 });
+      });
+      bg.on('pointerdown', () => this._onPitchSelected(key));
+
+      this._pitchButtons.push(bg, nameText, costText, descText);
+    });
+
+    // Bullpen button
+    const bullpenAvailable = this.rosterManager.getAvailableBullpen();
+    if (stamina <= 0.30 && bullpenAvailable.length > 0) {
+      const bpX = 640;
+      const bpY = HAND_Y + CARD_H / 2 + 30;
+      const bpBg = this.add.rectangle(bpX, bpY, 200, 32, 0x1565c0)
+        .setStrokeStyle(2, 0x42a5f5)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(5);
+      const bpTxt = this.add.text(bpX, bpY, `BULLPEN (${bullpenAvailable.length} available)`, {
+        fontSize: '12px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(6);
+
+      bpBg.on('pointerover', () => bpBg.setStrokeStyle(2, 0xffd600));
+      bpBg.on('pointerout', () => bpBg.setStrokeStyle(2, 0x42a5f5));
+      bpBg.on('pointerdown', () => this._showBullpenSelection());
+
+      this._pitchButtons.push(bpBg, bpTxt);
+    }
+  }
+
+  _showBullpenSelection() {
+    this._destroyPitchButtons();
+    this._pitchButtons = [];
+
+    const relievers = this.rosterManager.getAvailableBullpen();
+    const currentPitcher = this.rosterManager.getMyPitcher();
+    const staminaPct = Math.round(this.rosterManager.getMyPitcherStamina() * 100);
+
+    this.resultText.setText(`${currentPitcher.name} (${staminaPct}% stamina) — Call the bullpen?`);
+    this.resultText.setColor('#42a5f5');
+    this.handNameText.setText('Select a reliever or go back');
+    this.handNameText.setColor('#90caf9');
+
+    const totalCards = relievers.length + 1;
+    const spacing = Math.min(CARD_SPACING, 120);
+    const startX = 640 - ((totalCards - 1) * spacing) / 2;
+
+    relievers.forEach((p, i) => {
+      const x = startX + i * spacing;
+      const y = HAND_Y;
+
+      const bg = this.add.rectangle(x, y, CARD_W, CARD_H, 0x1565c0, 0.9)
+        .setDepth(5).setStrokeStyle(2, 0x42a5f5)
+        .setInteractive({ useHandCursor: true });
+      const nameText = this.add.text(x, y - 40, p.name.split(' ').pop(), {
+        fontSize: '12px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(6);
+      const velText = this.add.text(x, y - 15, `VEL ${p.velocity}`, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#ef5350',
+      }).setOrigin(0.5).setDepth(6);
+      const ctrlText = this.add.text(x, y + 3, `CTL ${p.control}`, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#66bb6a',
+      }).setOrigin(0.5).setDepth(6);
+      const staText = this.add.text(x, y + 21, `STA ${p.stamina}`, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#ffd600',
+      }).setOrigin(0.5).setDepth(6);
+      const freshText = this.add.text(x, y + 42, '100%', {
+        fontSize: '10px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(6);
+
+      const bullpenIndex = this.rosterManager.bullpen.indexOf(p);
+
+      const nameY = y - 40, velY = y - 15, ctrlY = y + 3, staY = y + 21, freshY = y + 42;
+      bg.on('pointerover', () => {
+        bg.setStrokeStyle(3, 0xffd600);
+        [bg, nameText, velText, ctrlText, staText, freshText].forEach((el, idx) => {
+          const baseY = [y, nameY, velY, ctrlY, staY, freshY][idx];
+          this.tweens.add({ targets: el, y: baseY - 8, duration: 100 });
+        });
+      });
+      bg.on('pointerout', () => {
+        bg.setStrokeStyle(2, 0x42a5f5);
+        [bg, nameText, velText, ctrlText, staText, freshText].forEach((el, idx) => {
+          const baseY = [y, nameY, velY, ctrlY, staY, freshY][idx];
+          this.tweens.add({ targets: el, y: baseY, duration: 100 });
+        });
+      });
+      bg.on('pointerdown', () => {
+        this._destroyPitchButtons();
+        const newPitcher = this.rosterManager.swapPitcher(bullpenIndex);
+        this._pitchState.myPitcher = newPitcher;
+        this._addGameLog(`Bullpen: ${newPitcher.name} warming up`, '#42a5f5');
+
+        this.resultText.setText(`${newPitcher.name} takes the mound!`);
+        this.resultText.setColor('#69f0ae');
+        this.handNameText.setText(`VEL ${newPitcher.velocity} | CTL ${newPitcher.control} | STA ${newPitcher.stamina}`);
+        this.handNameText.setColor('#42a5f5');
+
+        this.time.delayedCall(1500, () => this._showPitchSelection());
+      });
+
+      this._pitchButtons.push(bg, nameText, velText, ctrlText, staText, freshText);
+    });
+
+    // "Keep Pitching" button
+    const keepX = startX + relievers.length * spacing;
+    const keepY = HAND_Y;
+    const keepBg = this.add.rectangle(keepX, keepY, CARD_W, CARD_H, 0x555555, 0.9)
+      .setDepth(5).setStrokeStyle(2, 0x777777)
+      .setInteractive({ useHandCursor: true });
+    const keepText = this.add.text(keepX, keepY - 10, 'Keep', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(6);
+    const keepSub = this.add.text(keepX, keepY + 10, `${staminaPct}%`, {
+      fontSize: '11px', fontFamily: 'monospace', color: staminaPct > 15 ? '#ffd600' : '#ff5252',
+    }).setOrigin(0.5).setDepth(6);
+
+    const keepTextY = keepY - 10, keepSubY = keepY + 10;
+    keepBg.on('pointerover', () => {
+      keepBg.setStrokeStyle(3, 0xffd600);
+      this.tweens.add({ targets: keepBg, y: keepY - 8, duration: 100 });
+      this.tweens.add({ targets: keepText, y: keepTextY - 8, duration: 100 });
+      this.tweens.add({ targets: keepSub, y: keepSubY - 8, duration: 100 });
+    });
+    keepBg.on('pointerout', () => {
+      keepBg.setStrokeStyle(2, 0x777777);
+      this.tweens.add({ targets: keepBg, y: keepY, duration: 100 });
+      this.tweens.add({ targets: keepText, y: keepTextY, duration: 100 });
+      this.tweens.add({ targets: keepSub, y: keepSubY, duration: 100 });
+    });
+    keepBg.on('pointerdown', () => {
+      this._destroyPitchButtons();
+      this._showPitchSelection();
+    });
+
+    this._pitchButtons.push(keepBg, keepText, keepSub);
+  }
+
+  _pitchShortDesc(key) {
+    switch (key) {
+      case 'fastball': return 'High K\nMore XBH';
+      case 'breaking': return 'Hard to hit\nWalk risk';
+      case 'slider': return 'Weak contact\nLow XBH';
+      case 'changeup': return 'Saves arm\nSafe hits';
+      case 'ibb': return 'Free pass\nto 1st base';
+      default: return '';
+    }
+  }
+
+  _destroyPitchButtons() {
+    if (this._pitchButtons) {
+      this._pitchButtons.forEach(el => el.destroy());
+      this._pitchButtons = null;
+    }
+  }
+
+  _onPitchSelected(pitchType) {
+    this._destroyPitchButtons();
+
+    const ps = this._pitchState;
+    const inning = this.baseball.getStatus().inning;
+    const result = this.rosterManager.simSingleAtBat(inning, pitchType, ps.bases);
+
+    if (result.isOut) {
+      ps.outs++;
+    }
+    ps.runs += result.scored || 0;
+
+    // Game log entry
+    const oppBatterLast = result.batter.name.split(' ').pop().slice(0, 8);
+    const pitchAbbr = { Fastball: 'FB', 'Breaking Ball': 'BRK', Slider: 'SLD', Changeup: 'CHG', IBB: 'IBB' };
+    const pitchShort = pitchAbbr[PITCH_TYPES[pitchType]?.name] || pitchType;
+    if (result.isOut) {
+      this._addGameLog(`${oppBatterLast}: ${result.outcome} ${pitchShort}`, '#999999');
+    } else {
+      const runNote = result.scored > 0 ? ` +${result.scored}R` : '';
+      this._addGameLog(`${oppBatterLast}: ${result.outcome}${runNote} ${pitchShort}`, '#ff8a80');
+    }
+
+    // Show result line
+    const icon = result.isOut ? '\u274c' : (result.walked ? '\ud83d\udeb6' : '\u2705');
+    let text = `${icon} ${result.batter.name} - ${result.outcome}`;
+    if (!result.isOut && result.scored > 0) {
+      text += ` (${result.scored} run${result.scored > 1 ? 's' : ''})`;
+    }
+
+    const color = result.isOut ? '#999999' : (result.scored > 0 ? '#ff8a80' : '#ffe082');
+    const logY = 420 + ps.logIndex * 26;
+    const logLine = this.add.text(640, logY + 5, text, {
+      fontSize: '14px', fontFamily: 'monospace', color,
+    }).setOrigin(0.5).setDepth(9).setAlpha(0);
+    ps.logElements.push(logLine);
+    ps.logIndex++;
+
+    this.tweens.add({
+      targets: logLine, alpha: 1, y: logY, duration: 200,
+    });
+
+    this._updateBases(ps.bases);
+
+    if (ps.outs >= 3) {
+      this.time.delayedCall(800, () => this._finishOpponentHalf());
+    } else {
+      this.time.delayedCall(600, () => this._showPitchSelection());
+    }
+  }
+
+  _finishOpponentHalf() {
+    const ps = this._pitchState;
+
+    // Clean up log elements
+    ps.logElements.forEach(el => {
+      this.tweens.add({ targets: el, alpha: 0, duration: 300 });
+    });
+    this.time.delayedCall(350, () => ps.logElements.forEach(el => el.destroy()));
+
+    // Switch side with accumulated runs
+    this.baseball.switchSide(ps.runs);
+    this._addGameLog(`--- End of half: ${ps.runs} run${ps.runs !== 1 ? 's' : ''} ---`, '#4caf50');
+
+    // Show summary
+    const summary = ps.runs === 0
+      ? `${ps.myPitcher.name} shuts them down!`
+      : `${ps.oppLabel} score${ps.runs === 1 ? 's' : ''} ${ps.runs} run${ps.runs !== 1 ? 's' : ''}`;
+    this.resultText.setText(summary);
+    this.resultText.setColor(ps.runs > 0 ? '#ff8a80' : '#69f0ae');
+    this.handNameText.setText('');
+
+    this.tweens.add({
+      targets: this.scoreText,
+      scale: { from: 1.3, to: 1 },
+      duration: 400, ease: 'Back.easeOut',
+    });
+
+    this._updateScoreboard();
+    this._updateBases([false, false, false]);
+
+    this.time.delayedCall(1800, () => {
+      if (this.baseball.isGameOver()) {
+        this._endGame();
+        return;
+      }
+      if (this.baseball.shouldShowShop()) {
+        this._goToShop();
+        return;
+      }
+      this._returnToGameScene();
+    });
+  }
+
+  _returnToGameScene() {
+    this.scene.start('GameScene', {
+      fromPitching: true,
+      rosterManager: this.rosterManager,
+      baseball: this.baseball,
+      traitManager: this.traitManager,
+      cardEngine: this.cardEngine,
+      gameLogEntries: this.gameLogEntries,
+    });
+  }
+
+  _goToShop() {
+    this.scene.start('ShopScene', {
+      rosterManager: this.rosterManager,
+      traitManager: this.traitManager,
+      baseball: this.baseball,
+      cardEngine: this.cardEngine,
+      gameLogEntries: this.gameLogEntries,
+    });
+  }
+
+  _endGame() {
+    const result = this.baseball.getResult();
+    result.yourTeam = this.rosterManager.getTeam();
+    result.opponentTeam = this.rosterManager.getOpponentTeam();
+    this.scene.start('GameOverScene', result);
+  }
+}

@@ -19,6 +19,12 @@ const OUTCOME_EFFECTS = {
   'Walk-Off':           { basesToMove: 4, isOut: false },
   'Perfect Game':       { basesToMove: 4, isOut: false },
   'Walk':               { basesToMove: 1, isOut: false },
+  'Double Play':        { basesToMove: 0, isOut: true, outsRecorded: 2 },
+  'Fielder\'s Choice':  { basesToMove: 0, isOut: true, fieldsersChoice: true },
+  'Error':              { basesToMove: 1, isOut: false },
+  'Dropped Third Strike': { basesToMove: 1, isOut: false },
+  'HBP':                { basesToMove: 1, isOut: false },
+  'Sac Bunt':           { basesToMove: 0, isOut: true, sacBunt: true },
 };
 
 export default class BaseballState {
@@ -102,8 +108,33 @@ export default class BaseballState {
     let description = outcome;
 
     if (effect.isOut) {
-      this.outs++;
-      description = `${outcome} - Out ${this.outs}`;
+      // Double Play: 2 outs, remove lead runner from 1st
+      if (effect.outsRecorded === 2) {
+        this.outs += 2;
+        this.bases[0] = false; // runner on 1st out
+        description = `Double Play! Outs: ${this.outs}`;
+      } else if (effect.sacBunt) {
+        // Sac Bunt: advance all runners 1 base, then record the out
+        // advanceAllRunners() already updates playerScore internally
+        const sacRuns = this.advanceAllRunners();
+        runsScored += sacRuns;
+        this.outs++;
+        description = sacRuns > 0
+          ? `Sac Bunt - Out ${this.outs}, ${sacRuns} run${sacRuns > 1 ? 's' : ''} scored!`
+          : `Sac Bunt - Out ${this.outs}, runners advance`;
+      } else if (effect.fieldsersChoice) {
+        // Fielder's Choice: lead runner out, batter safe on 1st
+        this.outs++;
+        // Remove the lead runner (highest occupied base)
+        for (let i = 2; i >= 0; i--) {
+          if (this.bases[i]) { this.bases[i] = false; break; }
+        }
+        this.bases[0] = true; // batter reaches 1st
+        description = `Fielder's Choice - Out ${this.outs}`;
+      } else {
+        this.outs++;
+        description = `${outcome} - Out ${this.outs}`;
+      }
 
       if (this.outs >= 3) {
         this.bases = [false, false, false];
@@ -165,6 +196,27 @@ export default class BaseballState {
     } else if (!this.bases[2]) {
       this.bases[2] = true;
     }
+  }
+
+  /**
+   * Advance all existing runners by 1 base (no batter placed).
+   * Used for full-count (3-2) runner advance.
+   * Returns runs scored.
+   */
+  advanceAllRunners() {
+    let runs = 0;
+    for (let i = 2; i >= 0; i--) {
+      if (!this.bases[i]) continue;
+      this.bases[i] = false;
+      if (i + 1 >= 3) {
+        runs++;
+        this.playerScore += 1;
+        this._currentInningPlayerRuns += 1;
+      } else {
+        this.bases[i + 1] = true;
+      }
+    }
+    return runs;
   }
 
   /**

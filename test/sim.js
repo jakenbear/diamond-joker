@@ -568,8 +568,8 @@ group('1h. Pitch Type Modifiers');
 
 {
   // PITCH_TYPES export exists with expected keys
-  assert(PITCH_TYPES.fastball && PITCH_TYPES.breaking && PITCH_TYPES.changeup && PITCH_TYPES.ibb,
-    'PITCH_TYPES has fastball, breaking, changeup, ibb');
+  assert(PITCH_TYPES.fastball && PITCH_TYPES.breaking && PITCH_TYPES.slider && PITCH_TYPES.changeup && PITCH_TYPES.ibb,
+    'PITCH_TYPES has fastball, breaking, slider, changeup, ibb');
 }
 {
   // Fastball hit rate < changeup hit rate (statistical, N=2000)
@@ -630,6 +630,34 @@ group('1h. Pitch Type Modifiers');
     if (['Double', 'Triple', 'Home Run'].includes(cu.outcome)) changeupXBH++;
   }
   assert(fastballXBH > changeupXBH, `Fastball XBH (${fastballXBH}) > changeup XBH (${changeupXBH})`);
+}
+{
+  // Slider XBH rate < fastball XBH rate (lowest XBH mult at 0.5x)
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const N = 3000;
+  let sliderXBH = 0, fastballXBH = 0;
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    const bases = [false, false, false];
+    const sl = rm.simSingleAtBat(1, 'slider', bases);
+    if (['Double', 'Triple', 'Home Run'].includes(sl.outcome)) sliderXBH++;
+  }
+  for (let i = 0; i < N; i++) {
+    const rm = new RosterManager(canada, 0, usa);
+    const bases = [false, false, false];
+    const fb = rm.simSingleAtBat(1, 'fastball', bases);
+    if (['Double', 'Triple', 'Home Run'].includes(fb.outcome)) fastballXBH++;
+  }
+  assert(sliderXBH < fastballXBH, `Slider XBH (${sliderXBH}) < fastball XBH (${fastballXBH})`);
+}
+{
+  // Slider stamina cost is 3%
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const rm = new RosterManager(canada, 0, usa);
+  rm.simSingleAtBat(1, 'slider', [false, false, false]);
+  assertClose(rm.getMyPitcherStamina(), 0.96, 0.98, 'Stamina after slider ~0.97');
 }
 {
   // Breaking ball walk rate with low control pitcher (control=3 → 12% walk chance)
@@ -1512,6 +1540,602 @@ group('2c. Statistical Sim — average brain (N=100 games)');
     const pct = ((count / totalAtBats) * 100).toFixed(1);
     console.log(`    ${outcome.padEnd(20)} ${count.toString().padStart(5)}  (${pct}%)`);
   }
+}
+
+// ═══════════════════════════════════════════════════════
+//  COUNT SYSTEM TESTS
+// ═══════════════════════════════════════════════════════
+
+import CountManager, { COUNT_MODIFIERS } from '../src/CountManager.js';
+
+group('Count System: Basic State');
+
+{
+  const cm = new CountManager();
+  const count = cm.getCount();
+  assert(count.balls === 0 && count.strikes === 0, 'New CountManager starts at 0-0');
+}
+{
+  const cm = new CountManager();
+  cm.balls = 2;
+  cm.strikes = 1;
+  cm.reset();
+  const count = cm.getCount();
+  assert(count.balls === 0 && count.strikes === 0, 'reset() clears count to 0-0');
+}
+{
+  const cm = new CountManager();
+  assert(!cm.isWalk(), 'isWalk() false at 0 balls');
+  cm.balls = 3;
+  assert(!cm.isWalk(), 'isWalk() false at 3 balls');
+  cm.balls = 4;
+  assert(cm.isWalk(), 'isWalk() true at 4 balls');
+}
+{
+  const cm = new CountManager();
+  cm.setStartingBalls(1);
+  assert(cm.getCount().balls === 1, 'setStartingBalls(1) sets balls to 1');
+  cm.setStartingBalls(5);
+  assert(cm.getCount().balls === 3, 'setStartingBalls(5) caps at 3');
+}
+
+group('Count System: recordDiscard');
+
+{
+  // High control pitcher (7+): never throws balls
+  const cm = new CountManager();
+  let anyBall = false;
+  for (let i = 0; i < 200; i++) {
+    cm.reset();
+    const result = cm.recordDiscard(8);
+    if (result.isBall) anyBall = true;
+  }
+  assert(!anyBall, 'Control 8 pitcher never throws balls (200 trials)');
+}
+{
+  // Strike increments correctly
+  const cm = new CountManager();
+  const r1 = cm.recordDiscard(10); // control 10 = no balls
+  assert(r1.isStrike && cm.getCount().strikes === 1, 'First discard: strike 1');
+  const r2 = cm.recordDiscard(10);
+  assert(r2.isStrike && cm.getCount().strikes === 2, 'Second discard: strike 2');
+  const r3 = cm.recordDiscard(10);
+  assert(r3.isFoul && cm.getCount().strikes === 2, 'Third discard: foul (strikes stay at 2)');
+}
+{
+  // Ball accumulation with wild pitcher (control 3, ballChance = 32%)
+  const N = 2000;
+  let totalBalls = 0;
+  for (let i = 0; i < N; i++) {
+    const cm = new CountManager();
+    const result = cm.recordDiscard(3);
+    if (result.isBall) totalBalls++;
+  }
+  const ballRate = totalBalls / N;
+  assertClose(ballRate, 0.22, 0.42, `Wild pitcher (control 3) ball rate ~32%`);
+}
+{
+  // Walk detection: force 4 balls
+  const cm = new CountManager();
+  cm.balls = 3;
+  // Use control 1 for very high ball chance: (7-1)*0.08 = 48%
+  let walked = false;
+  for (let i = 0; i < 200 && !walked; i++) {
+    cm.balls = 3; // reset to 3 each try
+    const result = cm.recordDiscard(1);
+    if (result.isWalk) walked = true;
+  }
+  assert(walked, 'Walk detected when 4th ball accumulates');
+}
+
+group('Count System: Count Modifiers');
+
+{
+  const cm = new CountManager();
+  const mods = cm.getCountModifiers();
+  assert(mods.chipsMod === 0 && mods.multMod === 0, '0-0 count: neutral modifiers');
+}
+{
+  const cm = new CountManager();
+  cm.balls = 3;
+  cm.strikes = 0;
+  const mods = cm.getCountModifiers();
+  assert(mods.chipsMod === 2 && mods.multMod === 1.0, '3-0 count: +2 chips, +1.0 mult');
+}
+{
+  const cm = new CountManager();
+  cm.balls = 0;
+  cm.strikes = 2;
+  const mods = cm.getCountModifiers();
+  assert(mods.chipsMod === -1 && mods.multMod === -0.5, '0-2 count: -1 chips, -0.5 mult');
+}
+{
+  // All count modifier keys exist
+  const expectedKeys = ['3-0','2-0','3-1','1-0','2-1','3-2','0-0','1-1','2-2','0-1','1-2','0-2'];
+  const allExist = expectedKeys.every(k => COUNT_MODIFIERS[k] !== undefined);
+  assert(allExist, 'All 12 count modifier entries exist');
+}
+
+group('Count System: Two-Strike Groundout Penalty');
+
+{
+  // Statistical test: pairs at 2 strikes should ground out more than at 0 strikes
+  const N = 3000;
+  let groundouts0 = 0, groundouts2 = 0;
+  const pair = makeCards([[8, 'H'], [8, 'D']]);
+  for (let i = 0; i < N; i++) {
+    const r0 = CardEngine.evaluateHand(pair, null, null, null, 0);
+    if (r0.outcome === 'Groundout') groundouts0++;
+    const r2 = CardEngine.evaluateHand(pair, null, null, null, 2);
+    if (r2.outcome === 'Groundout') groundouts2++;
+  }
+  assert(groundouts2 > groundouts0, `Two-strike penalty: groundouts at 2 strikes (${groundouts2}) > at 0 strikes (${groundouts0})`);
+}
+
+group('Count System: Walk Machine Trait');
+
+{
+  const wm = BATTER_TRAITS.find(t => t.id === 'walk_machine');
+  assert(wm, 'Walk Machine trait exists');
+  assert(wm.effect.type === 'start_with_ball', 'Walk Machine uses start_with_ball effect');
+  assert(wm.effect.value === 1, 'Walk Machine gives +1 starting ball');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SITUATIONAL ENGINE TESTS (Phase 2)
+// ═══════════════════════════════════════════════════════
+
+import SituationalEngine from '../src/SituationalEngine.js';
+
+group('Situational Engine: Double Play');
+
+{
+  // DP requires: groundout + runner on 1st + < 2 outs
+  const N = 2000;
+  let dpCount = 0;
+  for (let i = 0; i < N; i++) {
+    const result = SituationalEngine.check('Groundout', {
+      outs: 0, bases: [true, false, false], inning: 5,
+    }, 5);
+    if (result.type === 'double_play') dpCount++;
+  }
+  const dpRate = dpCount / N;
+  // speed 5: chance = 35% - 15% = 20%
+  assertClose(dpRate, 0.12, 0.28, `DP rate with speed 5 ~20%`);
+}
+{
+  // No DP with 2 outs
+  let anyDp = false;
+  for (let i = 0; i < 500; i++) {
+    const result = SituationalEngine.check('Groundout', {
+      outs: 2, bases: [true, false, false], inning: 5,
+    }, 5);
+    if (result.type === 'double_play') anyDp = true;
+  }
+  assert(!anyDp, 'No double play with 2 outs');
+}
+{
+  // No DP without runner on 1st
+  let anyDp = false;
+  for (let i = 0; i < 500; i++) {
+    const result = SituationalEngine.check('Groundout', {
+      outs: 0, bases: [false, true, false], inning: 5,
+    }, 5);
+    if (result.type === 'double_play') anyDp = true;
+  }
+  assert(!anyDp, 'No double play without runner on 1st');
+}
+{
+  // Fast runners turn fewer DPs
+  const N = 3000;
+  let dpSlow = 0, dpFast = 0;
+  for (let i = 0; i < N; i++) {
+    const gs = { outs: 0, bases: [true, false, false], inning: 5 };
+    if (SituationalEngine.check('Groundout', gs, 2).type === 'double_play') dpSlow++;
+    if (SituationalEngine.check('Groundout', gs, 9).type === 'double_play') dpFast++;
+  }
+  assert(dpSlow > dpFast, `Slow runners DP more (${dpSlow}) than fast runners (${dpFast})`);
+}
+
+group('Situational Engine: Fielder\'s Choice');
+
+{
+  // FC happens on groundouts with runner on 1st (non-DP)
+  // Need to exclude DP triggers — test with 2 outs where DP can't happen
+  const N = 2000;
+  let fcCount = 0;
+  for (let i = 0; i < N; i++) {
+    const result = SituationalEngine.check('Groundout', {
+      outs: 2, bases: [true, false, false], inning: 5,
+    }, 5);
+    if (result.type === 'fielders_choice') fcCount++;
+  }
+  const fcRate = fcCount / N;
+  assertClose(fcRate, 0.30, 0.50, `FC rate at 2 outs ~40%`);
+}
+{
+  // No FC without runner on 1st
+  let anyFc = false;
+  for (let i = 0; i < 500; i++) {
+    const result = SituationalEngine.check('Groundout', {
+      outs: 0, bases: [false, false, false], inning: 5,
+    }, 5);
+    if (result.type === 'fielders_choice') anyFc = true;
+  }
+  assert(!anyFc, 'No FC without runner on 1st');
+}
+
+group('Situational Engine: Error');
+
+{
+  // Error on groundout/flyout, ~4% base + late inning bonus
+  const N = 5000;
+  let errorCount = 0;
+  for (let i = 0; i < N; i++) {
+    const result = SituationalEngine.check('Groundout', {
+      outs: 0, bases: [false, false, false], inning: 3,
+    }, 5);
+    if (result.type === 'error') errorCount++;
+  }
+  const errRate = errorCount / N;
+  assertClose(errRate, 0.02, 0.07, `Error rate in inning 3 ~4%`);
+}
+{
+  // Late-inning bonus: inning 9 should have higher error rate
+  const N = 5000;
+  let earlyErrors = 0, lateErrors = 0;
+  for (let i = 0; i < N; i++) {
+    const earlyGs = { outs: 0, bases: [false, false, false], inning: 3 };
+    const lateGs = { outs: 0, bases: [false, false, false], inning: 9 };
+    if (SituationalEngine.check('Flyout', earlyGs, 5).type === 'error') earlyErrors++;
+    if (SituationalEngine.check('Flyout', lateGs, 5).type === 'error') lateErrors++;
+  }
+  assert(lateErrors > earlyErrors, `Late-inning errors (${lateErrors}) > early-inning errors (${earlyErrors})`);
+}
+{
+  // No error on non-outs (singles, etc.)
+  let anyError = false;
+  for (let i = 0; i < 200; i++) {
+    const result = SituationalEngine.check('Single', {
+      outs: 0, bases: [false, false, false], inning: 9,
+    }, 5);
+    if (result.type === 'error') anyError = true;
+  }
+  assert(!anyError, 'No errors on hits');
+}
+
+group('Situational Engine: BaseballState DP/FC/Error Resolution');
+
+{
+  // Double Play records 2 outs and removes runner from 1st
+  const bs = new BaseballState();
+  bs.bases = [true, false, false]; // runner on 1st
+  bs.outs = 0;
+  const result = bs.resolveOutcome('Double Play', 0);
+  assert(bs.outs === 2 || bs.state === 'SWITCH_SIDE', 'DP records 2 outs');
+  assert(!bs.bases[0], 'DP removes runner from 1st');
+}
+{
+  // DP with 2 outs = 4 total outs → side retired (outs reset to 0)
+  const bs = new BaseballState();
+  bs.bases = [true, false, false];
+  bs.outs = 2;
+  bs.resolveOutcome('Double Play', 0);
+  assert(bs.state === 'SWITCH_SIDE', 'DP with 2 outs retires side');
+  assert(bs.outs === 0, 'Outs reset after side retired');
+}
+{
+  // Fielder's Choice: lead runner out, batter on 1st
+  const bs = new BaseballState();
+  bs.bases = [true, true, false]; // runners on 1st and 2nd
+  bs.outs = 0;
+  bs.resolveOutcome("Fielder's Choice", 0);
+  assert(bs.outs === 1, 'FC records 1 out');
+  assert(bs.bases[0], 'FC: batter on 1st');
+  assert(!bs.bases[1], 'FC: lead runner (2nd) removed');
+}
+{
+  // Error: treated as single (runner advances)
+  const bs = new BaseballState();
+  bs.bases = [false, false, false];
+  bs.outs = 0;
+  bs.resolveOutcome('Error', 0);
+  assert(bs.outs === 0, 'Error does not record an out');
+  assert(bs.bases[0], 'Error: batter reaches 1st');
+}
+
+// ═══════════════════════════════════════════════════════
+//  PHASE 3: WILD PITCH, HBP, SAC BUNT, DROPPED 3RD STRIKE
+// ═══════════════════════════════════════════════════════
+
+group('Phase 3: Dropped Third Strike');
+
+{
+  // D3K requires: strikeout + 1st base empty
+  const N = 3000;
+  let d3kCount = 0;
+  for (let i = 0; i < N; i++) {
+    const result = SituationalEngine.check('Strikeout', {
+      outs: 1, bases: [false, false, false], inning: 5,
+    }, 5);
+    if (result.type === 'dropped_third_strike') d3kCount++;
+  }
+  const d3kRate = d3kCount / N;
+  // speed 5: 5% + 5% = 10%
+  assertClose(d3kRate, 0.06, 0.14, `D3K rate with speed 5 ~10%`);
+}
+{
+  // No D3K when 1st base is occupied
+  let anyD3k = false;
+  for (let i = 0; i < 500; i++) {
+    const result = SituationalEngine.check('Strikeout', {
+      outs: 1, bases: [true, false, false], inning: 5,
+    }, 5);
+    if (result.type === 'dropped_third_strike') anyD3k = true;
+  }
+  assert(!anyD3k, 'No D3K with runner on 1st');
+}
+{
+  // D3K only on strikeouts
+  let anyD3k = false;
+  for (let i = 0; i < 500; i++) {
+    const result = SituationalEngine.check('Groundout', {
+      outs: 1, bases: [false, false, false], inning: 5,
+    }, 5);
+    if (result.type === 'dropped_third_strike') anyD3k = true;
+  }
+  assert(!anyD3k, 'No D3K on groundouts');
+}
+{
+  // D3K resolves as batter reaching 1st (not an out)
+  const bs = new BaseballState();
+  bs.bases = [false, false, false];
+  bs.outs = 1;
+  bs.resolveOutcome('Dropped Third Strike', 0);
+  assert(bs.outs === 1, 'D3K does not record an out');
+  assert(bs.bases[0], 'D3K: batter reaches 1st');
+}
+
+group('Phase 3: Wild Pitch');
+
+{
+  // Wild pitch only triggers with runners on base
+  let anyWP = false;
+  for (let i = 0; i < 500; i++) {
+    const result = SituationalEngine.checkWildPitch(3, [false, false, false]);
+    if (result.triggered) anyWP = true;
+  }
+  assert(!anyWP, 'No wild pitch without runners');
+}
+{
+  // Wild pitch never triggers with high control
+  let anyWP = false;
+  for (let i = 0; i < 500; i++) {
+    const result = SituationalEngine.checkWildPitch(7, [true, false, false]);
+    if (result.triggered) anyWP = true;
+  }
+  assert(!anyWP, 'No wild pitch with control 7+');
+}
+{
+  // Wild pitch rate with low control pitcher
+  const N = 3000;
+  let wpCount = 0;
+  for (let i = 0; i < N; i++) {
+    const result = SituationalEngine.checkWildPitch(3, [true, false, false]);
+    if (result.triggered) wpCount++;
+  }
+  const wpRate = wpCount / N;
+  // control 3: (6-3)*2% = 6%
+  assertClose(wpRate, 0.03, 0.10, `Wild pitch rate with control 3 ~6%`);
+}
+
+group('Phase 3: HBP');
+
+{
+  // HBP never triggers with high control
+  let anyHBP = false;
+  for (let i = 0; i < 500; i++) {
+    const result = SituationalEngine.checkHBP(6);
+    if (result.triggered) anyHBP = true;
+  }
+  assert(!anyHBP, 'No HBP with control 6+');
+}
+{
+  // HBP rate with low control
+  const N = 5000;
+  let hbpCount = 0;
+  for (let i = 0; i < N; i++) {
+    const result = SituationalEngine.checkHBP(3);
+    if (result.triggered) hbpCount++;
+  }
+  const hbpRate = hbpCount / N;
+  // control 3: (5-3)*1.5% = 3%
+  assertClose(hbpRate, 0.01, 0.05, `HBP rate with control 3 ~3%`);
+}
+{
+  // HBP resolves as batter reaching 1st
+  const bs = new BaseballState();
+  bs.outs = 0;
+  bs.resolveOutcome('HBP', 0);
+  assert(bs.outs === 0, 'HBP does not record an out');
+  assert(bs.bases[0], 'HBP: batter reaches 1st');
+}
+
+group('Phase 3: Sac Bunt');
+
+{
+  // Sac Bunt: records 1 out, runners advance
+  const bs = new BaseballState();
+  bs.bases = [true, false, false]; // runner on 1st
+  bs.outs = 0;
+  bs.resolveOutcome('Sac Bunt', 0);
+  assert(bs.outs === 1, 'Sac Bunt records 1 out');
+  assert(bs.bases[1], 'Sac Bunt: runner advanced to 2nd');
+  assert(!bs.bases[0], 'Sac Bunt: 1st base cleared');
+}
+{
+  // Sac Bunt with runner on 3rd scores a run
+  const bs = new BaseballState();
+  bs.bases = [false, false, true]; // runner on 3rd
+  bs.outs = 0;
+  const result = bs.resolveOutcome('Sac Bunt', 0);
+  assert(bs.outs === 1, 'Sac Bunt with runner on 3rd records 1 out');
+  assert(bs.playerScore === 1, 'Sac Bunt with runner on 3rd scores 1 run');
+}
+{
+  // Sac Bunt with runners on 1st and 3rd
+  const bs = new BaseballState();
+  bs.bases = [true, false, true]; // runners on 1st and 3rd
+  bs.outs = 0;
+  bs.resolveOutcome('Sac Bunt', 0);
+  assert(bs.outs === 1, 'Sac Bunt records 1 out');
+  assert(bs.playerScore === 1, 'Runner from 3rd scores');
+  assert(bs.bases[1], 'Runner from 1st advanced to 2nd');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Deck Definitions
+// ═══════════════════════════════════════════════════════
+
+group('Deck Definitions');
+
+{
+  // Standard deck
+  const ce = new CardEngine('standard');
+  assert(ce.deck.length === 52, 'Standard deck has 52 cards');
+  assert(ce.discardsRemaining === 2, 'Standard deck has 2 discards');
+  assert(ce.handSize === 5, 'Standard hand size is 5');
+}
+
+{
+  // No face deck
+  const ce = new CardEngine('no_face');
+  assert(ce.deck.length === 40, 'No Face deck has 40 cards (no J/Q/K)');
+  const hasJack = ce.deck.some(c => c.rank === 11);
+  assert(!hasJack, 'No Face deck has no Jacks');
+}
+
+{
+  // Double deck
+  const ce = new CardEngine('double');
+  assert(ce.deck.length === 104, 'Double deck has 104 cards');
+  assert(ce.discardsRemaining === 3, 'Double deck has 3 discards');
+}
+
+{
+  // Default constructor uses standard
+  const ce = new CardEngine();
+  assert(ce.deck.length === 52, 'Default deck is standard 52');
+}
+
+{
+  // resetDeck restores deck config discards
+  const ce = new CardEngine('double');
+  ce.discardsRemaining = 0;
+  ce.resetDeck();
+  assert(ce.discardsRemaining === 3, 'resetDeck restores deck config discards');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Sacrifice Fly (automatic)
+// ═══════════════════════════════════════════════════════
+
+group('Sacrifice Fly');
+
+{
+  // Flyout with runner on 3rd and < 2 outs should score the run
+  const bs = new BaseballState();
+  bs.bases = [false, false, true]; // runner on 3rd
+  bs.outs = 0;
+  const runs = bs.processSacrificeFly();
+  assert(runs === 1, 'Sac fly scores 1 run');
+  assert(bs.bases[2] === false, 'Sac fly clears runner from 3rd');
+  assert(bs.playerScore === 1, 'Sac fly adds to player score');
+}
+
+{
+  // No runner on 3rd — no sac fly
+  const bs = new BaseballState();
+  bs.bases = [true, true, false];
+  bs.outs = 0;
+  const runs = bs.processSacrificeFly();
+  assert(runs === 0, 'No sac fly without runner on 3rd');
+  assert(bs.playerScore === 0, 'No run scored without runner on 3rd');
+}
+
+{
+  // Flyout resolves as an out (1 out recorded)
+  const bs = new BaseballState();
+  bs.bases = [false, false, true];
+  bs.outs = 1;
+  // processSacrificeFly scores the run; resolveOutcome records the out
+  bs.processSacrificeFly();
+  const result = bs.resolveOutcome('Flyout', 0);
+  assert(bs.outs === 2, 'Sac fly still records the flyout');
+  assert(bs.playerScore === 1, 'Run scored on sac fly');
+}
+
+{
+  // 2 outs — sac fly should NOT trigger in game logic
+  // (processSacrificeFly itself doesn't check outs, the caller does)
+  // Verify processSacrificeFly still works mechanically
+  const bs = new BaseballState();
+  bs.bases = [false, false, true];
+  bs.outs = 2;
+  const runs = bs.processSacrificeFly();
+  assert(runs === 1, 'processSacrificeFly works mechanically at 2 outs');
+  // Note: GameScene checks outs < 2 before calling this
+}
+
+// ═══════════════════════════════════════════════════════
+//  Bullpen
+// ═══════════════════════════════════════════════════════
+
+group('Bullpen');
+
+{
+  const team = TEAMS[0]; // first team
+  const rm = new RosterManager(team, 0, TEAMS[1]);
+
+  // Bullpen has all pitchers except the starter
+  const bp = rm.getAvailableBullpen();
+  assert(bp.length === team.pitchers.length - 1, `Bullpen has ${team.pitchers.length - 1} relievers`);
+  assert(bp.every(p => !p.used), 'All relievers start unused');
+
+  // Starter is the first pitcher
+  assert(rm.getMyPitcher().name === team.pitchers[0].name, 'Starter is pitchers[0]');
+}
+
+{
+  const team = TEAMS[0];
+  const rm = new RosterManager(team, 0, TEAMS[1]);
+
+  // Swap in first reliever
+  const oldPitcher = rm.getMyPitcher().name;
+  const reliever = rm.getAvailableBullpen()[0];
+  const newPitcher = rm.swapPitcher(0);
+
+  assert(newPitcher.name === reliever.name, 'Swapped pitcher is the reliever');
+  assert(newPitcher.name !== oldPitcher, 'New pitcher differs from starter');
+  assert(rm.getMyPitcherStamina() === 1.0, 'Reliever starts with full stamina');
+  assert(rm.bullpen[0].used === true, 'Used reliever is marked');
+}
+
+{
+  const team = TEAMS[0];
+  const rm = new RosterManager(team, 0, TEAMS[1]);
+
+  // Use all relievers
+  const totalRelievers = rm.getAvailableBullpen().length;
+  for (let i = 0; i < totalRelievers; i++) {
+    rm.swapPitcher(i);
+  }
+  assert(rm.getAvailableBullpen().length === 0, 'No relievers left after using all');
+
+  // Swapping with no available relievers returns current pitcher
+  const current = rm.getMyPitcher();
+  const same = rm.swapPitcher(0);
+  assert(same.name === current.name, 'Swap with used reliever returns current');
 }
 
 // ═══════════════════════════════════════════════════════
