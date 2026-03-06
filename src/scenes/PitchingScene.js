@@ -11,6 +11,9 @@ const CARD_W = 100;
 const CARD_H = 140;
 const CARD_SPACING = 120;
 const HAND_Y = 560;
+const PANEL_W = 210;
+const PITCHER_PANEL_X = 115;
+const BATTER_PANEL_X = 1165;
 
 export default class PitchingScene extends Phaser.Scene {
   constructor() {
@@ -39,6 +42,8 @@ export default class PitchingScene extends Phaser.Scene {
     this._createBaseDiamond();
     this._createResultDisplay();
     this._createGameLog();
+    this._createPitcherPanel();
+    this._createBatterPanel();
 
     this._startPitching();
   }
@@ -173,6 +178,152 @@ export default class PitchingScene extends Phaser.Scene {
     this.gameLogText.setText(visible.map(e => e.text).join('\n'));
   }
 
+  // ── Player Panels ──────────────────────────────────────
+
+  _statBar(val) {
+    const max = 5;
+    const filled = Math.round(Math.min(val, 10) / 10 * max);
+    return '\u2588'.repeat(filled) + '\u2591'.repeat(max - filled) + ` ${val}`;
+  }
+
+  _createPitcherPanel() {
+    const x = PITCHER_PANEL_X;
+    this.add.rectangle(x, 280, PANEL_W, 320, 0x0a1f0d, 0.85)
+      .setStrokeStyle(2, 0x2e7d32);
+
+    const team = this.rosterManager.getTeam();
+    const headerLabel = team ? `${team.logo} PITCHING` : 'PITCHING';
+    this.add.text(x, 135, headerLabel, {
+      fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    this.myPitcherNameText = this.add.text(x, 160, '', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      align: 'center', wordWrap: { width: PANEL_W - 20 },
+    }).setOrigin(0.5);
+
+    this.myPitcherVelText = this.add.text(x - 55, 190, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
+    });
+    this.myPitcherCtlText = this.add.text(x - 55, 210, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
+    });
+    this.myPitcherStaText = this.add.text(x - 55, 230, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+    });
+
+    this.add.rectangle(x, 255, PANEL_W - 30, 1, 0x2e7d32, 0.5);
+
+    this.staminaBarLabel = this.add.text(x, 270, '', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    this.staminaBarBg = this.add.rectangle(x, 292, PANEL_W - 40, 12, 0x1a3a1a)
+      .setStrokeStyle(1, 0x2e7d32);
+    this.staminaBarFill = this.add.rectangle(
+      x - (PANEL_W - 40) / 2, 292, PANEL_W - 40, 10, 0x69f0ae
+    ).setOrigin(0, 0.5);
+
+    this.pitchCountText = this.add.text(x, 315, '', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#b0bec5',
+    }).setOrigin(0.5);
+  }
+
+  _updatePitcherPanel() {
+    const pitcher = this.rosterManager.getMyPitcher();
+    const stamina = this.rosterManager.getMyPitcherStamina();
+    const staminaPct = Math.round(stamina * 100);
+
+    this.myPitcherNameText.setText(pitcher.name);
+    this.myPitcherVelText.setText(`VEL  ${this._statBar(pitcher.velocity)}`);
+    this.myPitcherCtlText.setText(`CTL  ${this._statBar(pitcher.control)}`);
+    this.myPitcherStaText.setText(`STA  ${this._statBar(pitcher.stamina)}`);
+
+    const staminaColor = staminaPct > 50 ? 0x69f0ae : staminaPct > 25 ? 0xffd600 : 0xff5252;
+    const barW = PANEL_W - 40;
+    this.staminaBarFill.displayWidth = barW * stamina;
+    this.staminaBarFill.setFillStyle(staminaColor);
+
+    const colorHex = staminaPct > 50 ? '#69f0ae' : staminaPct > 25 ? '#ffd600' : '#ff5252';
+    this.staminaBarLabel.setText(`STAMINA ${staminaPct}%`);
+    this.staminaBarLabel.setColor(colorHex);
+
+    const ps = this._pitchState;
+    this.pitchCountText.setText(`${ps.outs} out${ps.outs !== 1 ? 's' : ''}  |  ${ps.runs} run${ps.runs !== 1 ? 's' : ''}`);
+  }
+
+  _createBatterPanel() {
+    const x = BATTER_PANEL_X;
+    this.add.rectangle(x, 280, PANEL_W, 320, 0x1a0a0d, 0.85)
+      .setStrokeStyle(2, 0x8b0000);
+
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const headerLabel = oppTeam ? `${oppTeam.logo} AT BAT` : 'AT BAT';
+    this.add.text(x, 135, headerLabel, {
+      fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    this.oppBatterNameText = this.add.text(x, 160, '', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      align: 'center', wordWrap: { width: PANEL_W - 20 },
+    }).setOrigin(0.5);
+
+    this.oppBatterNumText = this.add.text(x, 185, '', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
+    }).setOrigin(0.5);
+
+    this.oppBatterPwrText = this.add.text(x - 55, 210, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
+    });
+    this.oppBatterCntText = this.add.text(x - 55, 230, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
+    });
+    this.oppBatterSpdText = this.add.text(x - 55, 250, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+    });
+
+    this.add.rectangle(x, 275, PANEL_W - 30, 1, 0x8b0000, 0.5);
+
+    this.dueUpText = this.add.text(x, 295, '', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#b0bec5',
+      align: 'center', wordWrap: { width: PANEL_W - 20 },
+    }).setOrigin(0.5);
+  }
+
+  _updateBatterPanel() {
+    const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
+    const idx = this.rosterManager.opponentBatterIndex;
+
+    this.oppBatterNameText.setText(batter.name);
+    const pos = batter.pos ? ` | ${batter.pos}` : '';
+    this.oppBatterNumText.setText(`#${idx + 1} in lineup${pos}`);
+
+    this.oppBatterPwrText.setText(`PWR  ${this._statBar(batter.power)}`);
+    this.oppBatterCntText.setText(`CNT  ${this._statBar(batter.contact)}`);
+    this.oppBatterSpdText.setText(`SPD  ${this._statBar(batter.speed)}`);
+
+    // On-deck preview
+    const nextIdx = (idx + 1) % this.rosterManager.opponentRoster.length;
+    const onDeck = this.rosterManager.opponentRoster[nextIdx];
+    this.dueUpText.setText(`On deck: ${onDeck.name}`);
+
+    // Walk-up animation
+    const targets = [
+      this.oppBatterNameText, this.oppBatterNumText,
+      this.oppBatterPwrText, this.oppBatterCntText, this.oppBatterSpdText,
+      this.dueUpText,
+    ];
+    targets.forEach((t, i) => {
+      const origX = t.x;
+      t.setAlpha(0);
+      t.x = origX + 50;
+      this.tweens.add({
+        targets: t, x: origX, alpha: 1,
+        duration: 300, delay: i * 50, ease: 'Quad.easeOut',
+      });
+    });
+  }
+
   // ── Pitching Flow ───────────────────────────────────────
 
   _startPitching() {
@@ -192,25 +343,21 @@ export default class PitchingScene extends Phaser.Scene {
 
     this.resultText.setColor('#ffffff');
     this.resultText.setText(`${oppLabel} batting...`);
-    this.handNameText.setText(`${myPitcher.name} pitching`);
-    this.handNameText.setColor('#81c784');
+    this.handNameText.setText('');
 
+    this._updatePitcherPanel();
+    this._updateBatterPanel();
     this._updateBases(this._pitchState.bases);
     this._showPitchSelection();
   }
 
   _showPitchSelection() {
-    const ps = this._pitchState;
-    const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
-    const stamina = this.rosterManager.getMyPitcherStamina();
-    const staminaPct = Math.round(stamina * 100);
-    const staminaColor = staminaPct > 50 ? '#69f0ae' : staminaPct > 25 ? '#ffd600' : '#ff5252';
+    this.resultText.setText('Select a pitch');
+    this.resultText.setColor('#b0bec5');
+    this.handNameText.setText('');
 
-    this.resultText.setText(`${batter.name} (${batter.pos}) — CON ${batter.contact} / POW ${batter.power}`);
-    this.resultText.setColor('#ffffff');
-    this.handNameText.setText(`Stamina: ${staminaPct}%  |  ${ps.outs} out${ps.outs !== 1 ? 's' : ''}  |  ${ps.runs} run${ps.runs !== 1 ? 's' : ''}`);
-    this.handNameText.setColor(staminaColor);
-
+    this._updatePitcherPanel();
+    this._updateBatterPanel();
     this._createPitchButtons();
   }
 
@@ -356,8 +503,8 @@ export default class PitchingScene extends Phaser.Scene {
 
         this.resultText.setText(`${newPitcher.name} takes the mound!`);
         this.resultText.setColor('#69f0ae');
-        this.handNameText.setText(`VEL ${newPitcher.velocity} | CTL ${newPitcher.control} | STA ${newPitcher.stamina}`);
-        this.handNameText.setColor('#42a5f5');
+        this.handNameText.setText('');
+        this._updatePitcherPanel();
 
         this.time.delayedCall(1500, () => this._showPitchSelection());
       });
