@@ -13,7 +13,7 @@ const CARD_SPACING = 120;
 const HAND_Y = 560;
 const PANEL_W = 210;
 const PITCHER_PANEL_X = 115;   // same as GameScene BATTER_X
-const BATTER_PANEL_X = 1165;   // same as GameScene PITCHER_X
+const BATTER_PANEL_X = 1130;   // slightly inward to prevent text clipping
 
 export default class PitchingScene extends Phaser.Scene {
   constructor() {
@@ -29,8 +29,8 @@ export default class PitchingScene extends Phaser.Scene {
   }
 
   create() {
-    // Background
-    this.add.rectangle(640, 360, 1280, 720, 0x0d3311);
+    // Background - match GameScene's config background
+    this.add.rectangle(640, 360, 1280, 720, 0x1b5e20);
 
     // Clean up on exit
     this.events.once('shutdown', () => {
@@ -69,6 +69,10 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(8);
 
+    this.youIndicator = this.add.text(0, 33, '(you)', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#69f0ae',
+    }).setOrigin(0.5, 0).setDepth(8).setAlpha(0.7);
+
     this._updateScoreboard();
   }
 
@@ -81,6 +85,15 @@ export default class PitchingScene extends Phaser.Scene {
     const oppName = oppTeam ? oppTeam.id : 'OPP';
     this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
     this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
+
+    // Position "(you)" under player team name
+    this.scoreText.updateText();
+    const scoreLeft = this.scoreText.x - this.scoreText.width / 2;
+    const measured = this.add.text(0, -100, playerName, {
+      fontSize: '22px', fontFamily: 'monospace',
+    });
+    this.youIndicator.setX(scoreLeft + measured.width / 2);
+    measured.destroy();
 
     const outDots = [];
     for (let i = 0; i < 3; i++) {
