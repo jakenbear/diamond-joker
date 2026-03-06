@@ -12,6 +12,7 @@ const config = {
   type: Phaser.AUTO,
   width: 1280,
   height: 720,
+  pixelArt: true,
   backgroundColor: 0x1b5e20,
   parent: document.body,
   scene: [TitleScene, TeamSelectScene, GameScene, PitchingScene, GameOverScene, ShopScene],
