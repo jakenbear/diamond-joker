@@ -14,7 +14,7 @@ const CARD_SPACING = 120;
 const HAND_Y = 560;
 const PANEL_W = 210;
 const PITCHER_PANEL_X = 115;   // same as GameScene BATTER_X
-const BATTER_PANEL_X = 1150;   // slightly inward to prevent right-edge clipping
+const BATTER_PANEL_X = 1165;   // matches GameScene PITCHER_X
 
 export default class PitchingScene extends Phaser.Scene {
   constructor() {
@@ -282,13 +282,13 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
     }).setOrigin(0.5);
 
-    this.myPitcherVelText = this.add.text(x - 75, 175, '', {
+    this.myPitcherVelText = this.add.text(x - 55, 175, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     });
-    this.myPitcherCtlText = this.add.text(x - 75, 195, '', {
+    this.myPitcherCtlText = this.add.text(x - 55, 195, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     });
-    this.myPitcherStaText = this.add.text(x - 75, 215, '', {
+    this.myPitcherStaText = this.add.text(x - 55, 215, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     });
 
@@ -355,13 +355,13 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
     }).setOrigin(0.5);
 
-    this.oppBatterPwrText = this.add.text(x - 75, 170, '', {
+    this.oppBatterPwrText = this.add.text(x - 55, 170, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     });
-    this.oppBatterCntText = this.add.text(x - 75, 190, '', {
+    this.oppBatterCntText = this.add.text(x - 55, 190, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     });
-    this.oppBatterSpdText = this.add.text(x - 75, 210, '', {
+    this.oppBatterSpdText = this.add.text(x - 55, 210, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     });
 
