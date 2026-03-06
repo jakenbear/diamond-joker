@@ -269,9 +269,9 @@ export default class CardEngine {
    * Apply rank-scaled quality rules.
    * Low ranks (2-5) risk groundout/flyout, scaled by hand strength.
    * High ranks (10-A) get bonus chips.
-   *   Pair:            40% groundout
-   *   Two Pair:        20% groundout
-   *   Three of a Kind: 10% flyout
+   *   Pair:            ~40% out (60% groundout, 40% flyout)
+   *   Two Pair:        20% out (50/50 groundout/flyout)
+   *   Three of a Kind: 10% out (flyout)
    */
   static _applyRankQuality(entry, pairRank, handIdx, strikeCount = 0) {
     // Pairs: rank-scaled out chance (all ranks, not just low)
@@ -279,9 +279,10 @@ export default class CardEngine {
       const twoStrikePenalty = strikeCount >= 2 ? 0.10 : 0;
       const outChance = Math.max(0.05, 0.80 - (pairRank - 2) * 0.06 + twoStrikePenalty);
       if (Math.random() < outChance) {
+        const outType = Math.random() < 0.40 ? 'Flyout' : 'Groundout';
         return {
-          handName: 'Groundout',
-          outcome: 'Groundout',
+          handName: outType,
+          outcome: outType,
           chips: 0,
           mult: 1,
           score: 0,
@@ -302,7 +303,7 @@ export default class CardEngine {
     if (pairRank >= 2 && pairRank <= 5) {
       const outChance = handIdx === 7 ? 0.2 : 0.1;
       if (Math.random() < outChance) {
-        const outType = handIdx === 6 ? 'Flyout' : 'Groundout';
+        const outType = handIdx === 6 ? 'Flyout' : (Math.random() < 0.50 ? 'Flyout' : 'Groundout');
         return {
           handName: outType,
           outcome: outType,

@@ -172,52 +172,52 @@ group('1a. Hand Evaluation');
 group('1b. Rank Quality (statistical, N=1000)');
 
 {
-  // Low pair (rank 3): ~74% groundout rate (0.80 - (3-2)*0.06 = 0.74)
-  let groundouts = 0;
+  // Low pair (rank 3): ~74% out rate (0.80 - (3-2)*0.06 = 0.74), split groundout/flyout
+  let outs = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
     const cards = makeCards([[3,'H'],[3,'D'],[7,'C'],[9,'S'],[11,'H']]);
     const r = CardEngine.evaluateHand(cards);
-    if (r.handName === 'Groundout') groundouts++;
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
-  const rate = groundouts / N;
-  assertClose(rate, 0.64, 0.84, `Low Pair (3s) groundout rate ~74%`);
+  const rate = outs / N;
+  assertClose(rate, 0.64, 0.84, `Low Pair (3s) out rate ~74%`);
 }
 {
-  // Mid pair (rank 8): ~44% groundout rate (0.80 - 6*0.06 = 0.44)
-  let groundouts = 0;
+  // Mid pair (rank 8): ~44% out rate (0.80 - 6*0.06 = 0.44)
+  let outs = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
     const cards = makeCards([[8,'H'],[8,'D'],[3,'C'],[5,'S'],[11,'H']]);
     const r = CardEngine.evaluateHand(cards);
-    if (r.handName === 'Groundout') groundouts++;
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
-  const rate = groundouts / N;
-  assertClose(rate, 0.34, 0.54, `Mid Pair (8s) groundout rate ~44%`);
+  const rate = outs / N;
+  assertClose(rate, 0.34, 0.54, `Mid Pair (8s) out rate ~44%`);
 }
 {
-  // High pair (rank A): ~8% groundout rate (0.80 - 12*0.06 = 0.08)
-  let groundouts = 0;
+  // High pair (rank A): ~8% out rate (0.80 - 12*0.06 = 0.08)
+  let outs = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
     const cards = makeCards([[14,'H'],[14,'D'],[3,'C'],[5,'S'],[7,'H']]);
     const r = CardEngine.evaluateHand(cards);
-    if (r.handName === 'Groundout') groundouts++;
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
-  const rate = groundouts / N;
-  assertClose(rate, 0.02, 0.16, `High Pair (Aces) groundout rate ~8%`);
+  const rate = outs / N;
+  assertClose(rate, 0.02, 0.16, `High Pair (Aces) out rate ~8%`);
 }
 {
-  // Low Two Pair: ~20% groundout rate (unchanged)
-  let groundouts = 0;
+  // Low Two Pair: ~20% out rate, split groundout/flyout
+  let outs = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
     const cards = makeCards([[3,'H'],[3,'D'],[4,'C'],[4,'S'],[11,'H']]);
     const r = CardEngine.evaluateHand(cards);
-    if (r.handName === 'Groundout') groundouts++;
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
-  const rate = groundouts / N;
-  assertClose(rate, 0.10, 0.30, `Low Two Pair groundout rate ~20%`);
+  const rate = outs / N;
+  assertClose(rate, 0.10, 0.30, `Low Two Pair out rate ~20%`);
 }
 {
   // Low Three of a Kind: ~10% flyout rate (unchanged)
@@ -1659,17 +1659,17 @@ group('Count System: Count Modifiers');
 group('Count System: Two-Strike Groundout Penalty');
 
 {
-  // Statistical test: pairs at 2 strikes should ground out more than at 0 strikes
+  // Statistical test: pairs at 2 strikes should get out more than at 0 strikes
   const N = 3000;
-  let groundouts0 = 0, groundouts2 = 0;
+  let outs0 = 0, outs2 = 0;
   const pair = makeCards([[8, 'H'], [8, 'D']]);
   for (let i = 0; i < N; i++) {
     const r0 = CardEngine.evaluateHand(pair, null, null, null, 0);
-    if (r0.outcome === 'Groundout') groundouts0++;
+    if (r0.outcome === 'Groundout' || r0.outcome === 'Flyout') outs0++;
     const r2 = CardEngine.evaluateHand(pair, null, null, null, 2);
-    if (r2.outcome === 'Groundout') groundouts2++;
+    if (r2.outcome === 'Groundout' || r2.outcome === 'Flyout') outs2++;
   }
-  assert(groundouts2 > groundouts0, `Two-strike penalty: groundouts at 2 strikes (${groundouts2}) > at 0 strikes (${groundouts0})`);
+  assert(outs2 > outs0, `Two-strike penalty: outs at 2 strikes (${outs2}) > at 0 strikes (${outs0})`);
 }
 
 group('Count System: Walk Machine Trait');
