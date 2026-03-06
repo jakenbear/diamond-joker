@@ -13,7 +13,7 @@ const CARD_SPACING = 120;
 const HAND_Y = 560;
 const PANEL_W = 210;
 const PITCHER_PANEL_X = 115;   // same as GameScene BATTER_X
-const BATTER_PANEL_X = 1130;   // slightly inward to prevent text clipping
+const BATTER_PANEL_X = 1165;   // symmetric with PITCHER_PANEL_X (1280 - 115)
 
 export default class PitchingScene extends Phaser.Scene {
   constructor() {
@@ -597,8 +597,14 @@ export default class PitchingScene extends Phaser.Scene {
     const oppBatterLast = result.batter.name.split(' ').pop().slice(0, 8);
     const pitchAbbr = { Fastball: 'FB', 'Breaking Ball': 'BRK', Slider: 'SLD', Changeup: 'CHG', IBB: 'IBB' };
     const pitchShort = pitchAbbr[PITCH_TYPES[pitchType]?.name] || pitchType;
+    // For strikeouts, show a realistic ball-strike count
+    let countStr = '';
+    if (result.outcome === 'Strikeout') {
+      const fakeBalls = [0, 0, 1, 1, 2, 2, 3][Math.floor(Math.random() * 7)];
+      countStr = ` ${fakeBalls}-2`;
+    }
     if (result.isOut) {
-      this._addGameLog(`${oppBatterLast}: ${result.outcome} ${pitchShort}`, '#999999');
+      this._addGameLog(`${oppBatterLast}: ${result.outcome}${countStr} ${pitchShort}`, '#999999');
     } else {
       const runNote = result.scored > 0 ? ` +${result.scored}R` : '';
       this._addGameLog(`${oppBatterLast}: ${result.outcome}${runNote} ${pitchShort}`, '#ff8a80');

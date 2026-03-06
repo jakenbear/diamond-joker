@@ -1741,7 +1741,14 @@ export default class GameScene extends Phaser.Scene {
       // Game log entry
       const logBatter = batter.name.split(' ').pop().slice(0, 8);
       const logHand = this._shortHandName(handResult.handName || '');
-      const logCount = `${count.balls}-${count.strikes}`;
+      // For strikeouts, show a realistic count ending in strike 3
+      let logCount;
+      if (handResult.outcome === 'Strikeout') {
+        const fakeBalls = [0, 0, 1, 1, 2, 2, 3][Math.floor(Math.random() * 7)];
+        logCount = `${fakeBalls}-2`;
+      } else {
+        logCount = `${count.balls}-${count.strikes}`;
+      }
       if (situational.transformed) {
         this._addGameLog(`${logBatter}: ${logHand}>${situational.outcome} ${logCount}`, situational.type === 'error' ? '#ffab40' : '#ff8a80');
       } else if (isOut && sacrificeFlyRun > 0) {
