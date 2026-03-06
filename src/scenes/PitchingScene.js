@@ -282,13 +282,13 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
     }).setOrigin(0.5);
 
-    this.myPitcherVelText = this.add.text(x - 55, 175, '', {
+    this.myPitcherVelText = this.add.text(x - 75, 175, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     });
-    this.myPitcherCtlText = this.add.text(x - 55, 195, '', {
+    this.myPitcherCtlText = this.add.text(x - 75, 195, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     });
-    this.myPitcherStaText = this.add.text(x - 55, 215, '', {
+    this.myPitcherStaText = this.add.text(x - 75, 215, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     });
 
@@ -355,13 +355,13 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
     }).setOrigin(0.5);
 
-    this.oppBatterPwrText = this.add.text(x - 55, 170, '', {
+    this.oppBatterPwrText = this.add.text(x - 75, 170, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     });
-    this.oppBatterCntText = this.add.text(x - 55, 190, '', {
+    this.oppBatterCntText = this.add.text(x - 75, 190, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     });
-    this.oppBatterSpdText = this.add.text(x - 55, 210, '', {
+    this.oppBatterSpdText = this.add.text(x - 75, 210, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     });
 
