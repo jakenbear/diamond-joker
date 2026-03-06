@@ -188,7 +188,7 @@ export default class GameScene extends Phaser.Scene {
     const playerNameWidth = measuredWidth.width;
     measuredWidth.destroy();
     this.youIndicator.setX(scoreLeft + playerNameWidth / 2);
-    this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
+    this._animateChipCounter(s.totalChips);
 
     const outDots = [];
     for (let i = 0; i < 3; i++) {
@@ -1675,10 +1675,18 @@ export default class GameScene extends Phaser.Scene {
             duration: 400, delay: 200, ease: 'Quad.easeIn',
           });
         } else {
+          // Scoring glow pulse before fly-away
+          cs.glow.setFillStyle(0xffffff);
+          this.tweens.add({
+            targets: cs.glow,
+            alpha: { from: 1, to: 0.7 },
+            duration: 200,
+            onComplete: () => cs.glow.setFillStyle(0xffd600),
+          });
           this.tweens.add({
             targets: parts,
             x: 640, y: 300, alpha: 0, scale: 0.3,
-            duration: 350, delay: i * 50, ease: 'Quad.easeIn',
+            duration: 350, delay: 200 + i * 50, ease: 'Quad.easeIn',
           });
         }
       } else {
@@ -1768,6 +1776,14 @@ export default class GameScene extends Phaser.Scene {
         scale: { from: 0.5, to: 1 }, alpha: { from: 0, to: 1 },
         duration: 400, ease: 'Back.easeOut',
       });
+
+      // Screen shake on extra-base hits
+      const xbh = ['Home Run', 'Triple', 'Double'];
+      if (xbh.includes(handResult.outcome)) {
+        const intensity = handResult.outcome === 'Home Run' ? 0.006 : 0.003;
+        const duration = handResult.outcome === 'Home Run' ? 300 : 200;
+        this.cameras.main.shake(duration, intensity);
+      }
 
       this._updateScoreboard();
 
@@ -1951,6 +1967,27 @@ export default class GameScene extends Phaser.Scene {
       duration: 400,
       delay: 600,
       onComplete: () => popup.destroy(),
+    });
+  }
+
+  /** Animate chip counter rolling from current to target value */
+  _animateChipCounter(target) {
+    const current = this._displayedChips ?? target;
+    if (current === target) {
+      this.chipBalanceText.setText(`Chips: ${target}`);
+      this._displayedChips = target;
+      return;
+    }
+    this._displayedChips = target;
+    const obj = { val: current };
+    this.tweens.add({
+      targets: obj,
+      val: target,
+      duration: 500,
+      ease: 'Quad.easeOut',
+      onUpdate: () => {
+        this.chipBalanceText.setText(`Chips: ${Math.round(obj.val)}`);
+      },
     });
   }
 
