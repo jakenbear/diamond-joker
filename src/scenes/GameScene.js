@@ -2032,23 +2032,23 @@ export default class GameScene extends Phaser.Scene {
     elements.push(overlay);
 
     // "Middle of Inning X" header
-    const inningLabel = this.add.text(640, 140, `Inning ${s.inning}`, {
+    const inningLabel = this.add.text(640, 250, `Inning ${s.inning}`, {
       fontSize: '44px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
     elements.push(inningLabel);
 
     // Half indicator
-    const halfLabel = this.add.text(640, 185, '▼  Bottom Half  —  Pitching', {
+    const halfLabel = this.add.text(640, 295, '▼  Bottom Half  —  Pitching', {
       fontSize: '18px', fontFamily: 'monospace', color: '#ff8a80',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
     elements.push(halfLabel);
 
     // Box score
-    const boxElements = this._createBoxScore(640, 360, s, 11);
+    const boxElements = this._createBoxScore(640, 420, s, 11);
     elements.push(...boxElements);
 
     // Animate in
-    this.tweens.add({ targets: overlay, alpha: 0.9, duration: 300 });
+    this.tweens.add({ targets: overlay, alpha: 1, duration: 300 });
     this.tweens.add({
       targets: [inningLabel, halfLabel, ...boxElements],
       alpha: 1, duration: 300, delay: 150,
@@ -2074,23 +2074,23 @@ export default class GameScene extends Phaser.Scene {
     elements.push(overlay);
 
     // "Inning X" header
-    const inningLabel = this.add.text(640, 140, `Inning ${s.inning}`, {
+    const inningLabel = this.add.text(640, 250, `Inning ${s.inning}`, {
       fontSize: '44px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
     elements.push(inningLabel);
 
     // Half indicator
-    const halfLabel = this.add.text(640, 185, '▲  Top Half  —  Batting', {
+    const halfLabel = this.add.text(640, 295, '▲  Top Half  —  Batting', {
       fontSize: '18px', fontFamily: 'monospace', color: '#69f0ae',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
     elements.push(halfLabel);
 
     // Box score
-    const boxElements = this._createBoxScore(640, 360, s, 11);
+    const boxElements = this._createBoxScore(640, 420, s, 11);
     elements.push(...boxElements);
 
     // Animate in
-    this.tweens.add({ targets: overlay, alpha: 0.9, duration: 300 });
+    this.tweens.add({ targets: overlay, alpha: 1, duration: 300 });
     this.tweens.add({
       targets: [inningLabel, halfLabel, ...boxElements],
       alpha: 1, duration: 300, delay: 150,
