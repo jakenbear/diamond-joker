@@ -494,6 +494,8 @@ export default class GameScene extends Phaser.Scene {
         if (this.runners[i]) this.runners[i].destroy();
         const runner = this.add.circle(fromPos.x, fromPos.y, 10, 0xffd600).setDepth(3);
         this.runners[i] = runner;
+        // Trail particles along basepath
+        this._spawnRunnerTrail(fromPos, bp);
         // Pulse glow
         this.tweens.add({
           targets: runner,
@@ -515,6 +517,7 @@ export default class GameScene extends Phaser.Scene {
         // Runner left — animate to next base or home
         if (this.runners[i]) {
           const toPos = i === 2 ? this.homePosition : this.basePositions[i + 1];
+          this._spawnRunnerTrail(bp, toPos);
           const runnerRef = this.runners[i];
           this.tweens.add({
             targets: runnerRef,
@@ -550,6 +553,25 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     this._prevBases = [...bases];
+  }
+
+  /** Spawn fading trail dots between two base positions */
+  _spawnRunnerTrail(from, to) {
+    const steps = 5;
+    for (let s = 1; s <= steps; s++) {
+      const t = s / (steps + 1);
+      const x = from.x + (to.x - from.x) * t;
+      const y = from.y + (to.y - from.y) * t;
+      const dot = this.add.circle(x, y, 4, 0xffd600, 0.6).setDepth(2);
+      this.tweens.add({
+        targets: dot,
+        alpha: 0,
+        scale: 0.3,
+        duration: 400,
+        delay: s * 40,
+        onComplete: () => dot.destroy(),
+      });
+    }
   }
 
   // ── Result Display (center) ───────────────────────────

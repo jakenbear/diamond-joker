@@ -128,21 +128,79 @@ export default class PitchingScene extends Phaser.Scene {
   }
 
   _updateBases(bases) {
+    const cx = 640, cy = 280, size = 55;
+    const homePos = { x: cx, y: cy + size };
     for (let i = 0; i < 3; i++) {
       const bp = this.basePositions[i];
       if (bases[i] && !this.runners[i]) {
-        const dot = this.add.circle(bp.x, bp.y + 10, 7, 0xffd600).setDepth(3).setAlpha(0);
-        this.tweens.add({ targets: dot, alpha: 1, y: bp.y, duration: 200 });
+        const fromPos = i === 0 ? homePos : this.basePositions[i - 1];
+        const dot = this.add.circle(fromPos.x, fromPos.y, 7, 0xffd600).setDepth(3);
+        this._spawnRunnerTrail(fromPos, bp);
+        this.tweens.add({ targets: dot, x: bp.x, y: bp.y, duration: 300, ease: 'Quad.easeInOut' });
+        this.tweens.add({
+          targets: dot, alpha: { from: 1, to: 0.6 },
+          duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        });
         this.runners[i] = dot;
       } else if (!bases[i] && this.runners[i]) {
+        const toPos = i === 2 ? homePos : this.basePositions[i + 1];
+        this._spawnRunnerTrail(bp, toPos);
         const runnerRef = this.runners[i];
         this.tweens.add({
-          targets: runnerRef, alpha: 0, y: bp.y - 10, duration: 200,
+          targets: runnerRef, x: toPos.x, y: toPos.y, alpha: 0, duration: 300,
+          ease: 'Quad.easeIn',
           onComplete: () => runnerRef.destroy(),
         });
         this.runners[i] = null;
       }
     }
+  }
+
+  _spawnRunnerTrail(from, to) {
+    const steps = 5;
+    for (let s = 1; s <= steps; s++) {
+      const t = s / (steps + 1);
+      const x = from.x + (to.x - from.x) * t;
+      const y = from.y + (to.y - from.y) * t;
+      const dot = this.add.circle(x, y, 3, 0xffd600, 0.6).setDepth(2);
+      this.tweens.add({
+        targets: dot, alpha: 0, scale: 0.3,
+        duration: 400, delay: s * 40,
+        onComplete: () => dot.destroy(),
+      });
+    }
+  }
+
+  _showStrikeoutK() {
+    const k = this.add.text(640, 280, 'K', {
+      fontSize: '120px', fontFamily: 'monospace', color: '#ff5252', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(15).setAlpha(0);
+    this.tweens.add({
+      targets: k,
+      alpha: { from: 0, to: 0.8 }, scale: { from: 2, to: 1 },
+      duration: 300, ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: k, alpha: 0, scale: 0.8,
+      duration: 400, delay: 500,
+      onComplete: () => k.destroy(),
+    });
+  }
+
+  _showScorePopup(text, color) {
+    const popup = this.add.text(640, 260, text, {
+      fontSize: '32px', fontFamily: 'monospace', color, fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(15).setAlpha(0);
+    this.tweens.add({
+      targets: popup,
+      alpha: { from: 0, to: 1 }, y: 200, scale: { from: 1.5, to: 1 },
+      duration: 400, ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: popup, alpha: 0, y: 160,
+      duration: 500, delay: 800,
+      onComplete: () => popup.destroy(),
+    });
   }
 
   // ── Result Display ──────────────────────────────────────
@@ -599,14 +657,21 @@ export default class PitchingScene extends Phaser.Scene {
 
     if (result.isOut) {
       ps.outs++;
-      if (result.outcome === 'Strikeout') SoundManager.strikeout();
-      else SoundManager.out();
+      if (result.outcome === 'Strikeout') {
+        SoundManager.strikeout();
+        this._showStrikeoutK();
+      } else {
+        SoundManager.out();
+      }
     } else if (result.walked) {
       SoundManager.walk();
     } else {
       SoundManager.hit();
     }
-    if (result.scored > 0) SoundManager.runScored();
+    if (result.scored > 0) {
+      SoundManager.runScored();
+      this._showScorePopup(`+${result.scored} RUN${result.scored > 1 ? 'S' : ''}!`, '#ff8a80');
+    }
     ps.runs += result.scored || 0;
 
     // Game log entry
