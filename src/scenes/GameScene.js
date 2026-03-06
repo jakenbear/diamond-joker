@@ -2032,19 +2032,19 @@ export default class GameScene extends Phaser.Scene {
     elements.push(overlay);
 
     // "Middle of Inning X" header
-    const inningLabel = this.add.text(640, 380, `Inning ${s.inning}`, {
+    const inningLabel = this.add.text(640, 420, `Inning ${s.inning}`, {
       fontSize: '44px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
     elements.push(inningLabel);
 
     // Half indicator
-    const halfLabel = this.add.text(640, 425, '▼  Bottom Half  —  Pitching', {
+    const halfLabel = this.add.text(640, 465, '▼  Bottom Half  —  Pitching', {
       fontSize: '18px', fontFamily: 'monospace', color: '#ff8a80',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
     elements.push(halfLabel);
 
     // Box score
-    const boxElements = this._createBoxScore(640, 540, s, 11);
+    const boxElements = this._createBoxScore(640, 560, s, 11);
     elements.push(...boxElements);
 
     // Animate in
@@ -2074,19 +2074,19 @@ export default class GameScene extends Phaser.Scene {
     elements.push(overlay);
 
     // "Inning X" header
-    const inningLabel = this.add.text(640, 380, `Inning ${s.inning}`, {
+    const inningLabel = this.add.text(640, 420, `Inning ${s.inning}`, {
       fontSize: '44px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
     elements.push(inningLabel);
 
     // Half indicator
-    const halfLabel = this.add.text(640, 425, '▲  Top Half  —  Batting', {
+    const halfLabel = this.add.text(640, 465, '▲  Top Half  —  Batting', {
       fontSize: '18px', fontFamily: 'monospace', color: '#69f0ae',
     }).setOrigin(0.5).setDepth(11).setAlpha(0);
     elements.push(halfLabel);
 
     // Box score
-    const boxElements = this._createBoxScore(640, 540, s, 11);
+    const boxElements = this._createBoxScore(640, 560, s, 11);
     elements.push(...boxElements);
 
     // Animate in

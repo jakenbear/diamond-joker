@@ -12,8 +12,8 @@ const CARD_H = 140;
 const CARD_SPACING = 120;
 const HAND_Y = 560;
 const PANEL_W = 210;
-const PITCHER_PANEL_X = 115;
-const BATTER_PANEL_X = 1280 - 130;
+const PITCHER_PANEL_X = 115;   // same as GameScene BATTER_X
+const BATTER_PANEL_X = 1165;   // same as GameScene PITCHER_X
 
 export default class PitchingScene extends Phaser.Scene {
   constructor() {
@@ -48,41 +48,45 @@ export default class PitchingScene extends Phaser.Scene {
     this._startPitching();
   }
 
-  // ── Scoreboard (minimal) ────────────────────────────────
+  // ── Scoreboard (matches GameScene layout) ───────────────
 
   _createScoreboard() {
     this.add.rectangle(640, 25, 1280, 50, 0x0d3311).setDepth(7);
 
-    const yourTeam = this.rosterManager.getTeam();
-    const oppTeam = this.rosterManager.getOpponentTeam();
-    const yourLabel = yourTeam ? `${yourTeam.logo} ${yourTeam.id}` : 'YOU';
-    const oppLabel = oppTeam ? `${oppTeam.logo} ${oppTeam.id}` : 'OPP';
+    this.inningText = this.add.text(PITCHER_PANEL_X + PANEL_W / 2 + 20, 10, '', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ffffff',
+    }).setDepth(8);
 
-    this.add.text(460, 25, yourLabel, {
-      fontSize: '14px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(8);
+    this.scoreText = this.add.text(640, 8, '', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#ffd600',
+    }).setOrigin(0.5, 0).setDepth(8);
 
-    this.scoreText = this.add.text(560, 25, '', {
-      fontSize: '18px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(8);
+    this.outsText = this.add.text(BATTER_PANEL_X - PANEL_W / 2 - 20, 10, '', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ff8a80',
+    }).setOrigin(1, 0).setDepth(8);
 
-    this.add.text(660, 25, oppLabel, {
-      fontSize: '14px', fontFamily: 'monospace', color: '#ff8a80', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(8);
-
-    const s = this.baseball.getStatus();
-    this.inningText = this.add.text(810, 25, '', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#b0bec5',
-    }).setOrigin(0.5).setDepth(8);
+    this.chipBalanceText = this.add.text(640, 33, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
+    }).setOrigin(0.5, 0).setDepth(8);
 
     this._updateScoreboard();
   }
 
   _updateScoreboard() {
     const s = this.baseball.getStatus();
-    this.scoreText.setText(`${s.playerScore} - ${s.opponentScore}`);
-    const half = s.half === 'top' ? '▲' : '▼';
-    this.inningText.setText(`${half} ${s.inning}`);
+    this.inningText.setText(`INN ${s.inning} ${s.half === 'top' ? '\u25b2' : '\u25bc'}`);
+    const playerTeam = this.rosterManager.getTeam();
+    const playerName = playerTeam ? playerTeam.id : 'YOU';
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const oppName = oppTeam ? oppTeam.id : 'OPP';
+    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
+    this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
+
+    const outDots = [];
+    for (let i = 0; i < 3; i++) {
+      outDots.push(i < s.outs ? '\u25cf' : '\u25cb');
+    }
+    this.outsText.setText(`Outs: ${outDots.join(' ')}`);
   }
 
   // ── Base Diamond ────────────────────────────────────────
@@ -188,43 +192,43 @@ export default class PitchingScene extends Phaser.Scene {
 
   _createPitcherPanel() {
     const x = PITCHER_PANEL_X;
-    this.add.rectangle(x, 280, PANEL_W, 320, 0x0a1f0d, 0.85)
+    this.add.rectangle(x, 280, PANEL_W, 400, 0x0a1f0d, 0.85)
       .setStrokeStyle(2, 0x2e7d32);
 
     const team = this.rosterManager.getTeam();
     const headerLabel = team ? `${team.logo} PITCHING` : 'PITCHING';
-    this.add.text(x, 135, headerLabel, {
+    this.add.text(x, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.myPitcherNameText = this.add.text(x, 160, '', {
+    this.myPitcherNameText = this.add.text(x, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: PANEL_W - 20 },
     }).setOrigin(0.5);
 
-    this.myPitcherVelText = this.add.text(x - 55, 190, '', {
+    this.myPitcherVelText = this.add.text(x - 55, 155, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     });
-    this.myPitcherCtlText = this.add.text(x - 55, 210, '', {
+    this.myPitcherCtlText = this.add.text(x - 55, 175, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     });
-    this.myPitcherStaText = this.add.text(x - 55, 230, '', {
+    this.myPitcherStaText = this.add.text(x - 55, 195, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     });
 
-    this.add.rectangle(x, 255, PANEL_W - 30, 1, 0x2e7d32, 0.5);
+    this.add.rectangle(x, 220, PANEL_W - 30, 1, 0x2e7d32, 0.5);
 
-    this.staminaBarLabel = this.add.text(x, 270, '', {
+    this.staminaBarLabel = this.add.text(x, 238, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.staminaBarBg = this.add.rectangle(x, 292, PANEL_W - 40, 12, 0x1a3a1a)
+    this.staminaBarBg = this.add.rectangle(x, 260, PANEL_W - 40, 12, 0x1a3a1a)
       .setStrokeStyle(1, 0x2e7d32);
     this.staminaBarFill = this.add.rectangle(
-      x - (PANEL_W - 40) / 2, 292, PANEL_W - 40, 10, 0x69f0ae
+      x - (PANEL_W - 40) / 2, 260, PANEL_W - 40, 10, 0x69f0ae
     ).setOrigin(0, 0.5);
 
-    this.pitchCountText = this.add.text(x, 315, '', {
+    this.pitchCountText = this.add.text(x, 285, '', {
       fontSize: '11px', fontFamily: 'monospace', color: '#b0bec5',
     }).setOrigin(0.5);
   }
@@ -254,37 +258,37 @@ export default class PitchingScene extends Phaser.Scene {
 
   _createBatterPanel() {
     const x = BATTER_PANEL_X;
-    this.add.rectangle(x, 280, PANEL_W, 320, 0x1a0a0d, 0.85)
+    this.add.rectangle(x, 280, PANEL_W, 400, 0x1a0a0d, 0.85)
       .setStrokeStyle(2, 0x8b0000);
 
     const oppTeam = this.rosterManager.getOpponentTeam();
     const headerLabel = oppTeam ? `${oppTeam.logo} AT BAT` : 'AT BAT';
-    this.add.text(x, 135, headerLabel, {
+    this.add.text(x, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.oppBatterNameText = this.add.text(x, 160, '', {
+    this.oppBatterNameText = this.add.text(x, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: PANEL_W - 20 },
     }).setOrigin(0.5);
 
-    this.oppBatterNumText = this.add.text(x, 185, '', {
+    this.oppBatterNumText = this.add.text(x, 148, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
     }).setOrigin(0.5);
 
-    this.oppBatterPwrText = this.add.text(x - 55, 210, '', {
+    this.oppBatterPwrText = this.add.text(x - 55, 175, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
     });
-    this.oppBatterCntText = this.add.text(x - 55, 230, '', {
+    this.oppBatterCntText = this.add.text(x - 55, 195, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
     });
-    this.oppBatterSpdText = this.add.text(x - 55, 250, '', {
+    this.oppBatterSpdText = this.add.text(x - 55, 215, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     });
 
-    this.add.rectangle(x, 275, PANEL_W - 30, 1, 0x8b0000, 0.5);
+    this.add.rectangle(x, 240, PANEL_W - 30, 1, 0x8b0000, 0.5);
 
-    this.dueUpText = this.add.text(x, 295, '', {
+    this.dueUpText = this.add.text(x, 260, '', {
       fontSize: '10px', fontFamily: 'monospace', color: '#b0bec5',
       align: 'center', wordWrap: { width: PANEL_W - 20 },
     }).setOrigin(0.5);
