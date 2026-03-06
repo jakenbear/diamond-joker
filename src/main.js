@@ -13,7 +13,7 @@ const config = {
   width: 1280,
   height: 720,
   backgroundColor: 0x1b5e20,
-  parent: document.body,
+  parent: 'game-container',
   scene: [TitleScene, TeamSelectScene, GameScene, PitchingScene, GameOverScene, ShopScene],
   scale: {
     mode: Phaser.Scale.FIT,

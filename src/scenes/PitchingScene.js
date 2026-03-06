@@ -5,7 +5,7 @@
  * Receives game managers via scene data. When the half-inning ends,
  * transitions back to GameScene (or ShopScene / GameOverScene).
  */
-import { PITCH_TYPES } from '../RosterManager.js';
+import { PITCH_TYPES, assignPitchRepertoire } from '../RosterManager.js';
 import SoundManager from '../SoundManager.js';
 
 const CARD_W = 100;
@@ -351,37 +351,38 @@ export default class PitchingScene extends Phaser.Scene {
 
     const oppTeam = this.rosterManager.getOpponentTeam();
     const headerLabel = oppTeam ? `${oppTeam.logo} AT BAT` : 'AT BAT';
-    this.add.text(x, 95, headerLabel, {
+    this.add.text(x - 30, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
-    this.oppBatterNameText = this.add.text(x, 120, '', {
+    this.oppBatterNameText = this.add.text(x - 30, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5);
 
-    this.oppBatterNumText = this.add.text(x, 148, '', {
+    this.oppBatterNumText = this.add.text(x - 30, 148, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
-    this.oppBatterPwrText = this.add.text(panelLeft + 10, 170, '', {
+    this.oppBatterPwrText = this.add.text(panelLeft - 20
+      , 170, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
       fixedWidth: textW,
     });
-    this.oppBatterCntText = this.add.text(panelLeft + 10, 190, '', {
+    this.oppBatterCntText = this.add.text(panelLeft - 20, 190, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
       fixedWidth: textW,
     });
-    this.oppBatterSpdText = this.add.text(panelLeft + 10, 210, '', {
+    this.oppBatterSpdText = this.add.text(panelLeft - 20, 210, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
       fixedWidth: textW,
     });
 
     this.add.rectangle(x, 235, PANEL_W - 30, 1, 0x8b0000, 0.5);
 
-    this.dueUpText = this.add.text(x, 260, '', {
+    this.dueUpText = this.add.text(x - 30, 260, '', {
       fontSize: '10px', fontFamily: 'monospace', color: '#b0bec5',
       align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5);
@@ -462,11 +463,19 @@ export default class PitchingScene extends Phaser.Scene {
     this._destroyPitchButtons();
     this._pitchButtons = [];
 
-    const keys = ['fastball', 'breaking', 'slider', 'changeup', 'ibb'];
-    const colors = [0xe53935, 0x1e88e5, 0xfb8c00, 0x43a047, 0x757575];
+    const pitcher = this.rosterManager.getMyPitcher();
+    const repertoire = assignPitchRepertoire(pitcher);
+    const keys = [...repertoire, 'ibb'];
+    const pitchColors = {
+      fastball: 0xe53935, breaking: 0x1e88e5, slider: 0xfb8c00, changeup: 0x43a047,
+      cutter: 0xab47bc, curveball: 0x1565c0, sinker: 0x6d4c41, splitter: 0xd84315,
+      twoseam: 0xc62828, knuckle: 0x00838f, screwball: 0x7b1fa2, palmball: 0x2e7d32,
+      ibb: 0x757575,
+    };
+    const colors = keys.map(k => pitchColors[k] || 0x757575);
     const stamina = this.rosterManager.getMyPitcherStamina();
 
-    const pitchSpacing = keys.length > 4 ? 105 : CARD_SPACING;
+    const pitchSpacing = 120;
     const pitchStartX = 640 - ((keys.length - 1) * pitchSpacing) / 2;
 
     keys.forEach((key, i) => {
@@ -474,7 +483,9 @@ export default class PitchingScene extends Phaser.Scene {
       const x = pitchStartX + i * pitchSpacing;
       const y = HAND_Y;
 
-      const bg = this.add.rectangle(x, y, CARD_W, CARD_H, colors[i], 0.9)
+      const cardSprite = this.add.image(x, y, 'card_back_red')
+        .setDisplaySize(CARD_W, CARD_H).setDepth(5).setTint(colors[i]);
+      const bg = this.add.rectangle(x, y, CARD_W, CARD_H, 0x000000, 0)
         .setDepth(5).setStrokeStyle(2, 0xffffff)
         .setInteractive({ useHandCursor: true });
 
@@ -497,21 +508,21 @@ export default class PitchingScene extends Phaser.Scene {
       const nameY = y - 45, costY = y - 15, descY = y + 15;
       bg.on('pointerover', () => {
         bg.setStrokeStyle(3, 0xffd600);
-        this.tweens.add({ targets: bg, y: y - 8, duration: 100 });
+        this.tweens.add({ targets: [bg, cardSprite], y: y - 8, duration: 100 });
         this.tweens.add({ targets: nameText, y: nameY - 8, duration: 100 });
         this.tweens.add({ targets: costText, y: costY - 8, duration: 100 });
         this.tweens.add({ targets: descText, y: descY - 8, duration: 100 });
       });
       bg.on('pointerout', () => {
         bg.setStrokeStyle(2, 0xffffff);
-        this.tweens.add({ targets: bg, y: y, duration: 100 });
+        this.tweens.add({ targets: [bg, cardSprite], y: y, duration: 100 });
         this.tweens.add({ targets: nameText, y: nameY, duration: 100 });
         this.tweens.add({ targets: costText, y: costY, duration: 100 });
         this.tweens.add({ targets: descText, y: descY, duration: 100 });
       });
       bg.on('pointerdown', () => this._onPitchSelected(key));
 
-      this._pitchButtons.push(bg, nameText, costText, descText);
+      this._pitchButtons.push(cardSprite, bg, nameText, costText, descText);
     });
 
     // Bullpen button
@@ -644,14 +655,22 @@ export default class PitchingScene extends Phaser.Scene {
   }
 
   _pitchShortDesc(key) {
-    switch (key) {
-      case 'fastball': return 'High K\nMore XBH';
-      case 'breaking': return 'Hard to hit\nWalk risk';
-      case 'slider': return 'Weak contact\nLow XBH';
-      case 'changeup': return 'Saves arm\nSafe hits';
-      case 'ibb': return 'Free pass\nto 1st base';
-      default: return '';
-    }
+    const descs = {
+      fastball: 'High K\nMore XBH',
+      breaking: 'Hard to hit\nWalk risk',
+      slider: 'Weak contact\nLow XBH',
+      changeup: 'Saves arm\nSafe hits',
+      cutter: 'Good Ks\nJams hitters',
+      curveball: 'Big break\nNeeds control',
+      sinker: 'Groundballs\nEasy contact',
+      splitter: 'Whiff pitch\nHigh cost',
+      twoseam: 'Heavy ball\nWeak contact',
+      knuckle: 'Wild pitch\nVery cheap',
+      screwball: 'Rare break\nHard to hit',
+      palmball: 'Slow & safe\nVery cheap',
+      ibb: 'Free pass\nto 1st base',
+    };
+    return descs[key] || '';
   }
 
   _destroyPitchButtons() {
@@ -690,7 +709,12 @@ export default class PitchingScene extends Phaser.Scene {
 
     // Game log entry
     const oppBatterLast = result.batter.name.split(' ').pop().slice(0, 8);
-    const pitchAbbr = { Fastball: 'FB', 'Breaking Ball': 'BRK', Slider: 'SLD', Changeup: 'CHG', IBB: 'IBB' };
+    const pitchAbbr = {
+      Fastball: 'FB', 'Breaking Ball': 'BRK', Slider: 'SLD', Changeup: 'CHG',
+      Cutter: 'CUT', Curveball: 'CRV', Sinker: 'SNK', Splitter: 'SPL',
+      'Two-Seam': '2S', Knuckleball: 'KNK', Screwball: 'SCR', Palmball: 'PLM',
+      'Intentional Walk': 'IBB',
+    };
     const pitchShort = pitchAbbr[PITCH_TYPES[pitchType]?.name] || pitchType;
     // For strikeouts, show a realistic ball-strike count
     let countStr = '';

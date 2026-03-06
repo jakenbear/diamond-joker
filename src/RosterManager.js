@@ -40,6 +40,70 @@ const PITCH_TYPES = {
     staminaCost: 0.03,
     description: 'Groundball pitch — weak contact if they hit',
   },
+  cutter: {
+    name: 'Cutter',
+    hitChanceMod: -0.03,
+    kBonusMult: 1.08,
+    xbhMult: 0.7,
+    staminaCost: 0.04,
+    description: 'Fastball-slider hybrid. Good Ks, jams batters',
+  },
+  curveball: {
+    name: 'Curveball',
+    hitChanceMod: -0.04,
+    kBonusMult: 1.1,
+    xbhMult: 0.5,
+    staminaCost: 0.04,
+    description: 'Big break. High K but needs control to land',
+  },
+  sinker: {
+    name: 'Sinker',
+    hitChanceMod: 0.01,
+    kBonusMult: 0.85,
+    xbhMult: 0.3,
+    staminaCost: 0.03,
+    description: 'Easy to hit, but almost always a groundball',
+  },
+  splitter: {
+    name: 'Splitter',
+    hitChanceMod: -0.04,
+    kBonusMult: 1.2,
+    xbhMult: 0.9,
+    staminaCost: 0.05,
+    description: 'Devastating whiff pitch. High stamina cost',
+  },
+  twoseam: {
+    name: 'Two-Seam',
+    hitChanceMod: -0.01,
+    kBonusMult: 0.9,
+    xbhMult: 0.4,
+    staminaCost: 0.03,
+    description: 'Heavy movement. Induces weak contact',
+  },
+  knuckle: {
+    name: 'Knuckleball',
+    hitChanceMod: -0.06,
+    kBonusMult: 1.0,
+    xbhMult: 1.2,
+    staminaCost: 0.01,
+    description: 'Unpredictable. Low cost but big hits possible',
+  },
+  screwball: {
+    name: 'Screwball',
+    hitChanceMod: -0.05,
+    kBonusMult: 1.05,
+    xbhMult: 0.6,
+    staminaCost: 0.05,
+    description: 'Rare reverse break. Hard to hit, taxing to throw',
+  },
+  palmball: {
+    name: 'Palmball',
+    hitChanceMod: -0.01,
+    kBonusMult: 0.9,
+    xbhMult: 0.4,
+    staminaCost: 0.02,
+    description: 'Slow changeup variant. Cheap and safe',
+  },
   ibb: {
     name: 'Intentional Walk',
     hitChanceMod: 0,
@@ -49,6 +113,49 @@ const PITCH_TYPES = {
     description: 'Puts batter on 1st base',
   },
 };
+
+/**
+ * Assign 4 pitches to a pitcher based on velocity/control profile.
+ * Every pitcher gets a fastball variant + 3 secondary pitches.
+ */
+function assignPitchRepertoire(pitcher) {
+  if (pitcher.pitches) return pitcher.pitches; // already assigned
+  const v = pitcher.velocity, c = pitcher.control;
+  let pitches;
+  if (v >= 10) {
+    // Flamethrower: pure gas + power secondaries
+    pitches = ['fastball', 'splitter', 'slider', 'cutter'];
+  } else if (v >= 9 && c >= 7) {
+    // Ace: elite stuff both ways
+    pitches = ['fastball', 'cutter', 'curveball', 'splitter'];
+  } else if (v >= 9) {
+    // Power pitcher: velocity + swing-and-miss
+    pitches = ['fastball', 'slider', 'splitter', 'breaking'];
+  } else if (v >= 8 && c >= 8) {
+    // Complete pitcher: well-rounded mix
+    pitches = ['fastball', 'cutter', 'changeup', 'curveball'];
+  } else if (c >= 9) {
+    // Surgeon: pinpoint control pitches
+    pitches = ['sinker', 'curveball', 'palmball', 'cutter'];
+  } else if (c >= 8) {
+    // Control artist: precision and deception
+    pitches = ['twoseam', 'curveball', 'changeup', 'cutter'];
+  } else if (v >= 8) {
+    // Hard thrower: power with breaking stuff
+    pitches = ['fastball', 'slider', 'cutter', 'breaking'];
+  } else if (v <= 5 && c <= 5) {
+    // Junkballer: weird stuff
+    pitches = ['knuckle', 'screwball', 'palmball', 'changeup'];
+  } else if (pitcher.stamina >= 8) {
+    // Workhorse: efficient mix
+    pitches = ['sinker', 'twoseam', 'changeup', 'slider'];
+  } else {
+    // Balanced: standard repertoire
+    pitches = ['fastball', 'slider', 'changeup', 'breaking'];
+  }
+  pitcher.pitches = pitches;
+  return pitches;
+}
 
 export default class RosterManager {
   /**
@@ -485,4 +592,4 @@ export default class RosterManager {
   }
 }
 
-export { TEAMS, MAX_TRAITS_PER_PLAYER, MAX_PITCHER_TRAITS, PITCH_TYPES };
+export { TEAMS, MAX_TRAITS_PER_PLAYER, MAX_PITCHER_TRAITS, PITCH_TYPES, assignPitchRepertoire };

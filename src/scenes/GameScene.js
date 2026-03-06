@@ -53,6 +53,7 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     this.load.image('card_back', 'assets/cards/back1.png');
+    this.load.image('card_back_red', 'assets/cards/back2.png');
 
     // Set nearest-neighbor filtering on card textures only (keeps text smooth)
     this.load.on('complete', () => {
@@ -62,6 +63,9 @@ export default class GameScene extends Phaser.Scene {
         }
       }
       this.textures.get('card_back').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      if (this.textures.exists('card_back_red')) {
+        this.textures.get('card_back_red').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
     });
   }
 
