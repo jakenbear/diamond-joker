@@ -2044,7 +2044,7 @@ export default class GameScene extends Phaser.Scene {
     elements.push(halfLabel);
 
     // Box score
-    const boxElements = this._createBoxScore(640, 320, s, 11);
+    const boxElements = this._createBoxScore(640, 360, s, 11);
     elements.push(...boxElements);
 
     // Animate in
@@ -2086,7 +2086,7 @@ export default class GameScene extends Phaser.Scene {
     elements.push(halfLabel);
 
     // Box score
-    const boxElements = this._createBoxScore(640, 320, s, 11);
+    const boxElements = this._createBoxScore(640, 360, s, 11);
     elements.push(...boxElements);
 
     // Animate in

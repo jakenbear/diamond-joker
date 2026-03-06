@@ -13,7 +13,7 @@ const CARD_SPACING = 120;
 const HAND_Y = 560;
 const PANEL_W = 210;
 const PITCHER_PANEL_X = 115;
-const BATTER_PANEL_X = 1165;
+const BATTER_PANEL_X = 1280 - 115;
 
 export default class PitchingScene extends Phaser.Scene {
   constructor() {
