@@ -1,89 +1,48 @@
 extends Control
 
 # ShopScene — Buy trait cards between innings, equip to batters.
+#
+# HOW TO EDIT THE LAYOUT:
+#   Open shop_scene.tscn and drag nodes around in the 2D editor.
+
+@onready var chips_label: Label = %ChipsLabel
+@onready var buys_label: Label = %BuysLabel
+@onready var cards_container: HBoxContainer = %CardsContainer
+@onready var status_label: Label = %StatusLabel
+@onready var continue_button: Button = %ContinueButton
 
 var shop_items: Array[Dictionary] = []
 var buy_buttons: Array[Button] = []
-var roster_buttons: Array[Button] = []
-var chips_label: Label = null
-var buys_label: Label = null
-var continue_button: Button = null
 var equip_panel: Control = null
+var roster_buttons: Array[Button] = []
 var selected_trait: Dictionary = {}
 var buys_remaining: int = 0
-var status_label: Label = null
 
 
 func _ready() -> void:
-	var bg := ColorRect.new()
-	bg.color = GameManager.COLORS["bg"]
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
-
 	GameManager.baseball.mark_shop_visited()
 	buys_remaining = GameManager.baseball.get_shop_buy_limit()
 	shop_items = GameManager.trait_manager.get_shop_selection(3)
 
-	_build_header()
+	continue_button.pressed.connect(_on_continue_pressed)
+
 	_build_shop_cards()
 	_build_roster_panel()
-	_build_footer()
-
 	_update_ui()
 
 
-func _build_header() -> void:
-	var bar := ColorRect.new()
-	bar.color = GameManager.COLORS["panel"]
-	bar.position = Vector2(0, 0)
-	bar.size = Vector2(1280, 50)
-	add_child(bar)
-
-	var title := Label.new()
-	title.text = "DUGOUT SHOP"
-	title.add_theme_font_size_override("font_size", 28)
-	title.add_theme_color_override("font_color", GameManager.COLORS["accent"])
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.position = Vector2(390, 8)
-	title.custom_minimum_size = Vector2(500, 35)
-	add_child(title)
-
-	chips_label = Label.new()
-	chips_label.add_theme_font_size_override("font_size", 22)
-	chips_label.add_theme_color_override("font_color", GameManager.COLORS["accent"])
-	chips_label.position = Vector2(20, 10)
-	chips_label.custom_minimum_size = Vector2(200, 30)
-	add_child(chips_label)
-
-	buys_label = Label.new()
-	buys_label.add_theme_font_size_override("font_size", 22)
-	buys_label.add_theme_color_override("font_color", GameManager.COLORS["text"])
-	buys_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	buys_label.position = Vector2(1000, 10)
-	buys_label.custom_minimum_size = Vector2(260, 30)
-	add_child(buys_label)
-
-
 func _build_shop_cards() -> void:
-	var cards_container := HBoxContainer.new()
-	cards_container.position = Vector2(90, 70)
-	cards_container.custom_minimum_size = Vector2(1100, 260)
-	cards_container.add_theme_constant_override("separation", 30)
-	add_child(cards_container)
-
 	for i in shop_items.size():
 		var item: Dictionary = shop_items[i]
 		var card_panel := VBoxContainer.new()
-		card_panel.custom_minimum_size = Vector2(320, 250)
+		card_panel.custom_minimum_size = Vector2(320, 300)
 		cards_container.add_child(card_panel)
 
-		# Card background
 		var card_bg := ColorRect.new()
 		card_bg.color = GameManager.COLORS["panel_light"]
 		card_bg.custom_minimum_size = Vector2(320, 200)
 		card_panel.add_child(card_bg)
 
-		# Trait name
 		var name_label := Label.new()
 		name_label.text = item.get("name", "?")
 		name_label.add_theme_font_size_override("font_size", 22)
@@ -92,7 +51,6 @@ func _build_shop_cards() -> void:
 		name_label.custom_minimum_size = Vector2(320, 30)
 		card_panel.add_child(name_label)
 
-		# Rarity
 		var rarity_colors := {"common": Color("#aaaaaa"), "uncommon": Color("#4fc3f7"), "rare": Color("#ffd700")}
 		var rarity_label := Label.new()
 		rarity_label.text = item.get("rarity", "common").to_upper()
@@ -102,7 +60,6 @@ func _build_shop_cards() -> void:
 		rarity_label.custom_minimum_size = Vector2(320, 18)
 		card_panel.add_child(rarity_label)
 
-		# Description
 		var desc_label := Label.new()
 		desc_label.text = item.get("description", "")
 		desc_label.add_theme_font_size_override("font_size", 16)
@@ -112,7 +69,6 @@ func _build_shop_cards() -> void:
 		desc_label.custom_minimum_size = Vector2(320, 50)
 		card_panel.add_child(desc_label)
 
-		# Buy button
 		var buy_btn := Button.new()
 		buy_btn.text = "BUY (%d chips)" % item.get("price", 0)
 		buy_btn.add_theme_font_size_override("font_size", 18)
@@ -124,12 +80,10 @@ func _build_shop_cards() -> void:
 
 func _build_roster_panel() -> void:
 	equip_panel = Control.new()
-	equip_panel.position = Vector2(0, 0)
-	equip_panel.size = Vector2(1280, 720)
+	equip_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	equip_panel.visible = false
 	add_child(equip_panel)
 
-	# Dimmed background
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.7)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -175,24 +129,6 @@ func _build_roster_panel() -> void:
 		roster_buttons.append(btn)
 
 
-func _build_footer() -> void:
-	status_label = Label.new()
-	status_label.add_theme_font_size_override("font_size", 18)
-	status_label.add_theme_color_override("font_color", GameManager.COLORS["text"])
-	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.position = Vector2(190, 590)
-	status_label.custom_minimum_size = Vector2(900, 30)
-	add_child(status_label)
-
-	continue_button = Button.new()
-	continue_button.text = "  CONTINUE TO NEXT INNING  "
-	continue_button.add_theme_font_size_override("font_size", 24)
-	continue_button.position = Vector2(430, 640)
-	continue_button.custom_minimum_size = Vector2(420, 55)
-	continue_button.pressed.connect(_on_continue_pressed)
-	add_child(continue_button)
-
-
 func _update_ui() -> void:
 	chips_label.text = "Chips: %d" % GameManager.baseball.get_total_chips()
 	buys_label.text = "Buys left: %d" % buys_remaining
@@ -216,11 +152,9 @@ func _on_buy_pressed(index: int) -> void:
 	GameManager.trait_manager.mark_owned(item.get("id", ""))
 	buys_remaining -= 1
 
-	# Disable this buy button
 	buy_buttons[index].disabled = true
 	buy_buttons[index].text = "SOLD"
 
-	# Show equip panel
 	equip_panel.visible = true
 	_update_ui()
 
@@ -235,7 +169,7 @@ func _on_equip_to_batter(player_index: int) -> void:
 			GameManager.roster.get_roster()[player_index].get("name", "?"),
 		]
 	else:
-		status_label.text = "Can't equip — max 2 traits per batter!"
+		status_label.text = "Can't equip -- max 2 traits per batter!"
 	selected_trait = {}
 	equip_panel.visible = false
 	_update_ui()

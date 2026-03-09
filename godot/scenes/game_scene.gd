@@ -1,285 +1,70 @@
 extends Control
 
 # GameScene — Main gameplay: play poker hands to bat.
-# Layout:
-#   Top bar:    Scoreboard (inning, score, outs, chips)
-#   Left:       Baseball diamond + batter/pitcher info
-#   Right:      Card hand + action buttons
-#   Center:     Outcome overlay text
+#
+# HOW TO EDIT THE LAYOUT:
+#   1. Open game_scene.tscn in Godot's editor
+#   2. Click any node in the Scene tree (left panel)
+#   3. Drag it on the 2D canvas, or edit properties in the Inspector (right panel)
+#   4. This script handles game logic — layout is all in the .tscn
 
 const SUIT_SYMBOLS := {"H": "♥", "D": "♦", "C": "♣", "S": "♠"}
 const SUIT_COLORS := {"H": Color("#e53935"), "D": Color("#e53935"), "C": Color("#222233"), "S": Color("#222233")}
 const RANK_DISPLAY := {2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", 10:"10", 11:"J", 12:"Q", 13:"K", 14:"A"}
 
-# UI references
-var card_buttons: Array[Button] = []
-var selected_indices: Array[int] = []
-var play_button: Button = null
-var discard_button: Button = null
-var outcome_label: Label = null
-var score_label: Label = null
-var inning_label: Label = null
-var outs_label: Label = null
-var chips_label: Label = null
-var batter_label: Label = null
-var pitcher_label: Label = null
-var hand_desc_label: Label = null
+# Node references from the .tscn (% finds unique-named nodes)
+@onready var score_label: Label = %ScoreLabel
+@onready var inning_label: Label = %InningLabel
+@onready var outs_label: Label = %OutsLabel
+@onready var chips_label: Label = %ChipsLabel
+@onready var batter_label: Label = %BatterLabel
+@onready var pitcher_label: Label = %PitcherLabel
+@onready var traits_label: Label = %TraitsLabel
+@onready var card_container: HBoxContainer = %CardContainer
+@onready var hand_desc_label: Label = %HandDescLabel
+@onready var discard_count_label: Label = %DiscardCountLabel
+@onready var play_button: Button = %PlayButton
+@onready var discard_button: Button = %DiscardButton
+@onready var strike_label: Label = %StrikeLabel
+@onready var outcome_label: Label = %OutcomeLabel
+
+# Base indicators and runner labels (arrays for easy iteration)
 var base_indicators: Array[ColorRect] = []
 var runner_labels: Array[Label] = []
-var discard_count_label: Label = null
+
+# Card buttons (created dynamically in the CardContainer)
+var card_buttons: Array[Button] = []
+var selected_indices: Array[int] = []
 var strike_count: int = 0
 
 
 func _ready() -> void:
-	# Background
-	var bg := ColorRect.new()
-	bg.color = GameManager.COLORS["bg"]
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	# Collect base/runner references from .tscn
+	base_indicators = [%Base1st, %Base2nd, %Base3rd]
+	runner_labels = [%Runner1st, %Runner2nd, %Runner3rd]
 
-	_build_scoreboard()
-	_build_diamond()
-	_build_info_panels()
-	_build_card_area()
-	_build_outcome_overlay()
+	# Connect button signals
+	play_button.pressed.connect(_on_play_pressed)
+	discard_button.pressed.connect(_on_discard_pressed)
 
-	# Start first at-bat
-	_new_at_bat()
-
-
-# ── Scoreboard (top bar) ──────────────────────────────────
-
-func _build_scoreboard() -> void:
-	var bar := ColorRect.new()
-	bar.color = GameManager.COLORS["panel"]
-	bar.position = Vector2(0, 0)
-	bar.size = Vector2(1280, 50)
-	add_child(bar)
-
-	# Team names + scores
-	var player_team_name: String = GameManager.player_team.get("nickname", "You")
-	var opp_team_name: String = GameManager.opponent_team.get("nickname", "Opponent")
-	score_label = Label.new()
-	score_label.add_theme_font_size_override("font_size", 22)
-	score_label.add_theme_color_override("font_color", GameManager.COLORS["text_bright"])
-	score_label.position = Vector2(20, 10)
-	score_label.custom_minimum_size = Vector2(300, 30)
-	add_child(score_label)
-
-	inning_label = Label.new()
-	inning_label.add_theme_font_size_override("font_size", 22)
-	inning_label.add_theme_color_override("font_color", GameManager.COLORS["accent"])
-	inning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	inning_label.position = Vector2(490, 10)
-	inning_label.custom_minimum_size = Vector2(300, 30)
-	add_child(inning_label)
-
-	outs_label = Label.new()
-	outs_label.add_theme_font_size_override("font_size", 22)
-	outs_label.add_theme_color_override("font_color", GameManager.COLORS["text"])
-	outs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	outs_label.position = Vector2(880, 10)
-	outs_label.custom_minimum_size = Vector2(150, 30)
-	add_child(outs_label)
-
-	chips_label = Label.new()
-	chips_label.add_theme_font_size_override("font_size", 22)
-	chips_label.add_theme_color_override("font_color", GameManager.COLORS["accent"])
-	chips_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	chips_label.position = Vector2(1060, 10)
-	chips_label.custom_minimum_size = Vector2(200, 30)
-	add_child(chips_label)
-
-
-# ── Diamond display (left side) ───────────────────────────
-
-func _build_diamond() -> void:
-	var diamond_panel := ColorRect.new()
-	diamond_panel.color = GameManager.COLORS["panel"].darkened(0.2)
-	diamond_panel.position = Vector2(20, 70)
-	diamond_panel.size = Vector2(340, 300)
-	add_child(diamond_panel)
-
-	var diamond_title := Label.new()
-	diamond_title.text = "DIAMOND"
-	diamond_title.add_theme_font_size_override("font_size", 14)
-	diamond_title.add_theme_color_override("font_color", GameManager.COLORS["text"])
-	diamond_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	diamond_title.position = Vector2(20, 72)
-	diamond_title.custom_minimum_size = Vector2(340, 20)
-	add_child(diamond_title)
-
-	# Base positions in diamond layout:
-	#        2nd (top)
-	#   3rd (left)   1st (right)
-	#       Home (bottom)
-	var base_positions := [
-		Vector2(270, 230),  # 1st base (right)
-		Vector2(190, 150),  # 2nd base (top)
-		Vector2(110, 230),  # 3rd base (left)
-	]
-	var home_pos := Vector2(190, 310)
-
-	# Draw diamond lines
-	var diamond_draw := Control.new()
-	diamond_draw.position = Vector2(0, 0)
-	diamond_draw.size = Vector2(380, 380)
-	diamond_draw.draw.connect(func():
-		var offset := Vector2(20, 70)
-		var pts := [home_pos + offset, base_positions[0] + offset, base_positions[1] + offset, base_positions[2] + offset, home_pos + offset]
-		for i in range(pts.size() - 1):
-			diamond_draw.draw_line(pts[i], pts[i + 1], Color(0.4, 0.4, 0.4, 0.5), 2.0)
-	)
-	add_child(diamond_draw)
-
-	# Home plate
-	var home := ColorRect.new()
-	home.color = Color.WHITE
-	home.position = Vector2(20 + home_pos.x - 8, 70 + home_pos.y - 8)
-	home.size = Vector2(16, 16)
-	add_child(home)
-
-	# Base indicators (1st, 2nd, 3rd)
-	for i in 3:
-		var base := ColorRect.new()
-		base.color = GameManager.COLORS["base_empty"]
-		var bp: Vector2 = base_positions[i]
-		base.position = Vector2(20 + bp.x - 15, 70 + bp.y - 15)
-		base.size = Vector2(30, 30)
-		base.rotation = deg_to_rad(45)
-		add_child(base)
-		base_indicators.append(base)
-
-		# Runner name label above base
-		var lbl := Label.new()
-		lbl.add_theme_font_size_override("font_size", 11)
-		lbl.add_theme_color_override("font_color", GameManager.COLORS["accent"])
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.position = Vector2(20 + bp.x - 40, 70 + bp.y - 32)
-		lbl.custom_minimum_size = Vector2(80, 16)
-		lbl.text = ""
-		add_child(lbl)
-		runner_labels.append(lbl)
-
-
-# ── Batter + Pitcher info (left side, below diamond) ──────
-
-func _build_info_panels() -> void:
-	batter_label = Label.new()
-	batter_label.add_theme_font_size_override("font_size", 16)
-	batter_label.add_theme_color_override("font_color", GameManager.COLORS["text_bright"])
-	batter_label.position = Vector2(20, 385)
-	batter_label.custom_minimum_size = Vector2(340, 40)
-	batter_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(batter_label)
-
-	pitcher_label = Label.new()
-	pitcher_label.add_theme_font_size_override("font_size", 14)
-	pitcher_label.add_theme_color_override("font_color", Color(GameManager.COLORS["text"], 0.7))
-	pitcher_label.position = Vector2(20, 430)
-	pitcher_label.custom_minimum_size = Vector2(340, 40)
-	pitcher_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(pitcher_label)
-
-	# Pitcher traits display
-	var traits_text := ""
-	var p: Dictionary = GameManager.roster.get_current_pitcher()
-	for t in p.get("traits", []):
-		traits_text += "[%s] %s  " % [t.get("name", "?"), t.get("description", "")]
-	if not traits_text.is_empty():
-		var traits_label := Label.new()
-		traits_label.text = "Pitcher traits: " + traits_text
-		traits_label.add_theme_font_size_override("font_size", 12)
-		traits_label.add_theme_color_override("font_color", GameManager.COLORS["out"])
-		traits_label.position = Vector2(20, 470)
-		traits_label.custom_minimum_size = Vector2(340, 30)
-		traits_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		add_child(traits_label)
-
-
-# ── Card hand area (right side) ───────────────────────────
-
-func _build_card_area() -> void:
-	# Card area background
-	var card_panel := ColorRect.new()
-	card_panel.color = GameManager.COLORS["panel"].darkened(0.15)
-	card_panel.position = Vector2(390, 70)
-	card_panel.size = Vector2(870, 540)
-	add_child(card_panel)
-
-	# "Your Hand" label
-	var hand_label := Label.new()
-	hand_label.text = "YOUR HAND"
-	hand_label.add_theme_font_size_override("font_size", 18)
-	hand_label.add_theme_color_override("font_color", GameManager.COLORS["text"])
-	hand_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hand_label.position = Vector2(390, 75)
-	hand_label.custom_minimum_size = Vector2(870, 25)
-	add_child(hand_label)
-
-	# Card buttons container
-	var card_container := HBoxContainer.new()
-	card_container.position = Vector2(430, 110)
-	card_container.custom_minimum_size = Vector2(800, 280)
-	card_container.add_theme_constant_override("separation", 15)
-	card_container.name = "CardContainer"
-	add_child(card_container)
-
-	# Create 5 card button slots
+	# Create 5 card buttons dynamically in the container
 	for i in 5:
 		var btn := _create_card_button(i)
 		card_container.add_child(btn)
 		card_buttons.append(btn)
 
-	# Hand description (shows what hand was detected)
-	hand_desc_label = Label.new()
-	hand_desc_label.add_theme_font_size_override("font_size", 20)
-	hand_desc_label.add_theme_color_override("font_color", GameManager.COLORS["accent"])
-	hand_desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hand_desc_label.position = Vector2(390, 400)
-	hand_desc_label.custom_minimum_size = Vector2(870, 30)
-	add_child(hand_desc_label)
+	# Show pitcher traits
+	var traits_text := ""
+	var p: Dictionary = GameManager.roster.get_current_pitcher()
+	for t in p.get("traits", []):
+		traits_text += "[%s] %s  " % [t.get("name", "?"), t.get("description", "")]
+	traits_label.text = "Pitcher traits: " + traits_text if not traits_text.is_empty() else ""
 
-	# Discard counter
-	discard_count_label = Label.new()
-	discard_count_label.add_theme_font_size_override("font_size", 16)
-	discard_count_label.add_theme_color_override("font_color", GameManager.COLORS["text"])
-	discard_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	discard_count_label.position = Vector2(390, 435)
-	discard_count_label.custom_minimum_size = Vector2(870, 25)
-	add_child(discard_count_label)
+	# Start first at-bat
+	_new_at_bat()
 
-	# Action buttons
-	var btn_container := HBoxContainer.new()
-	btn_container.position = Vector2(530, 480)
-	btn_container.custom_minimum_size = Vector2(600, 60)
-	btn_container.add_theme_constant_override("separation", 30)
-	add_child(btn_container)
 
-	play_button = Button.new()
-	play_button.text = "  PLAY HAND  "
-	play_button.add_theme_font_size_override("font_size", 24)
-	play_button.custom_minimum_size = Vector2(250, 55)
-	play_button.pressed.connect(_on_play_pressed)
-	btn_container.add_child(play_button)
-
-	discard_button = Button.new()
-	discard_button.text = "  DISCARD  "
-	discard_button.add_theme_font_size_override("font_size", 24)
-	discard_button.custom_minimum_size = Vector2(250, 55)
-	discard_button.pressed.connect(_on_discard_pressed)
-	btn_container.add_child(discard_button)
-
-	# Strike count display
-	var strike_label := Label.new()
-	strike_label.name = "StrikeLabel"
-	strike_label.add_theme_font_size_override("font_size", 16)
-	strike_label.add_theme_color_override("font_color", GameManager.COLORS["text"])
-	strike_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	strike_label.position = Vector2(390, 555)
-	strike_label.custom_minimum_size = Vector2(870, 25)
-	add_child(strike_label)
-
+# ── Card button factory ───────────────────────────────────
 
 func _create_card_button(index: int) -> Button:
 	var btn := Button.new()
@@ -290,10 +75,7 @@ func _create_card_button(index: int) -> Button:
 	# Cream background so card text is always readable
 	var bg_style := StyleBoxFlat.new()
 	bg_style.bg_color = Color("#f0ead6")
-	bg_style.corner_radius_top_left = 8
-	bg_style.corner_radius_top_right = 8
-	bg_style.corner_radius_bottom_left = 8
-	bg_style.corner_radius_bottom_right = 8
+	bg_style.set_corner_radius_all(8)
 	bg_style.border_width_left = 2
 	bg_style.border_width_right = 2
 	bg_style.border_width_top = 2
@@ -301,33 +83,17 @@ func _create_card_button(index: int) -> Button:
 	bg_style.border_color = Color("#999999")
 	btn.add_theme_stylebox_override("normal", bg_style)
 
-	# Hover style — slight highlight
 	var hover_style := bg_style.duplicate()
 	hover_style.bg_color = Color("#fffde8")
 	hover_style.border_color = Color("#ffd700")
 	btn.add_theme_stylebox_override("hover", hover_style)
 
-	# Pressed style
 	var press_style := bg_style.duplicate()
 	press_style.bg_color = Color("#e8e0c0")
 	btn.add_theme_stylebox_override("pressed", press_style)
 
 	btn.pressed.connect(_on_card_toggled.bind(index))
 	return btn
-
-
-# ── Outcome overlay ───────────────────────────────────────
-
-func _build_outcome_overlay() -> void:
-	outcome_label = Label.new()
-	outcome_label.add_theme_font_size_override("font_size", 36)
-	outcome_label.add_theme_color_override("font_color", GameManager.COLORS["accent"])
-	outcome_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	outcome_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	outcome_label.position = Vector2(200, 620)
-	outcome_label.custom_minimum_size = Vector2(880, 50)
-	outcome_label.text = ""
-	add_child(outcome_label)
 
 
 # ── Game Logic ────────────────────────────────────────────
@@ -389,8 +155,7 @@ func _update_ui() -> void:
 		if bases[i]:
 			base_indicators[i].color = GameManager.COLORS["base_on"]
 			if typeof(bases[i]) == TYPE_DICTIONARY:
-				var last_name: String = bases[i].get("name", "").split(" ")[-1]
-				runner_labels[i].text = last_name
+				runner_labels[i].text = bases[i].get("name", "").split(" ")[-1]
 			else:
 				runner_labels[i].text = "Runner"
 		else:
@@ -407,7 +172,6 @@ func _update_ui() -> void:
 			card_buttons[i].text = "%s\n%s" % [rank_str, suit_str]
 			card_buttons[i].visible = true
 
-			# Color based on suit
 			var suit_color: Color = SUIT_COLORS.get(card["suit"], Color.BLACK)
 			card_buttons[i].add_theme_color_override("font_color", suit_color)
 
@@ -415,25 +179,18 @@ func _update_ui() -> void:
 			if i in selected_indices:
 				var sel_style := StyleBoxFlat.new()
 				sel_style.bg_color = Color("#fff8dc")
-				sel_style.corner_radius_top_left = 8
-				sel_style.corner_radius_top_right = 8
-				sel_style.corner_radius_bottom_left = 8
-				sel_style.corner_radius_bottom_right = 8
+				sel_style.set_corner_radius_all(8)
 				sel_style.border_width_left = 3
 				sel_style.border_width_right = 3
 				sel_style.border_width_top = 3
 				sel_style.border_width_bottom = 3
 				sel_style.border_color = Color("#ffd700")
 				card_buttons[i].add_theme_stylebox_override("normal", sel_style)
-				card_buttons[i].position.y = -10  # raise selected card
+				card_buttons[i].position.y = -10
 			else:
-				# Reset to default cream style
 				var def_style := StyleBoxFlat.new()
 				def_style.bg_color = Color("#f0ead6")
-				def_style.corner_radius_top_left = 8
-				def_style.corner_radius_top_right = 8
-				def_style.corner_radius_bottom_left = 8
-				def_style.corner_radius_bottom_right = 8
+				def_style.set_corner_radius_all(8)
 				def_style.border_width_left = 2
 				def_style.border_width_right = 2
 				def_style.border_width_top = 2
@@ -455,16 +212,14 @@ func _update_ui() -> void:
 				preview_cards.append(hand[idx])
 		if not preview_cards.is_empty():
 			var preview := CardEngine.evaluate_hand(preview_cards)
-			hand_desc_label.text = "%s → %s" % [preview.get("hand_name", "?"), preview.get("outcome", "?")]
+			hand_desc_label.text = "%s -> %s" % [preview.get("hand_name", "?"), preview.get("outcome", "?")]
 		else:
 			hand_desc_label.text = ""
 	else:
 		hand_desc_label.text = "Select 1-5 cards to play"
 
 	# Strike count
-	var strike_node := get_node_or_null("StrikeLabel")
-	if strike_node:
-		strike_node.text = "Count: %d-%d" % [0, strike_count]
+	strike_label.text = "Count: %d-%d" % [0, strike_count]
 
 	# Button states
 	play_button.disabled = selected_indices.is_empty()
@@ -562,7 +317,6 @@ func _on_discard_pressed() -> void:
 	var bases: Array = GameManager.baseball.get_status()["bases"]
 	var wp: Dictionary = SituationalEngine.check_wild_pitch(pitcher.get("control", 5), bases)
 	if wp.get("triggered", false):
-		# Advance lead runner
 		GameManager.baseball.advance_all_runners()
 		outcome_label.text = "Wild Pitch! Runner advances!"
 
@@ -576,7 +330,6 @@ func _resolve_outcome(outcome: String, score: int) -> void:
 	var batter: Dictionary = GameManager.roster.get_current_batter()
 	var result: Dictionary = GameManager.baseball.resolve_outcome(outcome, score, batter)
 
-	# Show outcome text
 	outcome_label.text = result.get("description", outcome)
 
 	# Extra base attempt on hits
@@ -585,11 +338,9 @@ func _resolve_outcome(outcome: String, score: int) -> void:
 		if extra.get("advanced", false):
 			outcome_label.text += " (Runner advances!)"
 
-	# Check game state
 	var state: int = result.get("state", BaseballState.State.BATTING)
 
 	if state == BaseballState.State.GAME_OVER:
-		# Delay then go to game over
 		await get_tree().create_timer(2.0).timeout
 		GameManager.go_to_scene("game_over")
 		return
@@ -597,7 +348,6 @@ func _resolve_outcome(outcome: String, score: int) -> void:
 	if state == BaseballState.State.SWITCH_SIDE:
 		_update_ui()
 		await get_tree().create_timer(1.5).timeout
-		# Go to pitching scene for opponent's half
 		GameManager.go_to_scene("pitching")
 		return
 
