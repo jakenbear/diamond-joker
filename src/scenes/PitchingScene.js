@@ -84,7 +84,8 @@ export default class PitchingScene extends Phaser.Scene {
     const playerName = playerTeam ? playerTeam.id : 'YOU';
     const oppTeam = this.rosterManager.getOpponentTeam();
     const oppName = oppTeam ? oppTeam.id : 'OPP';
-    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
+    const liveOppScore = s.opponentScore + (this._pitchState ? this._pitchState.runs : 0);
+    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${liveOppScore} ${oppName}`);
     this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
 
     // Position "(you)" under player team name
@@ -706,6 +707,7 @@ export default class PitchingScene extends Phaser.Scene {
       this._showScorePopup(`+${result.scored} RUN${result.scored > 1 ? 'S' : ''}!`, '#ff8a80');
     }
     ps.runs += result.scored || 0;
+    if (result.scored > 0) this._updateScoreboard();
 
     // Game log entry
     const oppBatterLast = result.batter.name.split(' ').pop().slice(0, 8);
@@ -737,10 +739,24 @@ export default class PitchingScene extends Phaser.Scene {
     }
 
     const color = result.isOut ? '#999999' : (result.scored > 0 ? '#ff8a80' : '#ffe082');
-    const logY = 420 + ps.logIndex * 26;
+    const LOG_START_Y = 420;
+    const LOG_LINE_H = 26;
+    const MAX_VISIBLE = 4;
+
+    // Scroll existing entries up if we've exceeded the visible limit
+    if (ps.logIndex >= MAX_VISIBLE) {
+      const oldest = ps.logElements.shift();
+      this.tweens.add({ targets: oldest, alpha: 0, duration: 150, onComplete: () => oldest.destroy() });
+      ps.logElements.forEach(el => {
+        this.tweens.add({ targets: el, y: el.y - LOG_LINE_H, duration: 150 });
+      });
+    }
+
+    const displayIdx = Math.min(ps.logIndex, MAX_VISIBLE - 1);
+    const logY = LOG_START_Y + displayIdx * LOG_LINE_H;
     const logLine = this.add.text(640, logY + 5, text, {
       fontSize: '14px', fontFamily: 'monospace', color,
-    }).setOrigin(0.5).setDepth(9).setAlpha(0);
+    }).setOrigin(0.5).setDepth(4).setAlpha(0);
     ps.logElements.push(logLine);
     ps.logIndex++;
 
@@ -750,7 +766,12 @@ export default class PitchingScene extends Phaser.Scene {
 
     this._updateBases(ps.bases);
 
-    if (ps.outs >= 3) {
+    // Walk-off check: opponent takes the lead in 9th inning or later
+    const status = this.baseball.getStatus();
+    const liveOppScore = status.opponentScore + ps.runs;
+    if (status.inning >= 9 && liveOppScore > status.playerScore) {
+      this.time.delayedCall(800, () => this._finishOpponentHalf());
+    } else if (ps.outs >= 3) {
       this.time.delayedCall(800, () => this._finishOpponentHalf());
     } else {
       this.time.delayedCall(600, () => this._showPitchSelection());

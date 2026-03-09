@@ -1638,6 +1638,14 @@ export default class GameScene extends Phaser.Scene {
     const batterMod = this.rosterManager.applyBatterModifiers(handResult, gameState);
     handResult = batterMod.result;
     const batterBonuses = batterMod.bonuses;
+
+    // Re-apply batter trait post-modifiers after contact save so upgrades
+    // like Slugger Serum (Pair Single→Double) can trigger on the rescued hit
+    if (batterBonuses.contactSave && batterPostMod) {
+      handResult = batterPostMod(handResult, gameState);
+      handResult.score = Math.round(handResult.chips * handResult.mult);
+    }
+
     handResult = this.rosterManager.applyPitcherModifiers(handResult, gameState);
 
     // Sacrifice fly (trait-based, e.g. on strikeouts)

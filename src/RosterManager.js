@@ -378,6 +378,7 @@ export default class RosterManager {
         result.mult = 1.5;
         result.score = 2;
         result.wasGroundout = false;
+        result.playedDescription = `Pair of ${result.pairRank >= 11 ? {11:'J',12:'Q',13:'K',14:'A'}[result.pairRank] : result.pairRank}s (Contact!)`;
         bonuses.contactSave = true;
         // Fall through to apply normal hit bonuses below
       } else {
