@@ -74,16 +74,15 @@ func _ready() -> void:
 # ── Card slot factory ─────────────────────────────────────
 
 func _create_card_slot(index: int) -> Dictionary:
-	# Panel acts as clickable card container
+	# Panel wraps tightly around the card image (32x42 * 4 = 128x168 + border)
 	var panel := Panel.new()
-	panel.custom_minimum_size = Vector2(140, 190)
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(136, 176)  # 128+8 padding, 168+8 padding
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Default style
+	# Default style — tight border around card art
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#f0ead6")
-	style.set_corner_radius_all(8)
+	style.set_corner_radius_all(6)
 	style.border_width_left = 2
 	style.border_width_right = 2
 	style.border_width_top = 2
@@ -91,15 +90,15 @@ func _create_card_slot(index: int) -> Dictionary:
 	style.border_color = Color("#999999")
 	panel.add_theme_stylebox_override("panel", style)
 
-	# Card image centered in panel
+	# Card image fills the panel with minimal padding
 	var tex_rect := TextureRect.new()
 	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tex_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # pixel art stays crisp
 	tex_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	tex_rect.offset_left = 6
-	tex_rect.offset_top = 6
-	tex_rect.offset_right = -6
-	tex_rect.offset_bottom = -6
+	tex_rect.offset_left = 4
+	tex_rect.offset_top = 4
+	tex_rect.offset_right = -4
+	tex_rect.offset_bottom = -4
 	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(tex_rect)
 
