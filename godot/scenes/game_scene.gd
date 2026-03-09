@@ -74,38 +74,17 @@ func _ready() -> void:
 # ── Card slot factory ─────────────────────────────────────
 
 func _create_card_slot(index: int) -> Dictionary:
-	# Panel wraps tightly around the card image (32x42 * 4 = 128x168 + border)
-	var panel := Panel.new()
-	panel.custom_minimum_size = Vector2(136, 176)  # 128+8 padding, 168+8 padding
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	# Default style — tight border around card art
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#f0ead6")
-	style.set_corner_radius_all(6)
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_color = Color("#999999")
-	panel.add_theme_stylebox_override("panel", style)
-
-	# Card image fills the panel with minimal padding
+	# Just the card image — no background panel, no border
 	var tex_rect := TextureRect.new()
+	tex_rect.custom_minimum_size = Vector2(128, 168)
 	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tex_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # pixel art stays crisp
-	tex_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	tex_rect.offset_left = 4
-	tex_rect.offset_top = 4
-	tex_rect.offset_right = -4
-	tex_rect.offset_bottom = -4
-	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(tex_rect)
+	tex_rect.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	# Click handling
-	panel.gui_input.connect(_on_card_input.bind(index))
+	tex_rect.gui_input.connect(_on_card_input.bind(index))
 
-	return {"panel": panel, "texture": tex_rect}
+	return {"panel": tex_rect, "texture": tex_rect}
 
 
 func _on_card_input(event: InputEvent, index: int) -> void:
@@ -202,29 +181,13 @@ func _update_ui() -> void:
 			else:
 				card_textures[i].texture = null
 
-			# Selection highlight — gold border + raised look
+			# Selection: raise card up, unselected: normal position
 			if i in selected_indices:
-				var sel_style := StyleBoxFlat.new()
-				sel_style.bg_color = Color("#fff8dc")
-				sel_style.set_corner_radius_all(8)
-				sel_style.border_width_left = 3
-				sel_style.border_width_right = 3
-				sel_style.border_width_top = 3
-				sel_style.border_width_bottom = 3
-				sel_style.border_color = Color("#ffd700")
-				card_panels[i].add_theme_stylebox_override("panel", sel_style)
-				card_panels[i].position.y = -10
+				card_panels[i].position.y = -15
+				card_panels[i].modulate = Color(1.2, 1.2, 1.0, 1.0)  # slight brightness
 			else:
-				var def_style := StyleBoxFlat.new()
-				def_style.bg_color = Color("#f0ead6")
-				def_style.set_corner_radius_all(8)
-				def_style.border_width_left = 2
-				def_style.border_width_right = 2
-				def_style.border_width_top = 2
-				def_style.border_width_bottom = 2
-				def_style.border_color = Color("#999999")
-				card_panels[i].add_theme_stylebox_override("panel", def_style)
 				card_panels[i].position.y = 0
+				card_panels[i].modulate = Color.WHITE
 		else:
 			card_panels[i].visible = false
 
