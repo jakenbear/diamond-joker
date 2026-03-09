@@ -1,5 +1,5 @@
 /**
- * Diamond Joker — Headless Simulation Test Suite
+ * Aces Loaded! — Headless Simulation Test Suite
  * Run: node test/sim.js
  */
 

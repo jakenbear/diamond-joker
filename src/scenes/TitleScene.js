@@ -49,7 +49,7 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // Title
-    const title = this.add.text(640, 290, 'ACES & BASES', {
+    const title = this.add.text(640, 290, 'ACES LOADED!', {
       fontSize: '64px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setAlpha(0);
 

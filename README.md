@@ -1,4 +1,4 @@
-# Diamond Joker
+# Aces Loaded!
 
 A Balatro-style poker/baseball hybrid card game built with Phaser 3.
 

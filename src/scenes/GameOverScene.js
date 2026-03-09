@@ -91,7 +91,7 @@ export default class GameOverScene extends Phaser.Scene {
       this.scene.start('TitleScene');
     });
 
-    this.add.text(640, 680, 'Diamond Joker - A Card-Based Baseball Game', {
+    this.add.text(640, 680, 'Aces Loaded! - A Card-Based Baseball Game', {
       fontSize: '14px', fontFamily: 'monospace', color: '#555555',
     }).setOrigin(0.5);
   }
