@@ -137,7 +137,7 @@ export default class PitchingScene extends Phaser.Scene {
         const fromPos = i === 0 ? homePos : this.basePositions[i - 1];
         const dot = this.add.circle(fromPos.x, fromPos.y, 7, 0xffd600).setDepth(3);
         this._spawnRunnerTrail(fromPos, bp);
-        this.tweens.add({ targets: dot, x: bp.x, y: bp.y, duration: 300, ease: 'Quad.easeInOut' });
+        this.tweens.add({ targets: dot, x: bp.x, y: bp.y, duration: 500, ease: 'Quad.easeInOut' });
         this.tweens.add({
           targets: dot, alpha: { from: 1, to: 0.6 },
           duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
@@ -148,7 +148,7 @@ export default class PitchingScene extends Phaser.Scene {
         this._spawnRunnerTrail(bp, toPos);
         const runnerRef = this.runners[i];
         this.tweens.add({
-          targets: runnerRef, x: toPos.x, y: toPos.y, alpha: 0, duration: 300,
+          targets: runnerRef, x: toPos.x, y: toPos.y, alpha: 0, duration: 500,
           ease: 'Quad.easeIn',
           onComplete: () => runnerRef.destroy(),
         });

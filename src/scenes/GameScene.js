@@ -213,7 +213,7 @@ export default class GameScene extends Phaser.Scene {
     }
     this.strikesDots.setText(strikeDots.join(' '));
 
-    this._updateBases(s.bases);
+    if (!this._deferBaseUpdate) this._updateBases(s.bases);
   }
 
   // ── Batter Panel (left) ────────────────────────────────
@@ -530,7 +530,7 @@ export default class GameScene extends Phaser.Scene {
           targets: runner,
           x: bp.x,
           y: bp.y,
-          duration: 350,
+          duration: 500,
           ease: 'Quad.easeInOut',
         });
       } else if (!occupied && wasOccupied) {
@@ -544,7 +544,7 @@ export default class GameScene extends Phaser.Scene {
             x: toPos.x,
             y: toPos.y,
             alpha: 0,
-            duration: 350,
+            duration: 500,
             ease: 'Quad.easeIn',
             onComplete: () => runnerRef.destroy(),
           });
@@ -1783,8 +1783,10 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    // ── Phase 2: Resolve with cascade ──
+    // ── Phase 2: Resolve outcome (defer base display until Phase 2.5) ──
     const resolveStart = 900 + pitcherDelay + batterTraitDelay + situationalDelay;
+    this._deferBaseUpdate = true;
+
     this.time.delayedCall(resolveStart, () => {
       const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score);
 
@@ -1847,19 +1849,27 @@ export default class GameScene extends Phaser.Scene {
         SoundManager.hit();
       }
 
-      // Run scored chime
-      const runsForSound = (outcome.runsScored || 0) + sacrificeFlyRun + extraBase.scored;
-      if (runsForSound > 0) SoundManager.runScored();
-
+      // Update score text (without bases — those come in Phase 2.5)
       this._updateScoreboard();
+
+      // ── Phase 2.5: Resolve runners (T+400ms after outcome) ──
+      const RUNNER_DELAY = 400;
+      this.time.delayedCall(RUNNER_DELAY, () => {
+        this._deferBaseUpdate = false;
+        this._updateBases(this.baseball.getStatus().bases);
+
+        // Run scored chime after runners visually move
+        const runsForSound = (outcome.runsScored || 0) + sacrificeFlyRun + extraBase.scored;
+        if (runsForSound > 0) SoundManager.runScored();
+      });
 
       // For outs, skip cascade — just show outcome and move on
       if (isOut) {
         this.handNameText.setText('');
 
         this.rosterManager.advanceBatter();
-        this.time.delayedCall(600, () => this._updateBatterPanel());
-        this.time.delayedCall(1500, () => {
+        this.time.delayedCall(RUNNER_DELAY + 200, () => this._updateBatterPanel());
+        this.time.delayedCall(RUNNER_DELAY + 1200, () => {
           if (this.baseball.isGameOver()) { this._endGame(); return; }
           if (this.baseball.state === 'SWITCH_SIDE') { this._showMidInningTransition(); return; }
           this._startAtBat();
@@ -1867,13 +1877,14 @@ export default class GameScene extends Phaser.Scene {
         return;
       }
 
-      // ── Scoring Cascade for hits ──
+      // ── Phase 3: Scoring Cascade for hits (after runners) ──
       this.handNameText.setText('');
       const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage);
+      const totalCascadeDelay = RUNNER_DELAY + cascadeDelay;
 
       // Score popup for runs (after cascade)
       const totalRuns = outcome.runsScored + sacrificeFlyRun + extraBase.scored;
-      this.time.delayedCall(cascadeDelay, () => {
+      this.time.delayedCall(totalCascadeDelay, () => {
         if (totalRuns > 0) {
           const popupColor = totalRuns >= 4 ? '#ff6e40' : totalRuns >= 2 ? '#ffd600' : '#69f0ae';
           const popupText = totalRuns >= 4 ? `+${totalRuns} RUNS!!!` : `+${totalRuns} RUN${totalRuns > 1 ? 'S' : ''}!`;
@@ -1888,9 +1899,9 @@ export default class GameScene extends Phaser.Scene {
 
       // Advance batter
       this.rosterManager.advanceBatter();
-      this.time.delayedCall(cascadeDelay + 200, () => this._updateBatterPanel());
+      this.time.delayedCall(totalCascadeDelay + 200, () => this._updateBatterPanel());
 
-      this.time.delayedCall(cascadeDelay + 1200, () => {
+      this.time.delayedCall(totalCascadeDelay + 1200, () => {
         if (this.baseball.isGameOver()) { this._endGame(); return; }
         if (this.baseball.state === 'SWITCH_SIDE') { this._showMidInningTransition(); return; }
         this._startAtBat();
