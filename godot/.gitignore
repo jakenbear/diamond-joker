@@ -1,2 +1,5 @@
 # Godot editor cache
 .godot/
+
+# Godot import cache (auto-generated per machine)
+*.import

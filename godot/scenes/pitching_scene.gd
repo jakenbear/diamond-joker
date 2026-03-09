@@ -1,9 +1,7 @@
 extends Control
 
 # PitchingScene — Opponent's half-inning. You pick pitches.
-#
-# HOW TO EDIT THE LAYOUT:
-#   Open pitching_scene.tscn and drag nodes around in the 2D editor.
+# Pitches are displayed as cards on the right side (like Phaser).
 
 @onready var score_label: Label = %ScoreLabel
 @onready var inning_label: Label = %InningLabel
@@ -11,13 +9,13 @@ extends Control
 @onready var batter_label: Label = %BatterLabel
 @onready var pitcher_label: Label = %PitcherLabel
 @onready var stamina_label: Label = %StaminaLabel
-@onready var pitch_btn_container: VBoxContainer = %PitchButtonContainer
+@onready var pitch_card_container: HBoxContainer = %PitchCardContainer
 @onready var log_container: VBoxContainer = %LogContainer
 @onready var log_scroll: ScrollContainer = %LogScroll
 
 var base_indicators: Array[ColorRect] = []
 var runner_labels: Array[Label] = []
-var pitch_buttons: Array[Button] = []
+var pitch_cards: Array[Panel] = []
 
 var sim_outs: int = 0
 var sim_runs: int = 0
@@ -29,33 +27,72 @@ func _ready() -> void:
 	base_indicators = [%Base1st, %Base2nd, %Base3rd]
 	runner_labels = [%Runner1st, %Runner2nd, %Runner3rd]
 
-	_build_pitch_buttons()
+	_build_pitch_cards()
 	_update_ui()
 	_show_current_batter()
 
 
-func _build_pitch_buttons() -> void:
+func _build_pitch_cards() -> void:
 	var my_pitcher: Dictionary = GameManager.roster.get_my_pitcher()
 	var pitches: Array = my_pitcher.get("pitches", ["fastball", "slider", "changeup", "breaking"])
 
 	for pitch_key in pitches:
 		var pitch_data: Dictionary = PitchTypes.TYPES.get(pitch_key, {})
-		var btn := Button.new()
-		btn.text = "%s - %s" % [pitch_data.get("name", pitch_key), pitch_data.get("description", "")]
-		btn.add_theme_font_size_override("font_size", 14)
-		btn.custom_minimum_size = Vector2(300, 50)
-		btn.pressed.connect(_on_pitch_selected.bind(pitch_key))
-		pitch_btn_container.add_child(btn)
-		pitch_buttons.append(btn)
+		var card := _create_pitch_card(pitch_key, pitch_data)
+		pitch_card_container.add_child(card)
+		pitch_cards.append(card)
 
-	# IBB button
-	var ibb_btn := Button.new()
-	ibb_btn.text = "Intentional Walk - Put batter on 1st"
-	ibb_btn.add_theme_font_size_override("font_size", 14)
-	ibb_btn.custom_minimum_size = Vector2(300, 40)
-	ibb_btn.pressed.connect(_on_pitch_selected.bind("ibb"))
-	pitch_btn_container.add_child(ibb_btn)
-	pitch_buttons.append(ibb_btn)
+	# IBB card
+	var ibb_data := {"name": "IBB", "description": "Intentional Walk\nPut batter on 1st"}
+	var ibb_card := _create_pitch_card("ibb", ibb_data)
+	pitch_card_container.add_child(ibb_card)
+	pitch_cards.append(ibb_card)
+
+
+func _create_pitch_card(pitch_key: String, pitch_data: Dictionary) -> Panel:
+	var card := Panel.new()
+	card.custom_minimum_size = Vector2(145, 200)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# Card style
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#2a4a6a")
+	style.set_corner_radius_all(8)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color("#4a7aaa")
+	card.add_theme_stylebox_override("panel", style)
+
+	# Pitch name at top
+	var name_label := Label.new()
+	name_label.text = pitch_data.get("name", pitch_key).to_upper()
+	name_label.add_theme_font_size_override("font_size", 18)
+	name_label.add_theme_color_override("font_color", Color("#ffd700"))
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.position = Vector2(5, 15)
+	name_label.size = Vector2(135, 25)
+	card.add_child(name_label)
+
+	# Description
+	var desc_label := Label.new()
+	desc_label.text = pitch_data.get("description", "")
+	desc_label.add_theme_font_size_override("font_size", 11)
+	desc_label.add_theme_color_override("font_color", Color("#c7d5e0"))
+	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_label.position = Vector2(5, 50)
+	desc_label.size = Vector2(135, 120)
+	card.add_child(desc_label)
+
+	# Click handling
+	card.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_on_pitch_selected(pitch_key)
+	)
+
+	return card
 
 
 func _show_current_batter() -> void:
@@ -96,14 +133,16 @@ func _update_ui() -> void:
 			base_indicators[i].color = GameManager.COLORS["base_empty"]
 			runner_labels[i].text = ""
 
-	for btn in pitch_buttons:
-		btn.disabled = pitching_done
+	# Disable/dim pitch cards when done
+	for card in pitch_cards:
+		card.modulate = Color(0.4, 0.4, 0.4) if pitching_done else Color.WHITE
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE if pitching_done else Control.MOUSE_FILTER_STOP
 
 
 func _add_log_entry(text: String, is_out: bool, scored: int) -> void:
 	var entry := Label.new()
 	entry.text = text
-	entry.add_theme_font_size_override("font_size", 16)
+	entry.add_theme_font_size_override("font_size", 14)
 	if is_out:
 		entry.add_theme_color_override("font_color", GameManager.COLORS["out"])
 	elif scored > 0:
@@ -111,10 +150,9 @@ func _add_log_entry(text: String, is_out: bool, scored: int) -> void:
 	else:
 		entry.add_theme_color_override("font_color", GameManager.COLORS["text"])
 	entry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	entry.custom_minimum_size = Vector2(830, 0)
+	entry.custom_minimum_size = Vector2(300, 0)
 	log_container.add_child(entry)
 
-	# Auto-scroll to bottom
 	await get_tree().process_frame
 	log_scroll.scroll_vertical = int(log_scroll.get_v_scroll_bar().max_value)
 
