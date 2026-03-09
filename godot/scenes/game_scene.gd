@@ -12,6 +12,11 @@ const SUIT_SYMBOLS := {"H": "♥", "D": "♦", "C": "♣", "S": "♠"}
 const SUIT_COLORS := {"H": Color("#e53935"), "D": Color("#e53935"), "C": Color("#222233"), "S": Color("#222233")}
 const RANK_DISPLAY := {2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", 10:"10", 11:"J", 12:"Q", 13:"K", 14:"A"}
 
+# Card image file mapping: suit letter + rank string
+const SUIT_FILE := {"H": "h", "D": "d", "C": "c", "S": "s"}
+const RANK_FILE := {2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", 10:"10", 11:"j", 12:"q", 13:"k", 14:"a"}
+const CARD_SCALE := Vector2(4.0, 4.0)  # 32x42 -> 128x168
+
 # Node references from the .tscn (% finds unique-named nodes)
 @onready var score_label: Label = %ScoreLabel
 @onready var inning_label: Label = %InningLabel
@@ -32,8 +37,9 @@ const RANK_DISPLAY := {2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", 1
 var base_indicators: Array[ColorRect] = []
 var runner_labels: Array[Label] = []
 
-# Card buttons (created dynamically in the CardContainer)
-var card_buttons: Array[Button] = []
+# Card slots (each is a Panel with a TextureRect + click handling)
+var card_panels: Array[Panel] = []
+var card_textures: Array[TextureRect] = []
 var selected_indices: Array[int] = []
 var strike_count: int = 0
 
@@ -47,11 +53,12 @@ func _ready() -> void:
 	play_button.pressed.connect(_on_play_pressed)
 	discard_button.pressed.connect(_on_discard_pressed)
 
-	# Create 5 card buttons dynamically in the container
+	# Create 5 card slots with image support
 	for i in 5:
-		var btn := _create_card_button(i)
-		card_container.add_child(btn)
-		card_buttons.append(btn)
+		var slot := _create_card_slot(i)
+		card_container.add_child(slot["panel"])
+		card_panels.append(slot["panel"])
+		card_textures.append(slot["texture"])
 
 	# Show pitcher traits
 	var traits_text := ""
@@ -64,36 +71,56 @@ func _ready() -> void:
 	_new_at_bat()
 
 
-# ── Card button factory ───────────────────────────────────
+# ── Card slot factory ─────────────────────────────────────
 
-func _create_card_button(index: int) -> Button:
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(145, 210)
-	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.add_theme_font_size_override("font_size", 32)
+func _create_card_slot(index: int) -> Dictionary:
+	# Panel acts as clickable card container
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2(140, 190)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Cream background so card text is always readable
-	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = Color("#f0ead6")
-	bg_style.set_corner_radius_all(8)
-	bg_style.border_width_left = 2
-	bg_style.border_width_right = 2
-	bg_style.border_width_top = 2
-	bg_style.border_width_bottom = 2
-	bg_style.border_color = Color("#999999")
-	btn.add_theme_stylebox_override("normal", bg_style)
+	# Default style
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#f0ead6")
+	style.set_corner_radius_all(8)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = Color("#999999")
+	panel.add_theme_stylebox_override("panel", style)
 
-	var hover_style := bg_style.duplicate()
-	hover_style.bg_color = Color("#fffde8")
-	hover_style.border_color = Color("#ffd700")
-	btn.add_theme_stylebox_override("hover", hover_style)
+	# Card image centered in panel
+	var tex_rect := TextureRect.new()
+	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tex_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # pixel art stays crisp
+	tex_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tex_rect.offset_left = 6
+	tex_rect.offset_top = 6
+	tex_rect.offset_right = -6
+	tex_rect.offset_bottom = -6
+	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(tex_rect)
 
-	var press_style := bg_style.duplicate()
-	press_style.bg_color = Color("#e8e0c0")
-	btn.add_theme_stylebox_override("pressed", press_style)
+	# Click handling
+	panel.gui_input.connect(_on_card_input.bind(index))
 
-	btn.pressed.connect(_on_card_toggled.bind(index))
-	return btn
+	return {"panel": panel, "texture": tex_rect}
+
+
+func _on_card_input(event: InputEvent, index: int) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_on_card_toggled(index)
+
+
+func _get_card_texture(card: Dictionary) -> Texture2D:
+	var suit_char: String = SUIT_FILE.get(card["suit"], "h")
+	var rank_char: String = RANK_FILE.get(card["rank"], "2")
+	var path := "res://assets/cards/%s%s.png" % [suit_char, rank_char]
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
 
 
 # ── Game Logic ────────────────────────────────────────────
@@ -162,18 +189,19 @@ func _update_ui() -> void:
 			base_indicators[i].color = GameManager.COLORS["base_empty"]
 			runner_labels[i].text = ""
 
-	# Cards
+	# Cards — load card art images
 	var hand: Array = GameManager.card_engine.hand
-	for i in card_buttons.size():
+	for i in card_panels.size():
 		if i < hand.size():
 			var card: Dictionary = hand[i]
-			var rank_str: String = RANK_DISPLAY.get(card["rank"], "?")
-			var suit_str: String = SUIT_SYMBOLS.get(card["suit"], "?")
-			card_buttons[i].text = "%s\n%s" % [rank_str, suit_str]
-			card_buttons[i].visible = true
+			card_panels[i].visible = true
 
-			var suit_color: Color = SUIT_COLORS.get(card["suit"], Color.BLACK)
-			card_buttons[i].add_theme_color_override("font_color", suit_color)
+			# Load card image
+			var tex: Texture2D = _get_card_texture(card)
+			if tex:
+				card_textures[i].texture = tex
+			else:
+				card_textures[i].texture = null
 
 			# Selection highlight — gold border + raised look
 			if i in selected_indices:
@@ -185,8 +213,8 @@ func _update_ui() -> void:
 				sel_style.border_width_top = 3
 				sel_style.border_width_bottom = 3
 				sel_style.border_color = Color("#ffd700")
-				card_buttons[i].add_theme_stylebox_override("normal", sel_style)
-				card_buttons[i].position.y = -10
+				card_panels[i].add_theme_stylebox_override("panel", sel_style)
+				card_panels[i].position.y = -10
 			else:
 				var def_style := StyleBoxFlat.new()
 				def_style.bg_color = Color("#f0ead6")
@@ -196,10 +224,10 @@ func _update_ui() -> void:
 				def_style.border_width_top = 2
 				def_style.border_width_bottom = 2
 				def_style.border_color = Color("#999999")
-				card_buttons[i].add_theme_stylebox_override("normal", def_style)
-				card_buttons[i].position.y = 0
+				card_panels[i].add_theme_stylebox_override("panel", def_style)
+				card_panels[i].position.y = 0
 		else:
-			card_buttons[i].visible = false
+			card_panels[i].visible = false
 
 	# Discard counter
 	discard_count_label.text = "Discards: %d" % GameManager.card_engine.discards_remaining
