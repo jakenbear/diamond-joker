@@ -8,7 +8,7 @@ extends Control
 #   Center:     Outcome overlay text
 
 const SUIT_SYMBOLS := {"H": "♥", "D": "♦", "C": "♣", "S": "♠"}
-const SUIT_COLORS := {"H": Color("#e53935"), "D": Color("#e53935"), "C": Color("#1a1a2e"), "S": Color("#1a1a2e")}
+const SUIT_COLORS := {"H": Color("#e53935"), "D": Color("#e53935"), "C": Color("#222233"), "S": Color("#222233")}
 const RANK_DISPLAY := {2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", 10:"10", 11:"J", 12:"Q", 13:"K", 14:"A"}
 
 # UI references
@@ -144,8 +144,8 @@ func _build_diamond() -> void:
 		var base := ColorRect.new()
 		base.color = GameManager.COLORS["base_empty"]
 		var bp: Vector2 = base_positions[i]
-		base.position = Vector2(20 + bp.x - 12, 70 + bp.y - 12)
-		base.size = Vector2(24, 24)
+		base.position = Vector2(20 + bp.x - 15, 70 + bp.y - 15)
+		base.size = Vector2(30, 30)
 		base.rotation = deg_to_rad(45)
 		add_child(base)
 		base_indicators.append(base)
@@ -283,9 +283,35 @@ func _build_card_area() -> void:
 
 func _create_card_button(index: int) -> Button:
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(140, 200)
+	btn.custom_minimum_size = Vector2(145, 210)
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.add_theme_font_size_override("font_size", 28)
+	btn.add_theme_font_size_override("font_size", 32)
+
+	# Cream background so card text is always readable
+	var bg_style := StyleBoxFlat.new()
+	bg_style.bg_color = Color("#f0ead6")
+	bg_style.corner_radius_top_left = 8
+	bg_style.corner_radius_top_right = 8
+	bg_style.corner_radius_bottom_left = 8
+	bg_style.corner_radius_bottom_right = 8
+	bg_style.border_width_left = 2
+	bg_style.border_width_right = 2
+	bg_style.border_width_top = 2
+	bg_style.border_width_bottom = 2
+	bg_style.border_color = Color("#999999")
+	btn.add_theme_stylebox_override("normal", bg_style)
+
+	# Hover style — slight highlight
+	var hover_style := bg_style.duplicate()
+	hover_style.bg_color = Color("#fffde8")
+	hover_style.border_color = Color("#ffd700")
+	btn.add_theme_stylebox_override("hover", hover_style)
+
+	# Pressed style
+	var press_style := bg_style.duplicate()
+	press_style.bg_color = Color("#e8e0c0")
+	btn.add_theme_stylebox_override("pressed", press_style)
+
 	btn.pressed.connect(_on_card_toggled.bind(index))
 	return btn
 
@@ -382,14 +408,39 @@ func _update_ui() -> void:
 			card_buttons[i].visible = true
 
 			# Color based on suit
-			var suit_color: Color = SUIT_COLORS.get(card["suit"], Color.WHITE)
+			var suit_color: Color = SUIT_COLORS.get(card["suit"], Color.BLACK)
 			card_buttons[i].add_theme_color_override("font_color", suit_color)
 
-			# Selection highlight
+			# Selection highlight — gold border + raised look
 			if i in selected_indices:
-				card_buttons[i].modulate = Color(1.0, 0.85, 0.2, 1.0)
+				var sel_style := StyleBoxFlat.new()
+				sel_style.bg_color = Color("#fff8dc")
+				sel_style.corner_radius_top_left = 8
+				sel_style.corner_radius_top_right = 8
+				sel_style.corner_radius_bottom_left = 8
+				sel_style.corner_radius_bottom_right = 8
+				sel_style.border_width_left = 3
+				sel_style.border_width_right = 3
+				sel_style.border_width_top = 3
+				sel_style.border_width_bottom = 3
+				sel_style.border_color = Color("#ffd700")
+				card_buttons[i].add_theme_stylebox_override("normal", sel_style)
+				card_buttons[i].position.y = -10  # raise selected card
 			else:
-				card_buttons[i].modulate = Color.WHITE
+				# Reset to default cream style
+				var def_style := StyleBoxFlat.new()
+				def_style.bg_color = Color("#f0ead6")
+				def_style.corner_radius_top_left = 8
+				def_style.corner_radius_top_right = 8
+				def_style.corner_radius_bottom_left = 8
+				def_style.corner_radius_bottom_right = 8
+				def_style.border_width_left = 2
+				def_style.border_width_right = 2
+				def_style.border_width_top = 2
+				def_style.border_width_bottom = 2
+				def_style.border_color = Color("#999999")
+				card_buttons[i].add_theme_stylebox_override("normal", def_style)
+				card_buttons[i].position.y = 0
 		else:
 			card_buttons[i].visible = false
 
