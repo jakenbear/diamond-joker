@@ -37,8 +37,8 @@ const CARD_SCALE := Vector2(4.0, 4.0)  # 32x42 -> 128x168
 var base_indicators: Array[ColorRect] = []
 var runner_labels: Array[Label] = []
 
-# Card slots (each is a Panel with a TextureRect + click handling)
-var card_panels: Array[Panel] = []
+# Card slots (TextureRect nodes showing card art)
+var card_panels: Array[TextureRect] = []
 var card_textures: Array[TextureRect] = []
 var selected_indices: Array[int] = []
 var strike_count: int = 0
@@ -77,6 +77,7 @@ func _create_card_slot(index: int) -> Dictionary:
 	# Just the card image — no background panel, no border
 	var tex_rect := TextureRect.new()
 	tex_rect.custom_minimum_size = Vector2(128, 168)
+	tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE  # allow scaling beyond texture size
 	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tex_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # pixel art stays crisp
 	tex_rect.mouse_filter = Control.MOUSE_FILTER_STOP
