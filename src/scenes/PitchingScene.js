@@ -126,6 +126,7 @@ export default class PitchingScene extends Phaser.Scene {
       { x: cx - size, y: cy },
     ];
     this.runners = [null, null, null];
+    this.runnerLabels = [null, null, null];
   }
 
   _updateBases(bases) {
@@ -153,6 +154,21 @@ export default class PitchingScene extends Phaser.Scene {
           onComplete: () => runnerRef.destroy(),
         });
         this.runners[i] = null;
+      }
+
+      // Runner name label
+      if (this.runnerLabels[i]) {
+        this.runnerLabels[i].destroy();
+        this.runnerLabels[i] = null;
+      }
+      if (bases[i] && typeof bases[i] === 'object' && bases[i].name) {
+        const lastName = bases[i].name.split(' ').pop();
+        const labelY = i === 1 ? bp.y - 18 : bp.y - 16;
+        const label = this.add.text(bp.x, labelY, lastName, {
+          fontSize: '8px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+        }).setOrigin(0.5, 1).setDepth(4).setAlpha(0);
+        this.tweens.add({ targets: label, alpha: 0.9, duration: 300, delay: 200 });
+        this.runnerLabels[i] = label;
       }
     }
   }
@@ -433,7 +449,7 @@ export default class PitchingScene extends Phaser.Scene {
     this._pitchState = {
       outs: 0,
       runs: 0,
-      bases: [false, false, false],
+      bases: [null, null, null],
       oppLabel,
       myPitcher,
       logElements: [],
@@ -806,7 +822,7 @@ export default class PitchingScene extends Phaser.Scene {
     });
 
     this._updateScoreboard();
-    this._updateBases([false, false, false]);
+    this._updateBases([null, null, null]);
 
     this.time.delayedCall(1800, () => {
       if (this.baseball.isGameOver()) {

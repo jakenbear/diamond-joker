@@ -696,11 +696,11 @@ group('1h. Pitch Type Modifiers');
   const canada = TEAMS.find(t => t.id === 'CAN');
   const usa = TEAMS.find(t => t.id === 'USA');
   const rm = new RosterManager(canada, 0, usa);
-  const bases = [false, false, false];
+  const bases = [null, null, null];
   const r = rm.simSingleAtBat(1, 'ibb', bases);
   assert(r.walked === true, 'IBB always walks');
   assert(r.outcome === 'Walk (IBB)', 'IBB outcome is Walk (IBB)');
-  assert(bases[0] === true, 'IBB puts batter on 1st');
+  assert(!!bases[0], 'IBB puts batter on 1st');
 }
 {
   // Stamina drains correctly per pitch type
@@ -745,8 +745,8 @@ group('1g. BaseballState');
   bs.bases = [true, false, false]; // runner on 1st
   bs.resolveOutcome('Single');
   // After single: runner on 1st moves to 2nd, batter goes to 1st
-  assert(bs.bases[0] === true, 'Single: batter on 1st');
-  assert(bs.bases[1] === true, 'Single: previous runner on 2nd');
+  assert(!!bs.bases[0], 'Single: batter on 1st');
+  assert(!!bs.bases[1], 'Single: previous runner on 2nd');
 }
 {
   // Home Run with bases loaded → 4 runs
@@ -762,15 +762,15 @@ group('1g. BaseballState');
   bs.bases = [false, false, true];
   const runs = bs.processSacrificeFly();
   assert(runs === 1, 'processSacrificeFly: 1 run scored');
-  assert(bs.bases[2] === false, 'processSacrificeFly: runner on 3rd cleared');
+  assert(!bs.bases[2], 'processSacrificeFly: runner on 3rd cleared');
 }
 {
   // processStolenBase: 1st→2nd
   const bs = new BaseballState();
   bs.bases = [true, false, false];
   bs.processStolenBase();
-  assert(bs.bases[0] === false, 'processStolenBase: 1st vacated');
-  assert(bs.bases[1] === true, 'processStolenBase: runner now on 2nd');
+  assert(!bs.bases[0], 'processStolenBase: 1st vacated');
+  assert(!!bs.bases[1], 'processStolenBase: runner now on 2nd');
 }
 {
   // Chips accumulate from hand scores
@@ -810,8 +810,8 @@ group('1g. BaseballState');
   bs.bases = [true, false, false];
   const r = bs.resolveOutcome('Double');
   assert(r.runsScored === 0, 'Double with runner on 1st → runner to 3rd, 0 runs');
-  assert(bs.bases[2] === true, 'Double: previous runner on 3rd');
-  assert(bs.bases[1] === true, 'Double: batter on 2nd');
+  assert(!!bs.bases[2], 'Double: previous runner on 3rd');
+  assert(!!bs.bases[1], 'Double: batter on 2nd');
 }
 {
   // Triple with runner on 2nd → runner scores
@@ -2049,7 +2049,7 @@ group('Sacrifice Fly');
   bs.outs = 0;
   const runs = bs.processSacrificeFly();
   assert(runs === 1, 'Sac fly scores 1 run');
-  assert(bs.bases[2] === false, 'Sac fly clears runner from 3rd');
+  assert(!bs.bases[2], 'Sac fly clears runner from 3rd');
   assert(bs.playerScore === 1, 'Sac fly adds to player score');
 }
 

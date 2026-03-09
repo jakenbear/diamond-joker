@@ -259,7 +259,7 @@ export default class RosterManager {
 
     // IBB — automatic walk
     if (pitchType === 'ibb') {
-      const scored = this._advanceRunners(bases, 1, 0);
+      const scored = this._advanceRunners(bases, 1, 0, batter);
       this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
       return { outcome: 'Walk (IBB)', isOut: false, basesGained: 1, batter, walked: true, scored };
     }
@@ -273,7 +273,7 @@ export default class RosterManager {
     if (pitchType === 'breaking') {
       const walkChance = Math.max(0, (6 - pitcher.control) * 0.04);
       if (walkChance > 0 && Math.random() < walkChance) {
-        const scored = this._advanceRunners(bases, 1, 0);
+        const scored = this._advanceRunners(bases, 1, 0, batter);
         this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
         return { outcome: 'Walk', isOut: false, basesGained: 1, batter, walked: true, scored };
       }
@@ -283,7 +283,7 @@ export default class RosterManager {
     if (result.isOut) {
       // No runner advancement on outs
     } else {
-      scored = this._advanceRunners(bases, result.basesGained, batter.speed);
+      scored = this._advanceRunners(bases, result.basesGained, batter.speed, batter);
     }
 
     this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
@@ -468,7 +468,7 @@ export default class RosterManager {
         });
       } else {
         // Advance runners
-        const scored = this._advanceRunners(bases, result.basesGained, batter.speed);
+        const scored = this._advanceRunners(bases, result.basesGained, batter.speed, batter);
         runs += scored;
         log.push({
           batter: batter.name,
@@ -535,25 +535,26 @@ export default class RosterManager {
   /**
    * Advance runners on bases. Returns number of runs scored.
    */
-  _advanceRunners(bases, basesGained, batterSpeed) {
+  _advanceRunners(bases, basesGained, batterSpeed, batter = null) {
     let scored = 0;
 
     if (basesGained >= 4) {
       // Home run: everyone scores
       scored += bases.filter(b => b).length + 1;
-      bases[0] = bases[1] = bases[2] = false;
+      bases[0] = bases[1] = bases[2] = null;
       return scored;
     }
 
     // Move runners forward by basesGained
     for (let i = 2; i >= 0; i--) {
       if (bases[i]) {
-        bases[i] = false;
+        const runner = bases[i];
+        bases[i] = null;
         const newBase = i + basesGained;
         if (newBase >= 3) {
           scored++;
         } else {
-          bases[newBase] = true;
+          bases[newBase] = runner;
         }
       }
     }
@@ -563,19 +564,20 @@ export default class RosterManager {
       scored++; // Triple+ means batter also scored (shouldn't happen with basesGained=3 but safety)
     }
     if (basesGained === 3) {
-      bases[2] = true; // batter on 3rd
+      bases[2] = batter || true; // batter on 3rd
     } else if (basesGained === 2) {
-      bases[1] = true; // batter on 2nd
+      bases[1] = batter || true; // batter on 2nd
     } else if (basesGained === 1) {
-      bases[0] = true; // batter on 1st
+      bases[0] = batter || true; // batter on 1st
     }
 
     // Speed bonus: small chance runner advances extra
     if (batterSpeed >= 7 && Math.random() < batterSpeed * 0.03) {
       for (let i = 1; i >= 0; i--) {
         if (bases[i] && !bases[i + 1]) {
-          bases[i] = false;
-          bases[i + 1] = true;
+          const runner = bases[i];
+          bases[i] = null;
+          bases[i + 1] = runner;
           break;
         }
       }

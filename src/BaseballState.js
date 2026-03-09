@@ -36,7 +36,7 @@ export default class BaseballState {
     this.inning = 1;
     this.half = 'top';       // 'top' = player bats, 'bottom' = opponent bats
     this.outs = 0;
-    this.bases = [false, false, false]; // [1st, 2nd, 3rd]
+    this.bases = [null, null, null]; // [1st, 2nd, 3rd] — null or batter object
     this.playerScore = 0;
     this.opponentScore = 0;
     this.state = 'BATTING';  // BATTING | RESOLVE | SWITCH_SIDE | GAME_OVER
@@ -93,7 +93,7 @@ export default class BaseballState {
    * @param {number} handScore - Score from the hand (chips * mult) to accumulate
    * Returns { runsScored, description, state }
    */
-  resolveOutcome(outcome, handScore = 0) {
+  resolveOutcome(outcome, handScore = 0, batter = null) {
     const effect = OUTCOME_EFFECTS[outcome];
     if (!effect) {
       return { runsScored: 0, description: 'Unknown outcome', state: this.state };
@@ -111,7 +111,7 @@ export default class BaseballState {
       // Double Play: 2 outs, remove lead runner from 1st
       if (effect.outsRecorded === 2) {
         this.outs += 2;
-        this.bases[0] = false; // runner on 1st out
+        this.bases[0] = null; // runner on 1st out
         description = `Double Play! Outs: ${this.outs}`;
       } else if (effect.sacBunt) {
         // Sac Bunt: advance all runners 1 base, then record the out
@@ -127,9 +127,9 @@ export default class BaseballState {
         this.outs++;
         // Remove the lead runner (highest occupied base)
         for (let i = 2; i >= 0; i--) {
-          if (this.bases[i]) { this.bases[i] = false; break; }
+          if (this.bases[i]) { this.bases[i] = null; break; }
         }
-        this.bases[0] = true; // batter reaches 1st
+        this.bases[0] = batter || true; // batter reaches 1st
         description = `Fielder's Choice - Out ${this.outs}`;
       } else {
         this.outs++;
@@ -137,7 +137,7 @@ export default class BaseballState {
       }
 
       if (this.outs >= 3) {
-        this.bases = [false, false, false];
+        this.bases = [null, null, null];
         this.outs = 0;
         this.state = 'SWITCH_SIDE';
         description += ' - Side retired!';
@@ -145,7 +145,7 @@ export default class BaseballState {
         this.state = 'BATTING';
       }
     } else {
-      runsScored = this._advanceRunners(effect.basesToMove);
+      runsScored = this._advanceRunners(effect.basesToMove, batter);
 
       if (this.half === 'top') {
         this.playerScore += runsScored;
@@ -178,7 +178,7 @@ export default class BaseballState {
    */
   processSacrificeFly() {
     if (!this.bases[2]) return 0;
-    this.bases[2] = false;
+    this.bases[2] = null;
     this.playerScore += 1;
     this._currentInningPlayerRuns += 1;
     return 1;
@@ -190,11 +190,12 @@ export default class BaseballState {
    */
   processStolenBase() {
     if (!this.bases[0]) return;
-    this.bases[0] = false;
+    const runner = this.bases[0];
+    this.bases[0] = null;
     if (!this.bases[1]) {
-      this.bases[1] = true;
+      this.bases[1] = runner;
     } else if (!this.bases[2]) {
-      this.bases[2] = true;
+      this.bases[2] = runner;
     }
   }
 
@@ -207,13 +208,14 @@ export default class BaseballState {
     let runs = 0;
     for (let i = 2; i >= 0; i--) {
       if (!this.bases[i]) continue;
-      this.bases[i] = false;
+      const runner = this.bases[i];
+      this.bases[i] = null;
       if (i + 1 >= 3) {
         runs++;
         this.playerScore += 1;
         this._currentInningPlayerRuns += 1;
       } else {
-        this.bases[i + 1] = true;
+        this.bases[i + 1] = runner;
       }
     }
     return runs;
@@ -223,31 +225,32 @@ export default class BaseballState {
    * Advance runners by a number of bases. Batter also occupies a base (unless HR/4).
    * Returns runs scored.
    */
-  _advanceRunners(basesToMove) {
+  _advanceRunners(basesToMove, batter = null) {
     let runs = 0;
 
     if (basesToMove >= 4) {
       // Home run: all runners + batter score
       runs = this.bases.filter(b => b).length + 1;
-      this.bases = [false, false, false];
+      this.bases = [null, null, null];
       return runs;
     }
 
     // Advance existing runners from 3rd base backward
     for (let i = 2; i >= 0; i--) {
       if (!this.bases[i]) continue;
+      const runner = this.bases[i];
       const newPos = i + basesToMove;
-      this.bases[i] = false;
+      this.bases[i] = null;
       if (newPos >= 3) {
         runs++;
       } else {
-        this.bases[newPos] = true;
+        this.bases[newPos] = runner;
       }
     }
 
     // Place batter on base
     if (basesToMove >= 1 && basesToMove <= 3) {
-      this.bases[basesToMove - 1] = true;
+      this.bases[basesToMove - 1] = batter || true;
     }
 
     return runs;
@@ -262,13 +265,14 @@ export default class BaseballState {
       // Try to advance the lead runner one extra base
       for (let i = 2; i >= 0; i--) {
         if (this.bases[i]) {
-          this.bases[i] = false;
+          const runner = this.bases[i];
+          this.bases[i] = null;
           if (i + 1 >= 3) {
             this.playerScore += 1;
             this._currentInningPlayerRuns += 1;
             return { scored: 1, advanced: true };
           } else {
-            this.bases[i + 1] = true;
+            this.bases[i + 1] = runner;
           }
           return { scored: 0, advanced: true };
         }

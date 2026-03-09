@@ -433,7 +433,8 @@ export default class GameScene extends Phaser.Scene {
   _createBaseDiamond() {
     this.baseGraphics = [];
     this.runners = [null, null, null]; // runner dots for 1st, 2nd, 3rd
-    this._prevBases = [false, false, false]; // track previous state for animations
+    this.runnerLabels = [null, null, null]; // runner name labels
+    this._prevBases = [null, null, null]; // track previous state for animations
     const cx = 640, cy = 175;
     const r = 65;
     this.baseDiamondCenter = { x: cx, y: cy };
@@ -572,7 +573,25 @@ export default class GameScene extends Phaser.Scene {
         }
       }
     }
-    this._prevBases = [...bases];
+    // Update runner name labels
+    for (let i = 0; i < 3; i++) {
+      const bp = this.basePositions[i];
+      if (this.runnerLabels[i]) {
+        this.runnerLabels[i].destroy();
+        this.runnerLabels[i] = null;
+      }
+      if (bases[i] && typeof bases[i] === 'object' && bases[i].name) {
+        const lastName = bases[i].name.split(' ').pop();
+        const labelY = i === 1 ? bp.y - 22 : bp.y - 20;
+        const label = this.add.text(bp.x, labelY, lastName, {
+          fontSize: '9px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+        }).setOrigin(0.5, 1).setDepth(4).setAlpha(0);
+        this.tweens.add({ targets: label, alpha: 0.9, duration: 300, delay: 200 });
+        this.runnerLabels[i] = label;
+      }
+    }
+
+    this._prevBases = bases.map(b => b ? true : null);
   }
 
   /** Spawn fading trail dots between two base positions */
@@ -1322,7 +1341,7 @@ export default class GameScene extends Phaser.Scene {
         this.handNameText.setText(hbp.description);
         this.handNameText.setColor('#ffab40');
 
-        this.baseball.resolveOutcome('HBP', 0);
+        this.baseball.resolveOutcome('HBP', 0, batter);
         this._addGameLog(`${batter.name.split(' ').pop()}: HBP — free base`, '#ffab40');
         this._updateScoreboard();
         this._clearCards();
@@ -1421,8 +1440,8 @@ export default class GameScene extends Phaser.Scene {
           ease: 'Back.easeOut',
         });
 
-        this.baseball.resolveOutcome('Walk', 0);
         const walkBatter = this.rosterManager.getCurrentBatter();
+        this.baseball.resolveOutcome('Walk', 0, walkBatter);
         const walkCount = this.countManager.getCount();
         this._addGameLog(`${walkBatter.name.split(' ').pop()}: Walk (${walkCount.balls}-${walkCount.strikes})`, '#66bb6a');
         this._updateScoreboard();
@@ -1453,8 +1472,8 @@ export default class GameScene extends Phaser.Scene {
           ease: 'Back.easeOut',
         });
 
-        this.baseball.resolveOutcome('Flyout', 0);
         const foulBatter = this.rosterManager.getCurrentBatter();
+        this.baseball.resolveOutcome('Flyout', 0, foulBatter);
         this._addGameLog(`${foulBatter.name.split(' ').pop()}: Foul pop-up — out!`, '#ff8a80');
         this._updateScoreboard();
         this._clearCards();
@@ -1788,7 +1807,7 @@ export default class GameScene extends Phaser.Scene {
     this._deferBaseUpdate = true;
 
     this.time.delayedCall(resolveStart, () => {
-      const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score);
+      const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score, batter);
 
       let extraBase = { scored: 0, advanced: false };
       if (handResult.extraBaseChance && !isOut) {
@@ -2101,7 +2120,7 @@ export default class GameScene extends Phaser.Scene {
     this.scorePreviewText.setAlpha(0);
 
     this.time.delayedCall(900, () => {
-      const outcome = this.baseball.resolveOutcome('Sac Bunt', 0);
+      const outcome = this.baseball.resolveOutcome('Sac Bunt', 0, batter);
       this._clearCards();
       const sacRuns = outcome.runsScored > 0 ? ` +${outcome.runsScored}R` : '';
       this._addGameLog(`${batter.name.split(' ').pop()}: Sac Bunt — runners advance${sacRuns}`, '#ffab40');
