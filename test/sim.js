@@ -290,8 +290,8 @@ group('1b. Rank Quality (statistical, N=1000)');
   }
   assert(highContactSaves > lowContactSaves,
     `High contact saves more (${highContactSaves}) than low contact (${lowContactSaves})`);
-  assertClose(lowContactSaves / N, 0.10, 0.26, `Contact 3 save rate ~18%`);
-  assertClose(highContactSaves / N, 0.44, 0.64, `Contact 9 save rate ~54%`);
+  assertClose(lowContactSaves / N, 0.05, 0.21, `Contact 3 save rate ~12%`);
+  assertClose(highContactSaves / N, 0.26, 0.46, `Contact 9 save rate ~36%`);
 }
 
 // ── 1c. Deck Integrity ─────────────────────────────────
@@ -2136,6 +2136,80 @@ group('Bullpen');
   const current = rm.getMyPitcher();
   const same = rm.swapPitcher(0);
   assert(same.name === current.name, 'Swap with used reliever returns current');
+}
+
+// ── Pitcher Adjusts: pairsPlayedThisInning tracking ──
+console.log('\n── Pitcher Adjusts: pair counter ──');
+
+{
+  const bs = new BaseballState();
+  assert(bs.pairsPlayedThisInning === 0, 'pairsPlayedThisInning starts at 0');
+  bs.pairsPlayedThisInning = 3;
+  bs.switchSide(0);
+  assert(bs.pairsPlayedThisInning === 0, 'pairsPlayedThisInning resets on switchSide');
+}
+
+{
+  const bs = new BaseballState();
+  bs.pairsPlayedThisInning = 5;
+  bs.reset();
+  assert(bs.pairsPlayedThisInning === 0, 'pairsPlayedThisInning resets on full reset');
+}
+
+console.log('\n── Pitcher Adjusts: escalating out chance ──');
+
+{
+  // With pairsPlayedThisInning = 3, pair of Aces (normally 8% out)
+  // should have 8% + 45% = 53% out chance
+  const bs = new BaseballState();
+  const aceCards = [{ rank: 14, suit: 'H' }, { rank: 14, suit: 'D' }];
+  let outs = 0;
+  const trials = 1000;
+  for (let i = 0; i < trials; i++) {
+    bs.pairsPlayedThisInning = 3; // reset before each eval since it increments
+    const r = CardEngine.evaluateHand(aceCards, null, null, { baseballState: bs });
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
+  }
+  const outRate = outs / trials;
+  assert(outRate > 0.35, `Aces with 3 prior pairs: out rate ${(outRate*100).toFixed(1)}% > 35%`);
+  assert(outRate < 0.75, `Aces with 3 prior pairs: out rate ${(outRate*100).toFixed(1)}% < 75%`);
+}
+
+{
+  // pairsPlayedThisInning should increment after each pair evaluation
+  const bs = new BaseballState();
+  assert(bs.pairsPlayedThisInning === 0, 'starts at 0 before play');
+  const pairCards = [{ rank: 14, suit: 'H' }, { rank: 14, suit: 'D' }];
+  CardEngine.evaluateHand(pairCards, null, null, { baseballState: bs });
+  assert(bs.pairsPlayedThisInning === 1, 'incremented to 1 after first pair');
+  CardEngine.evaluateHand(pairCards, null, null, { baseballState: bs });
+  assert(bs.pairsPlayedThisInning === 2, 'incremented to 2 after second pair');
+}
+
+console.log('\n── Contact rescue nerf ──');
+
+{
+  const canada = TEAMS.find(t => t.id === 'CAN');
+  const usa = TEAMS.find(t => t.id === 'USA');
+  const rm = new RosterManager(canada, 0, usa);
+  const origContact = rm.roster[0].contact;
+  rm.roster[0].contact = 10;
+
+  let saves = 0;
+  const trials = 2000;
+  for (let i = 0; i < trials; i++) {
+    const fakeResult = {
+      wasGroundout: true, originalHand: 'Pair', pairRank: 10,
+      outcome: 'Groundout', handName: 'Groundout', chips: 0, mult: 1, score: 0,
+    };
+    const { bonuses } = rm.applyBatterModifiers(fakeResult, {});
+    if (bonuses.contactSave) saves++;
+  }
+
+  rm.roster[0].contact = origContact;
+  const saveRate = saves / trials;
+  assert(saveRate > 0.25, `Contact-10 rescue rate ${(saveRate*100).toFixed(1)}% > 25%`);
+  assert(saveRate < 0.55, `Contact-10 rescue rate ${(saveRate*100).toFixed(1)}% < 55%`);
 }
 
 // ═══════════════════════════════════════════════════════

@@ -370,7 +370,7 @@ export default class RosterManager {
 
     // Contact save: batter can rescue a pair that became a Groundout
     if (result.wasGroundout && result.originalHand === 'Pair') {
-      const saveChance = batter.contact * 0.06;
+      const saveChance = batter.contact * 0.04;
       if (Math.random() < saveChance) {
         result.outcome = 'Single';
         result.handName = 'Pair';

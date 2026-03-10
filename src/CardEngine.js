@@ -175,7 +175,7 @@ export default class CardEngine {
 
     // ── Rank-scaled quality for Pair, Two Pair, Three of a Kind ──
     if (handIdx === 8 || handIdx === 7 || handIdx === 6) {
-      const qualityResult = CardEngine._applyRankQuality(entry, pairRank, handIdx, strikeCount);
+      const qualityResult = CardEngine._applyRankQuality(entry, pairRank, handIdx, strikeCount, gameState);
       if (qualityResult) {
         entry = qualityResult;
       }
@@ -273,11 +273,18 @@ export default class CardEngine {
    *   Two Pair:        20% out (50/50 groundout/flyout)
    *   Three of a Kind: 10% out (flyout)
    */
-  static _applyRankQuality(entry, pairRank, handIdx, strikeCount = 0) {
-    // Pairs: rank-scaled out chance (all ranks, not just low)
+  static _applyRankQuality(entry, pairRank, handIdx, strikeCount = 0, gameState = null) {
     if (handIdx === 8) {
       const twoStrikePenalty = strikeCount >= 2 ? 0.10 : 0;
-      const outChance = Math.max(0.05, 0.80 - (pairRank - 2) * 0.06 + twoStrikePenalty);
+      const pairsPlayed = gameState?.baseballState?.pairsPlayedThisInning || 0;
+      const pairPenalty = pairsPlayed * 0.15;
+      const outChance = Math.min(0.95, Math.max(0.05, 0.80 - (pairRank - 2) * 0.06 + twoStrikePenalty + pairPenalty));
+
+      // Increment the counter for next pair this inning
+      if (gameState?.baseballState) {
+        gameState.baseballState.pairsPlayedThisInning++;
+      }
+
       if (Math.random() < outChance) {
         const outType = Math.random() < 0.40 ? 'Flyout' : 'Groundout';
         return {
@@ -291,7 +298,7 @@ export default class CardEngine {
           pairRank,
         };
       }
-      // Survived the out check — high ranks still get bonus chips
+      // Survived — high ranks still get bonus chips
       if (pairRank >= 10) {
         const bonus = pairRank - 9;
         return { ...entry, chips: entry.chips + bonus };
