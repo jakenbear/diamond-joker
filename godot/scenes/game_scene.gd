@@ -203,7 +203,26 @@ func _update_ui() -> void:
 				preview_cards.append(hand[idx])
 		if not preview_cards.is_empty():
 			var preview := CardEngine.evaluate_hand(preview_cards)
-			hand_desc_label.text = "%s -> %s" % [preview.get("hand_name", "?"), preview.get("outcome", "?")]
+			var hand_name: String = preview.get("hand_name", "?")
+			var outcome: String = preview.get("outcome", "?")
+			var desc: String = "%s -> %s" % [hand_name, outcome]
+
+			# Pitcher adjusts warning for pairs
+			if hand_name == "Pair" and GameManager.baseball_state.pairs_played_this_inning > 0:
+				var count: int = GameManager.baseball_state.pairs_played_this_inning
+				if count == 1:
+					desc += " (Pitcher adjusting...)"
+					hand_desc_label.add_theme_color_override("font_color", Color("#ffe082"))
+				elif count == 2:
+					desc += " (Pitcher has your number!)"
+					hand_desc_label.add_theme_color_override("font_color", Color("#ff8a65"))
+				else:
+					desc += " (You're cooked!)"
+					hand_desc_label.add_theme_color_override("font_color", Color("#ff5252"))
+			else:
+				hand_desc_label.add_theme_color_override("font_color", Color("#f5f5dc"))
+
+			hand_desc_label.text = desc
 		else:
 			hand_desc_label.text = ""
 	else:
