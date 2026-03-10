@@ -42,6 +42,7 @@ var player_runs_by_inning: Array[int] = []
 var opponent_runs_by_inning: Array[int] = []
 var _current_inning_player_runs: int = 0
 var _at_bats_this_inning: int = 0
+var pairs_played_this_inning: int = 0
 
 
 func reset() -> void:
@@ -59,6 +60,7 @@ func reset() -> void:
 	opponent_runs_by_inning = []
 	_current_inning_player_runs = 0
 	_at_bats_this_inning = 0
+	pairs_played_this_inning = 0
 
 
 func get_total_chips() -> int:
@@ -261,6 +263,7 @@ func switch_side(sim_runs = null) -> Dictionary:
 		half = "top"
 		inning += 1
 		_at_bats_this_inning = 0
+		pairs_played_this_inning = 0
 
 		if inning > 9 and player_score != opponent_score:
 			state = State.GAME_OVER

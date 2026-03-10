@@ -192,7 +192,7 @@ func apply_batter_modifiers(eval_result: Dictionary, game_state: Dictionary) -> 
 
 	# Contact save: rescue a pair that became a Groundout
 	if result.get("was_groundout", false) and result.get("original_hand", "") == "Pair":
-		var save_chance: float = batter.get("contact", 5) * 0.06
+		var save_chance: float = batter.get("contact", 5) * 0.04
 		if randf() < save_chance:
 			result["outcome"] = "Single"
 			result["hand_name"] = "Pair"

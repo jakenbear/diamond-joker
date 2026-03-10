@@ -1072,8 +1072,9 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Evaluate without modifiers for a clean preview
-    const result = CardEngine.evaluateHand(cards);
+    // Preview with snapshot so we don't increment the real counter
+    const previewState = { baseballState: { pairsPlayedThisInning: this.baseball.pairsPlayedThisInning } };
+    const result = CardEngine.evaluateHand(cards, null, null, previewState);
     const handName = result.handName;
     const n = cards.length;
 
@@ -1098,6 +1099,17 @@ export default class GameScene extends Phaser.Scene {
       const realHand = result.originalHand || handName;
       preview = `${realHand} (risky — could be ${handName})`;
       color = '#ffe082';
+      // Add pitcher adjusts warning if applicable
+      if (realHand === 'Pair' && this.baseball.pairsPlayedThisInning > 0) {
+        const count = this.baseball.pairsPlayedThisInning;
+        if (count >= 2) {
+          preview = `${realHand} (Pitcher has your number!)`;
+          color = '#ff5252';
+        } else {
+          preview += ' — Pitcher adjusting...';
+          color = '#ff8a65';
+        }
+      }
     } else {
       const desc = result.playedDescription || handName;
       preview = `${desc} \u2192 ${result.outcome}`;
@@ -1107,6 +1119,21 @@ export default class GameScene extends Phaser.Scene {
       if (idx <= 2) color = '#ff6e40';     // orange-red for big hands
       else if (idx <= 5) color = '#ffd600'; // gold
       else color = '#81c784';               // green for small hands
+    }
+
+    // Pitcher adjusts warning for pairs
+    if (handName === 'Pair' && this.baseball.pairsPlayedThisInning > 0) {
+      const count = this.baseball.pairsPlayedThisInning;
+      if (count === 1) {
+        preview += ' (Pitcher adjusting...)';
+        color = '#ffe082'; // yellow
+      } else if (count === 2) {
+        preview += ' (Pitcher has your number!)';
+        color = '#ff8a65'; // orange
+      } else {
+        preview += " (You're cooked!)";
+        color = '#ff5252'; // red
+      }
     }
 
     this.handPreviewText.setText(preview);
@@ -1529,6 +1556,7 @@ export default class GameScene extends Phaser.Scene {
     const batter = this.rosterManager.getCurrentBatter();
     const pitcher = this.rosterManager.getCurrentPitcher();
     const gameState = this.baseball.getStatus();
+    gameState.baseballState = this.baseball;
 
     // Sac Bunt: 1 card played + runners on base + < 2 outs
     if (selectedArr.length === 1 && gameState.bases.some(b => b) && gameState.outs < 2) {

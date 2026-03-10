@@ -174,7 +174,7 @@ static func evaluate_hand(cards: Array[Dictionary], pre_modifier: Callable = Cal
 
 	# Rank-scaled quality for Pair, Two Pair, Three of a Kind
 	if hand_idx == 8 or hand_idx == 7 or hand_idx == 6:
-		var quality_result: Dictionary = _apply_rank_quality(entry, pair_rank, hand_idx, strike_count)
+		var quality_result: Dictionary = _apply_rank_quality(entry, pair_rank, hand_idx, strike_count, game_state)
 		if not quality_result.is_empty():
 			entry = quality_result
 
@@ -255,11 +255,19 @@ static func _get_pair_rank(freq: Dictionary) -> int:
 	return best_rank
 
 
-static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int, strike_count: int = 0) -> Dictionary:
+static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int, strike_count: int = 0, game_state: Dictionary = {}) -> Dictionary:
 	# Pairs: rank-scaled out chance
 	if hand_idx == 8:
 		var two_strike_penalty: float = 0.10 if strike_count >= 2 else 0.0
-		var out_chance: float = maxf(0.05, 0.80 - (pair_rank - 2) * 0.06 + two_strike_penalty)
+		var bs = game_state.get("baseball_state", null)
+		var pairs_played: int = bs.pairs_played_this_inning if bs else 0
+		var pair_penalty: float = pairs_played * 0.15
+		var out_chance: float = minf(0.95, maxf(0.05, 0.80 - (pair_rank - 2) * 0.06 + two_strike_penalty + pair_penalty))
+
+		# Increment counter for next pair this inning
+		if bs:
+			bs.pairs_played_this_inning += 1
+
 		if randf() < out_chance:
 			var out_type: String = "Flyout" if randf() < 0.40 else "Groundout"
 			return {
