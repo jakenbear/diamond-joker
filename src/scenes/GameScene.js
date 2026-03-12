@@ -556,15 +556,6 @@ export default class GameScene extends Phaser.Scene {
         this.runners[i] = runner;
         // Trail particles along basepath
         this._spawnRunnerTrail(fromPos, bp);
-        // Pulse glow
-        this.tweens.add({
-          targets: runner,
-          alpha: { from: 1, to: 0.6 },
-          duration: 600,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut',
-        });
         // Tween along basepath
         this.tweens.add({
           targets: runner,
@@ -599,14 +590,6 @@ export default class GameScene extends Phaser.Scene {
             ? this.add.image(bp.x, bp.y, runnerKey).setScale(2.5).setDepth(3)
             : this.add.circle(bp.x, bp.y, 10, 0xffd600).setDepth(3);
           this.runners[i] = runner;
-          this.tweens.add({
-            targets: runner,
-            alpha: { from: 1, to: 0.6 },
-            duration: 600,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut',
-          });
         }
       } else {
         // No runner, clean up
