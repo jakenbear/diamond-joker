@@ -251,14 +251,6 @@ export default class GameScene extends Phaser.Scene {
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
-    // Batter sprite icon
-    const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
-    const batterSpriteKey = `sprite_${teamKey}_batter`;
-    if (this.textures.exists(batterSpriteKey)) {
-      this.batterSprite = this.add.image(BATTER_X + 70, 135, batterSpriteKey)
-        .setScale(3).setDepth(2).setAlpha(0.9);
-    }
-
     // Player name
     this.batterNameText = this.add.text(BATTER_X, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
@@ -355,15 +347,6 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
-
-    // Pitcher sprite icon
-    const oppTeam = this.rosterManager.getOpponentTeam();
-    const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
-    const pitcherSpriteKey = `sprite_${oppKey}_pitcher`;
-    if (this.textures.exists(pitcherSpriteKey)) {
-      this.pitcherSprite = this.add.image(PITCHER_X - 70, 135, pitcherSpriteKey)
-        .setScale(3).setDepth(2).setAlpha(0.9).setFlipX(true);
-    }
 
     // Pitcher name
     this.pitcherNameText = this.add.text(PITCHER_X, 120, '', {
@@ -519,18 +502,36 @@ export default class GameScene extends Phaser.Scene {
       baseGfx.fillPath();
       this.baseGraphics.push(baseGfx);
     }
+
+    // Batter sprite at home plate
+    const team = this.rosterManager.getTeam();
+    const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
+    const batterSpriteKey = `sprite_${teamKey}_batter`;
+    if (this.textures.exists(batterSpriteKey)) {
+      this.batterSprite = this.add.image(cx + 20, cy + r - 5, batterSpriteKey)
+        .setScale(2.5).setDepth(3);
+    }
+
+    // Pitcher sprite at mound (center of diamond)
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
+    const pitcherSpriteKey = `sprite_${oppKey}_pitcher`;
+    if (this.textures.exists(pitcherSpriteKey)) {
+      this.pitcherMoundSprite = this.add.image(cx, cy, pitcherSpriteKey)
+        .setScale(2.5).setDepth(3).setFlipX(true);
+    }
   }
 
   _updateBases(bases) {
-    const cx = this.baseDiamondCenter.x;
-    const cy = this.baseDiamondCenter.y;
-    const r = this.baseDiamondRadius;
     const bs = 14;
 
-    for (let i = 0; i < 3; i++) {
+    // Process bases in order: 3rd → 2nd → 1st (lead runners advance first)
+    const order = [2, 1, 0];
+    for (const i of order) {
       const bp = this.basePositions[i];
       const occupied = bases[i];
       const wasOccupied = this._prevBases[i];
+      const stagger = (2 - i) * 200; // 3rd=0ms, 2nd=200ms, 1st=400ms
 
       // Redraw base with correct color
       this.baseGraphics[i].clear();
@@ -556,12 +557,13 @@ export default class GameScene extends Phaser.Scene {
         this.runners[i] = runner;
         // Trail particles along basepath
         this._spawnRunnerTrail(fromPos, bp);
-        // Tween along basepath
+        // Tween along basepath (staggered — lead runners move first)
         this.tweens.add({
           targets: runner,
           x: bp.x,
           y: bp.y,
           duration: 500,
+          delay: stagger,
           ease: 'Quad.easeInOut',
         });
       } else if (!occupied && wasOccupied) {
@@ -576,6 +578,7 @@ export default class GameScene extends Phaser.Scene {
             y: toPos.y,
             alpha: 0,
             duration: 500,
+            delay: stagger,
             ease: 'Quad.easeIn',
             onComplete: () => runnerRef.destroy(),
           });

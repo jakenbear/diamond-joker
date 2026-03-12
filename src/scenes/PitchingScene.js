@@ -129,30 +129,51 @@ export default class PitchingScene extends Phaser.Scene {
     ];
     this.runners = [null, null, null];
     this.runnerLabels = [null, null, null];
+    this.homePosition = { x: cx, y: cy + size };
+
+    // Pitcher sprite at mound (your team)
+    const team = this.rosterManager.getTeam();
+    const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
+    const pitcherKey = `sprite_${teamKey}_pitcher`;
+    if (this.textures.exists(pitcherKey)) {
+      this.add.image(cx, cy, pitcherKey).setScale(2).setDepth(3);
+    }
+
+    // Opponent batter sprite at home plate
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
+    const batterKey = `sprite_${oppKey}_batter`;
+    if (this.textures.exists(batterKey)) {
+      this.oppBatterSprite = this.add.image(cx + 18, cy + size - 5, batterKey)
+        .setScale(2).setDepth(3).setFlipX(true);
+    }
   }
 
   _updateBases(bases) {
-    const cx = 640, cy = 280, size = 55;
-    const homePos = { x: cx, y: cy + size };
-    for (let i = 0; i < 3; i++) {
+    const homePos = this.homePosition;
+    // Process 3rd → 2nd → 1st (lead runners advance first)
+    const order = [2, 1, 0];
+    for (const i of order) {
       const bp = this.basePositions[i];
+      const stagger = (2 - i) * 200;
       if (bases[i] && !this.runners[i]) {
         const fromPos = i === 0 ? homePos : this.basePositions[i - 1];
-        const dot = this.add.circle(fromPos.x, fromPos.y, 7, 0xffd600).setDepth(3);
+        const oppTeam = this.rosterManager.getOpponentTeam();
+        const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
+        const runnerKey = `sprite_${oppKey}_runner`;
+        const runner = this.textures.exists(runnerKey)
+          ? this.add.image(fromPos.x, fromPos.y, runnerKey).setScale(2).setDepth(3).setFlipX(true)
+          : this.add.circle(fromPos.x, fromPos.y, 7, 0xffd600).setDepth(3);
         this._spawnRunnerTrail(fromPos, bp);
-        this.tweens.add({ targets: dot, x: bp.x, y: bp.y, duration: 500, ease: 'Quad.easeInOut' });
-        this.tweens.add({
-          targets: dot, alpha: { from: 1, to: 0.6 },
-          duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-        });
-        this.runners[i] = dot;
+        this.tweens.add({ targets: runner, x: bp.x, y: bp.y, duration: 500, delay: stagger, ease: 'Quad.easeInOut' });
+        this.runners[i] = runner;
       } else if (!bases[i] && this.runners[i]) {
         const toPos = i === 2 ? homePos : this.basePositions[i + 1];
         this._spawnRunnerTrail(bp, toPos);
         const runnerRef = this.runners[i];
         this.tweens.add({
           targets: runnerRef, x: toPos.x, y: toPos.y, alpha: 0, duration: 500,
-          ease: 'Quad.easeIn',
+          delay: stagger, ease: 'Quad.easeIn',
           onComplete: () => runnerRef.destroy(),
         });
         this.runners[i] = null;
@@ -295,13 +316,6 @@ export default class PitchingScene extends Phaser.Scene {
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
-    // Pitcher sprite
-    const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
-    const spriteKey = `sprite_${teamKey}_pitcher`;
-    if (this.textures.exists(spriteKey)) {
-      this.add.image(x + 70, 135, spriteKey).setScale(3).setDepth(2).setAlpha(0.9);
-    }
-
     this.myPitcherNameText = this.add.text(x, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
@@ -381,13 +395,6 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
-
-    // Opponent batter sprite
-    const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
-    const batterSpriteKey = `sprite_${oppKey}_batter`;
-    if (this.textures.exists(batterSpriteKey)) {
-      this.add.image(x - 100, 135, batterSpriteKey).setScale(3).setDepth(2).setAlpha(0.9).setFlipX(true);
-    }
 
     this.oppBatterNameText = this.add.text(x - 30, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
