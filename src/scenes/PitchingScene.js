@@ -8,6 +8,8 @@
 import { PITCH_TYPES, assignPitchRepertoire } from '../RosterManager.js';
 import SoundManager from '../SoundManager.js';
 
+const TEAM_SPRITE_KEY = { 'Canada': 'canada', 'USA': 'usa', 'Japan': 'japan', 'Mexico': 'mexico' };
+
 const CARD_W = 100;
 const CARD_H = 140;
 const CARD_SPACING = 120;
@@ -293,6 +295,13 @@ export default class PitchingScene extends Phaser.Scene {
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
+    // Pitcher sprite
+    const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
+    const spriteKey = `sprite_${teamKey}_pitcher`;
+    if (this.textures.exists(spriteKey)) {
+      this.add.image(x + 70, 135, spriteKey).setScale(3).setDepth(2).setAlpha(0.9);
+    }
+
     this.myPitcherNameText = this.add.text(x, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
@@ -372,6 +381,13 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
+
+    // Opponent batter sprite
+    const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
+    const batterSpriteKey = `sprite_${oppKey}_batter`;
+    if (this.textures.exists(batterSpriteKey)) {
+      this.add.image(x - 100, 135, batterSpriteKey).setScale(3).setDepth(2).setAlpha(0.9).setFlipX(true);
+    }
 
     this.oppBatterNameText = this.add.text(x - 30, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',

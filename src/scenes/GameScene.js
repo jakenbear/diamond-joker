@@ -32,6 +32,8 @@ const RARITY_COLORS = {
   rare:     '#ce93d8',
 };
 
+const TEAM_SPRITE_KEY = { 'Canada': 'canada', 'USA': 'usa', 'Japan': 'japan', 'Mexico': 'mexico' };
+
 import HAND_TABLE from '../../data/hand_table.js';
 
 export default class GameScene extends Phaser.Scene {
@@ -55,6 +57,13 @@ export default class GameScene extends Phaser.Scene {
     this.load.image('card_back', 'assets/cards/back1.png');
     this.load.image('card_back_red', 'assets/cards/back2.png');
 
+    // Team sprites (batter, pitcher, runner)
+    for (const team of ['usa', 'japan', 'canada', 'mexico']) {
+      for (const pose of ['batter', 'pitcher', 'runner']) {
+        this.load.image(`sprite_${team}_${pose}`, `assets/sprites/${team}_${pose}.png`);
+      }
+    }
+
     // Set nearest-neighbor filtering on card textures only (keeps text smooth)
     this.load.on('complete', () => {
       for (const s of suits) {
@@ -65,6 +74,15 @@ export default class GameScene extends Phaser.Scene {
       this.textures.get('card_back').setFilter(Phaser.Textures.FilterMode.NEAREST);
       if (this.textures.exists('card_back_red')) {
         this.textures.get('card_back_red').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
+      // Nearest-neighbor on team sprites
+      for (const team of ['usa', 'japan', 'canada', 'mexico']) {
+        for (const pose of ['batter', 'pitcher', 'runner']) {
+          const key = `sprite_${team}_${pose}`;
+          if (this.textures.exists(key)) {
+            this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+          }
+        }
       }
     });
   }
@@ -233,6 +251,14 @@ export default class GameScene extends Phaser.Scene {
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
+    // Batter sprite icon
+    const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
+    const batterSpriteKey = `sprite_${teamKey}_batter`;
+    if (this.textures.exists(batterSpriteKey)) {
+      this.batterSprite = this.add.image(BATTER_X + 70, 135, batterSpriteKey)
+        .setScale(3).setDepth(2).setAlpha(0.9);
+    }
+
     // Player name
     this.batterNameText = this.add.text(BATTER_X, 120, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
@@ -329,6 +355,15 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
+
+    // Pitcher sprite icon
+    const oppTeam = this.rosterManager.getOpponentTeam();
+    const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
+    const pitcherSpriteKey = `sprite_${oppKey}_pitcher`;
+    if (this.textures.exists(pitcherSpriteKey)) {
+      this.pitcherSprite = this.add.image(PITCHER_X - 70, 135, pitcherSpriteKey)
+        .setScale(3).setDepth(2).setAlpha(0.9).setFlipX(true);
+    }
 
     // Pitcher name
     this.pitcherNameText = this.add.text(PITCHER_X, 120, '', {
@@ -508,12 +543,16 @@ export default class GameScene extends Phaser.Scene {
       this.baseGraphics[i].closePath();
       this.baseGraphics[i].fillPath();
 
-      // Runner dots
+      // Runner sprites
       if (occupied && !wasOccupied) {
         // Runner arriving — animate from previous base or home
         const fromPos = i === 0 ? this.homePosition : this.basePositions[i - 1];
         if (this.runners[i]) this.runners[i].destroy();
-        const runner = this.add.circle(fromPos.x, fromPos.y, 10, 0xffd600).setDepth(3);
+        const teamKey = TEAM_SPRITE_KEY[this.rosterManager.getTeam()?.name] || 'usa';
+        const runnerKey = `sprite_${teamKey}_runner`;
+        const runner = this.textures.exists(runnerKey)
+          ? this.add.image(fromPos.x, fromPos.y, runnerKey).setScale(2.5).setDepth(3)
+          : this.add.circle(fromPos.x, fromPos.y, 10, 0xffd600).setDepth(3);
         this.runners[i] = runner;
         // Trail particles along basepath
         this._spawnRunnerTrail(fromPos, bp);
@@ -552,9 +591,13 @@ export default class GameScene extends Phaser.Scene {
           this.runners[i] = null;
         }
       } else if (occupied && wasOccupied) {
-        // Runner stayed — ensure dot is at correct position
+        // Runner stayed — ensure sprite is at correct position
         if (!this.runners[i]) {
-          const runner = this.add.circle(bp.x, bp.y, 10, 0xffd600).setDepth(3);
+          const teamKey = TEAM_SPRITE_KEY[this.rosterManager.getTeam()?.name] || 'usa';
+          const runnerKey = `sprite_${teamKey}_runner`;
+          const runner = this.textures.exists(runnerKey)
+            ? this.add.image(bp.x, bp.y, runnerKey).setScale(2.5).setDepth(3)
+            : this.add.circle(bp.x, bp.y, 10, 0xffd600).setDepth(3);
           this.runners[i] = runner;
           this.tweens.add({
             targets: runner,
