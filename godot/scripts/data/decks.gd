@@ -16,31 +16,31 @@ static var DECK_CONFIGS: Dictionary = {
 		"name": "Standard",
 		"description": "52-card deck - the classic.",
 		"discards": 2,
-		"hand_size": 5,
+		"hand_size": 8,
 	},
 	"no_face": {
 		"name": "No Face",
 		"description": "40 cards - no Jacks, Queens, or Kings. Straights are tighter.",
 		"discards": 2,
-		"hand_size": 5,
+		"hand_size": 8,
 	},
 	"double": {
 		"name": "Double Deck",
 		"description": "104 cards - two full decks shuffled together. Pairs everywhere.",
 		"discards": 3,
-		"hand_size": 5,
+		"hand_size": 8,
 	},
 	"all_hearts": {
 		"name": "All Hearts",
 		"description": "52 cards, all Hearts. Flushes guaranteed, suits won't help.",
 		"discards": 2,
-		"hand_size": 5,
+		"hand_size": 8,
 	},
 	"small_ball": {
 		"name": "Small Ball",
 		"description": "32 cards - only 7 and up. High-value hands, smaller deck.",
 		"discards": 2,
-		"hand_size": 5,
+		"hand_size": 8,
 	},
 }
 

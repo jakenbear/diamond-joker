@@ -323,8 +323,8 @@ group('1c. Deck Integrity');
   const ce = new CardEngine();
   ce.draw(5);
   ce.discard([0, 1]);
-  assert(ce.hand.length === 5, 'discard([0,1]) → hand still 5 (replacements drawn)');
-  assert(ce.deck.length === 45, 'discard([0,1]) → deck=45');
+  assert(ce.hand.length === 8, 'discard([0,1]) → hand still 8 (replacements drawn)');
+  assert(ce.deck.length === 42, 'discard([0,1]) → deck=42');
 }
 {
   const ce = new CardEngine();
@@ -337,7 +337,7 @@ group('1c. Deck Integrity');
   ce.draw(5);
   ce.playHand([0, 1, 2, 3, 4]);
   const hand = ce.newAtBat();
-  assert(hand.length === 5, 'newAtBat gives 5 cards');
+  assert(hand.length === 8, 'newAtBat gives 8 cards');
   assert(ce.discardsRemaining === 2, 'newAtBat resets discards to 2');
 }
 {
@@ -835,7 +835,7 @@ group('1c-extra. Deck Exhaustion');
   }
   assert(ce.deck.length < 5, 'Deck depleted to < 5 cards');
   const hand = ce.newAtBat();
-  assert(hand.length === 5, 'newAtBat on near-empty deck still gives 5 cards');
+  assert(hand.length === 8, 'newAtBat on near-empty deck still gives 8 cards');
 }
 {
   // Play 15+ consecutive at-bats draining the deck → no crash
@@ -885,7 +885,7 @@ group('1c-extra. Deck Exhaustion');
   ce.draw(5); // draws only 3 from deck (deck now 0), hand has 3
   // Now discard 2 — needs to reshuffle discard pile to draw replacements
   const result = ce.discard([0, 1]);
-  assert(result.length === 5, `Discard with empty deck refills hand to 5 (got ${result.length})`);
+  assert(result.length === 8, `Discard with empty deck refills hand to 8 (got ${result.length})`);
 }
 
 // ── 1d-extra. Batter Cycling ─────────────────────────────
@@ -2004,7 +2004,7 @@ group('Deck Definitions');
   const ce = new CardEngine('standard');
   assert(ce.deck.length === 52, 'Standard deck has 52 cards');
   assert(ce.discardsRemaining === 2, 'Standard deck has 2 discards');
-  assert(ce.handSize === 5, 'Standard hand size is 5');
+  assert(ce.handSize === 8, 'Standard hand size is 8');
 }
 
 {

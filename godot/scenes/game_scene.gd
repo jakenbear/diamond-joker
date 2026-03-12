@@ -15,7 +15,7 @@ const RANK_DISPLAY := {2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", 1
 # Card image file mapping: suit letter + rank string
 const SUIT_FILE := {"H": "h", "D": "d", "C": "c", "S": "s"}
 const RANK_FILE := {2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", 10:"10", 11:"j", 12:"q", 13:"k", 14:"a"}
-const CARD_SCALE := Vector2(4.0, 4.0)  # 32x42 -> 128x168
+const CARD_SCALE := Vector2(3.0, 3.0)  # 32x42 -> 96x126
 
 # Node references from the .tscn (% finds unique-named nodes)
 @onready var score_label: Label = %ScoreLabel
@@ -53,8 +53,8 @@ func _ready() -> void:
 	play_button.pressed.connect(_on_play_pressed)
 	discard_button.pressed.connect(_on_discard_pressed)
 
-	# Create 5 card slots with image support
-	for i in 5:
+	# Create 8 card slots with image support
+	for i in 8:
 		var slot := _create_card_slot(i)
 		card_container.add_child(slot["panel"])
 		card_panels.append(slot["panel"])
@@ -76,7 +76,7 @@ func _ready() -> void:
 func _create_card_slot(index: int) -> Dictionary:
 	# Just the card image — no background panel, no border
 	var tex_rect := TextureRect.new()
-	tex_rect.custom_minimum_size = Vector2(128, 168)
+	tex_rect.custom_minimum_size = Vector2(96, 126)
 	tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE  # allow scaling beyond texture size
 	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tex_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # pixel art stays crisp

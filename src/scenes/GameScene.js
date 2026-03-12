@@ -15,11 +15,11 @@ const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const CARD_ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
 const CARD_ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
 
-const CARD_W = 100;
-const CARD_H = 140;
-const CARD_SPACING = 120;
-const HAND_Y = 560;
-const HAND_START_X = 640 - (4 * CARD_SPACING) / 2;
+const CARD_W = 96;
+const CARD_H = 126;
+const CARD_SPACING = 85;
+const HAND_Y = 570;
+const HAND_START_X = 640 - (7 * CARD_SPACING) / 2;
 
 // Panel constants
 const PANEL_W = 210;
