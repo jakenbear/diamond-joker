@@ -173,6 +173,17 @@ export default class CardEngine {
 
     let entry = { ...HAND_TABLE[handIdx] };
 
+    // ── Straight Flush probability roll: 80% HR, 15% Triple, 5% Double ──
+    if (entry.rollOutcome) {
+      const roll = Math.random();
+      if (roll < 0.05) {
+        entry.outcome = 'Double';
+      } else if (roll < 0.20) {
+        entry.outcome = 'Triple';
+      }
+      // else stays Home Run (80%)
+    }
+
     // ── Rank-scaled quality for Pair, Two Pair, Three of a Kind ──
     if (handIdx === 8 || handIdx === 7 || handIdx === 6) {
       const qualityResult = CardEngine._applyRankQuality(entry, pairRank, handIdx, strikeCount, gameState);

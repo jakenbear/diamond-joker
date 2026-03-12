@@ -50,12 +50,12 @@ When the deck runs low, the discard pile is reshuffled back in.
 
 | Hand | Baseball Outcome | Chips | Mult | Score |
 |------|-----------------|-------|------|-------|
-| Royal Flush | Perfect Game | 15 | 20 | 300 |
-| Straight Flush | Walk-Off | 10 | 10 | 100 |
-| Four of a Kind | Inside-the-Park HR | 6 | 6 | 36 |
-| Flush | Grand Slam | 5 | 5 | 25 |
+| Royal Flush | Home Run (guaranteed) | 15 | 20 | 300 |
+| Straight Flush | 80% HR / 15% Triple / 5% Double | 10 | 10 | 100 |
+| Four of a Kind | Triple | 6 | 6 | 36 |
+| Flush | Double | 5 | 5 | 25 |
 | Straight | Home Run | 4 | 4 | 16 |
-| Full House | RBI Double | 3 | 2.5 | 7.5 |
+| Full House | Double | 3 | 2.5 | 7.5 |
 | Three of a Kind | Triple | 3 | 3 | 9 |
 | Two Pair | Double | 2 | 2 | 4 |
 | Pair | Single | 1 | 1.5 | 1.5 |

@@ -172,6 +172,15 @@ static func evaluate_hand(cards: Array[Dictionary], pre_modifier: Callable = Cal
 
 	var entry: Dictionary = HandTable.get_entry(hand_idx)
 
+	# Straight Flush probability roll: 80% HR, 15% Triple, 5% Double
+	if entry.get("roll_outcome", false):
+		var roll: float = randf()
+		if roll < 0.05:
+			entry["outcome"] = "Double"
+		elif roll < 0.20:
+			entry["outcome"] = "Triple"
+		# else stays Home Run (80%)
+
 	# Rank-scaled quality for Pair, Two Pair, Three of a Kind
 	if hand_idx == 8 or hand_idx == 7 or hand_idx == 6:
 		var quality_result: Dictionary = _apply_rank_quality(entry, pair_rank, hand_idx, strike_count, game_state)
