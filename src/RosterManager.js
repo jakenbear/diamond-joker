@@ -248,9 +248,13 @@ export default class RosterManager {
    * @param {boolean[]} bases - [1st, 2nd, 3rd] runner state (mutated in place)
    * @returns {{ outcome: string, isOut: boolean, basesGained: number, batter: object, walked: boolean, scored: number }}
    */
-  simSingleAtBat(inning, pitchType, bases) {
+  simSingleAtBat(inning, pitchType, bases, staffMods = null) {
     const pitcher = this.myPitcher;
-    const fatigue = this._getPitcherFatigue(pitcher, inning);
+    let fatigue = this._getPitcherFatigue(pitcher, inning);
+    // Bullpen Coach: delay fatigue onset
+    if (staffMods && staffMods.fatigueDelay > 0) {
+      fatigue = this._getPitcherFatigue(pitcher, Math.max(1, inning - staffMods.fatigueDelay));
+    }
     const pitch = PITCH_TYPES[pitchType];
     const batter = this.opponentRoster[this.opponentBatterIndex];
 
@@ -264,7 +268,8 @@ export default class RosterManager {
       return { outcome: 'Walk (IBB)', isOut: false, basesGained: 1, batter, walked: true, scored };
     }
 
-    const result = this._simAtBatWithPitch(pitcher, batter, fatigue, pitch);
+    const hitReduction = staffMods ? (staffMods.hitReduction || 0) : 0;
+    const result = this._simAtBatWithPitch(pitcher, batter, fatigue, pitch, hitReduction);
 
     // Breaking ball walk risk: max(0, (6 - control) * 0.04)
     if (pitchType === 'breaking' && !result.isOut) {
@@ -294,7 +299,7 @@ export default class RosterManager {
    * At-bat sim with pitch type modifiers applied.
    * Stamina modulates fatigue: effectiveFatigue = inningFatigue * (0.5 + stamina * 0.5)
    */
-  _simAtBatWithPitch(pitcher, batter, fatigue, pitch) {
+  _simAtBatWithPitch(pitcher, batter, fatigue, pitch, hitReduction = 0) {
     const effectiveFatigue = fatigue * (0.5 + this.myPitcherStamina * 0.5);
 
     const pitchStrength = (pitcher.velocity * 0.6 + pitcher.control * 0.4) * effectiveFatigue;
@@ -302,7 +307,7 @@ export default class RosterManager {
 
     const matchup = batStrength - pitchStrength;
     const baseHitChance = Math.min(0.50, Math.max(0.12, 0.28 + matchup * 0.025));
-    const hitChance = Math.min(0.50, Math.max(0.05, baseHitChance + pitch.hitChanceMod));
+    const hitChance = Math.min(0.50, Math.max(0.05, baseHitChance + pitch.hitChanceMod - hitReduction));
 
     const roll = Math.random();
 

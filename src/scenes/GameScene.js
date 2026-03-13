@@ -1399,12 +1399,28 @@ export default class GameScene extends Phaser.Scene {
       .filter(t => t.effect && t.effect.type === 'add_hand_size')
       .reduce((sum, t) => sum + (t.effect.value || 1), 0);
 
-    // Bonus discards from batter traits (e.g. Batting Gloves)
+    // ── Staff effects at at-bat start ──
+    const staff = this.baseball.getStaff();
+
+    // Bench Coach: +1 discard for all
+    const staffDiscards = staff
+      .filter(s => s.effect.type === 'team_add_discard')
+      .reduce((sum, s) => sum + s.effect.value, 0);
+
+    // Bonus discards from batter traits (e.g. Batting Gloves) + staff
     const bonusDiscards = batter.traits
       .filter(t => t.effect && t.effect.type === 'add_discard')
-      .reduce((sum, t) => sum + (t.effect.value || 1), 0);
+      .reduce((sum, t) => sum + (t.effect.value || 1), 0) + staffDiscards;
     if (bonusDiscards > 0) {
       this.cardEngine.discardsRemaining += bonusDiscards;
+    }
+
+    // Pinch Crab / Card Shark Parrot: draw extra cards
+    const extraDraw = staff
+      .filter(s => s.effect.type === 'add_hand_draw')
+      .reduce((sum, s) => sum + s.effect.value, 0);
+    if (extraDraw > 0) {
+      this.cardEngine.draw(extraDraw);
     }
 
     this.discardCount = 0;
@@ -1612,6 +1628,15 @@ export default class GameScene extends Phaser.Scene {
       const handIndices = displayIndices
         .map(di => this._displayToHand[di] !== undefined ? this._displayToHand[di] : di);
       this.cardEngine.discard(handIndices);
+
+      // Trash Panda: chance to draw an extra card on discard
+      const drawOnDiscard = this.baseball.getStaffByEffect('bonus_draw_on_discard');
+      for (const s of drawOnDiscard) {
+        if (Math.random() < s.effect.chance) {
+          this.cardEngine.draw(1);
+        }
+      }
+
       // Reset deal order for new hand composition
       this.dealOrder = this.cardEngine.hand.map((_, i) => i);
       this._renderHand();
@@ -1744,8 +1769,16 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
+    // Black Sheep: ignore pair penalty (reset pairs counter before eval)
+    const blackSheep = this.baseball.getStaffByEffect('ignore_pair_penalty').length > 0;
+    const savedPairsPlayed = this.baseball.pairsPlayedThisInning;
+    if (blackSheep) this.baseball.pairsPlayedThisInning = 0;
+
     // Play selected cards with combined modifiers + strike count for two-strike penalty
     let handResult = this.cardEngine.playHand(selectedArr, combinedPreMod, trackingPostMod, gameState, count.strikes);
+
+    // Restore pairs counter (it was incremented during eval, keep that increment unless Black Sheep)
+    if (blackSheep) this.baseball.pairsPlayedThisInning = savedPairsPlayed;
 
     // Apply count modifiers to hand result
     const countMods = this.countManager.getCountModifiers();
@@ -1760,10 +1793,30 @@ export default class GameScene extends Phaser.Scene {
       handResult.score = Math.round(handResult.chips * handResult.mult);
     }
 
+    // Apply team stat boosts from staff (Batting Coach etc.)
+    const staff = this.baseball.getStaff();
+    const statBoosts = {};
+    for (const s of staff) {
+      if (s.effect && s.effect.type === 'team_stat_boost') {
+        statBoosts[s.effect.stat] = (statBoosts[s.effect.stat] || 0) + s.effect.value;
+      }
+    }
+    // Temporarily boost batter stats
+    const origStats = {};
+    for (const [stat, val] of Object.entries(statBoosts)) {
+      origStats[stat] = batter[stat];
+      batter[stat] += val;
+    }
+
     // Apply stat modifiers (now returns { result, bonuses })
     const batterMod = this.rosterManager.applyBatterModifiers(handResult, gameState);
     handResult = batterMod.result;
     const batterBonuses = batterMod.bonuses;
+
+    // Revert temporary stat boosts
+    for (const [stat, val] of Object.entries(origStats)) {
+      batter[stat] = val;
+    }
 
     // Re-apply batter trait post-modifiers after contact save so upgrades
     // like Slugger Serum (Pair Single→Double) can trigger on the rescued hit
@@ -1774,6 +1827,9 @@ export default class GameScene extends Phaser.Scene {
 
     handResult = this.rosterManager.applyPitcherModifiers(handResult, gameState);
 
+    // ── Staff effects (mascots & coaches) ──
+    const staffBonuses = this._applyStaffEffects(handResult, gameState);
+
     // Sacrifice fly (trait-based, e.g. on strikeouts)
     let sacrificeFlyRun = 0;
     if (handResult.sacrificeFly) {
@@ -1781,10 +1837,12 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Situational outcomes: DP, Fielder's Choice, Error
+    // Sly Fox: multiply error chance
     const situational = SituationalEngine.check(
       handResult.outcome,
       this.baseball.getStatus(),
       batter.speed,
+      staffBonuses.errorMult,
     );
     let situationalMessage = '';
     if (situational.transformed) {
@@ -1894,11 +1952,26 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    // ── Phase 1.75: Situational callout (T=pitcherDelay+batterTraitDelay+500) ──
+    // ── Phase 1.6: Staff effect callout (T=pitcherDelay+batterTraitDelay+500) ──
+    let staffDelay = 0;
+    if (staffBonuses.outcomeChanged && staffBonuses.messages.length > 0) {
+      staffDelay = 500;
+      this.time.delayedCall(pitcherDelay + batterTraitDelay + 500, () => {
+        this.handNameText.setText(`\u2b50 ${staffBonuses.messages[0].text}`);
+        this.handNameText.setColor(staffBonuses.messages[0].color);
+        this.tweens.add({
+          targets: this.handNameText,
+          alpha: { from: 0, to: 1 },
+          duration: 200,
+        });
+      });
+    }
+
+    // ── Phase 1.75: Situational callout (T=pitcherDelay+batterTraitDelay+staffDelay+500) ──
     let situationalDelay = 0;
     if (situationalMessage) {
       situationalDelay = 500;
-      this.time.delayedCall(pitcherDelay + batterTraitDelay + 500, () => {
+      this.time.delayedCall(pitcherDelay + batterTraitDelay + staffDelay + 500, () => {
         this.handNameText.setText(`\u26be ${situationalMessage}`);
         this.handNameText.setColor(situational.type === 'error' ? '#ffab40' : '#ff5252');
         this.tweens.add({
@@ -1910,15 +1983,16 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // ── Phase 2: Resolve outcome (defer base display until Phase 2.5) ──
-    const resolveStart = 900 + pitcherDelay + batterTraitDelay + situationalDelay;
+    const resolveStart = 900 + pitcherDelay + batterTraitDelay + staffDelay + situationalDelay;
     this._deferBaseUpdate = true;
 
     this.time.delayedCall(resolveStart, () => {
       const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score, batter);
 
       let extraBase = { scored: 0, advanced: false };
-      if (handResult.extraBaseChance && !isOut && handResult.outcome === 'Single') {
-        extraBase = this.baseball.tryExtraBase(handResult.extraBaseChance);
+      const totalExtraBase = (handResult.extraBaseChance || 0) + staffBonuses.extraBaseBonus;
+      if (totalExtraBase > 0 && !isOut && handResult.outcome === 'Single') {
+        extraBase = this.baseball.tryExtraBase(totalExtraBase);
       }
 
       this._clearCards();
@@ -2008,7 +2082,7 @@ export default class GameScene extends Phaser.Scene {
 
       // ── Phase 3: Scoring Cascade for hits (after runners) ──
       this.handNameText.setText('');
-      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage);
+      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage, staffBonuses);
       const totalCascadeDelay = RUNNER_DELAY + cascadeDelay;
 
       // Score popup for runs (after cascade)
@@ -2038,8 +2112,8 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Show scoring cascade: base hand → power → contact → trait → pitcher → final */
-  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg) {
+  /** Show scoring cascade: base hand → power → contact → trait → pitcher → staff → final */
+  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg, staffBonuses = null) {
     const steps = [];
     const stepDelay = 350;
     let runningChips = handResult.chips - bonuses.powerChips + pitcherPenalty.chips;
@@ -2100,7 +2174,14 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    // Step 6: Final score
+    // Step 6: Staff bonuses (mascots & coaches)
+    if (staffBonuses && staffBonuses.messages.length > 0) {
+      for (const msg of staffBonuses.messages) {
+        steps.push({ text: msg.text, color: msg.color });
+      }
+    }
+
+    // Step 7: Final score
     steps.push({
       text: `= ${handResult.score}`,
       color: '#ffffff',
@@ -2247,6 +2328,140 @@ export default class GameScene extends Phaser.Scene {
         this._startAtBat();
       });
     });
+  }
+
+  // ── Staff Effect Processor ─────────────────────────────────
+  // Data-driven: loops over active staff and applies effects by type.
+  // Returns { chipBonus, multBonus, outcomeChanged, messages[] }
+
+  _applyStaffEffects(handResult, gameState) {
+    const staff = this.baseball.getStaff();
+    const bonuses = { chipBonus: 0, multBonus: 0, outcomeChanged: false, messages: [], errorMult: 1, extraBaseBonus: 0 };
+    if (staff.length === 0) return bonuses;
+
+    for (const s of staff) {
+      if (!s.effect) continue;
+      const eff = s.effect;
+
+      switch (eff.type) {
+        // ── Mult bonuses (conditional) ──
+        case 'add_mult': {
+          let applies = true;
+          if (eff.condition) {
+            if (eff.condition.type === 'inning_range') {
+              applies = gameState.inning >= eff.condition.min && gameState.inning <= eff.condition.max;
+            } else if (eff.condition.type === 'bases_empty') {
+              applies = !gameState.bases.some(b => b);
+            }
+          }
+          if (applies) {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (${s.name})`, color: '#ffab40' });
+          }
+          break;
+        }
+
+        // ── Mult per run scored this inning ──
+        case 'mult_per_inning_run': {
+          const inningRuns = gameState.currentInningPlayerRuns || 0;
+          if (inningRuns > 0) {
+            const bonus = eff.value * inningRuns;
+            bonuses.multBonus += bonus;
+            bonuses.messages.push({ text: `+${bonus}x (${s.name}, ${inningRuns}R)`, color: '#ffab40' });
+          }
+          break;
+        }
+
+        // ── Chip bonuses ──
+        case 'flat_chips_per_ab': {
+          bonuses.chipBonus += eff.value;
+          bonuses.messages.push({ text: `+${eff.value} chips (${s.name})`, color: '#ffd600' });
+          break;
+        }
+        case 'per_runner_chips': {
+          const runners = gameState.bases.filter(b => b).length;
+          if (runners > 0) {
+            const bonus = eff.value * runners;
+            bonuses.chipBonus += bonus;
+            bonuses.messages.push({ text: `+${bonus} chips (${s.name}, ${runners} on)`, color: '#ffd600' });
+          }
+          break;
+        }
+
+        // ── Double chips (conditional) ──
+        case 'double_chips': {
+          let applies = false;
+          if (eff.condition && eff.condition.type === 'outcome_is') {
+            applies = handResult.outcome === eff.condition.value;
+          }
+          if (applies) {
+            bonuses.chipBonus += handResult.chips;
+            bonuses.messages.push({ text: `x2 chips! (${s.name})`, color: '#ff6e40' });
+          }
+          break;
+        }
+
+        // ── Outcome transformations ──
+        case 'team_convert_high_card': {
+          if (handResult.handName === 'High Card' && handResult.outcome === 'Strikeout') {
+            handResult.outcome = 'Single';
+            handResult.chips = Math.max(handResult.chips, eff.chips || 1);
+            handResult.mult = Math.max(handResult.mult, eff.mult || 1);
+            handResult.score = Math.round(handResult.chips * handResult.mult);
+            bonuses.outcomeChanged = true;
+            bonuses.messages.push({ text: `High Card → Single! (${s.name})`, color: '#69f0ae' });
+          }
+          break;
+        }
+        case 'strikeout_to_walk': {
+          if (handResult.outcome === 'Strikeout' && Math.random() < eff.chance) {
+            handResult.outcome = 'Walk';
+            bonuses.outcomeChanged = true;
+            bonuses.messages.push({ text: `K → Walk! (${s.name})`, color: '#69f0ae' });
+          }
+          break;
+        }
+
+        // ── Error multiplier (passed to SituationalEngine) ──
+        case 'error_multiplier': {
+          bonuses.errorMult *= eff.value;
+          break;
+        }
+
+        // ── Extra base chance boost ──
+        case 'team_extra_base': {
+          bonuses.extraBaseBonus += eff.value;
+          break;
+        }
+
+        // ── Stat boosts (Batting Coach etc.) applied at batter level ──
+        case 'team_stat_boost':
+        // ── Effects handled at at-bat start ──
+        case 'team_add_discard':
+        case 'add_hand_draw':
+        // ── Effects handled elsewhere ──
+        case 'shop_extra_cards':
+        case 'unlock_staff_slot':
+        case 'pitcher_hit_reduction':
+        case 'pitcher_fatigue_delay':
+        case 'bonus_draw_on_discard':
+        case 'strikeout_redraw':
+        case 'ignore_pair_penalty':
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    // Apply chip/mult bonuses to handResult
+    if (bonuses.chipBonus > 0 || bonuses.multBonus > 0) {
+      handResult.chips += bonuses.chipBonus;
+      handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
+      handResult.score = Math.round(handResult.chips * handResult.mult);
+    }
+
+    return bonuses;
   }
 
   // Pitching methods moved to PitchingScene.js

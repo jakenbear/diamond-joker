@@ -747,7 +747,17 @@ export default class PitchingScene extends Phaser.Scene {
 
     const ps = this._pitchState;
     const inning = this.baseball.getStatus().inning;
-    const result = this.rosterManager.simSingleAtBat(inning, pitchType, ps.bases);
+
+    // Compute staff modifiers for pitching
+    const staff = this.baseball.getStaff();
+    const staffMods = { hitReduction: 0, fatigueDelay: 0 };
+    for (const s of staff) {
+      if (!s.effect) continue;
+      if (s.effect.type === 'pitcher_hit_reduction') staffMods.hitReduction += s.effect.value;
+      if (s.effect.type === 'pitcher_fatigue_delay') staffMods.fatigueDelay += s.effect.value;
+    }
+
+    const result = this.rosterManager.simSingleAtBat(inning, pitchType, ps.bases, staffMods);
 
     if (result.isOut) {
       ps.outs++;

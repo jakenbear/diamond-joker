@@ -2323,6 +2323,103 @@ group('6. Innate Trait Pairs');
 }
 
 // ═══════════════════════════════════════════════════════
+//  PART 7: STAFF EFFECT INTEGRATION
+// ═══════════════════════════════════════════════════════
+
+console.log('\n\x1b[1m── Part 7: Staff Effect Integration ──\x1b[0m');
+
+{
+  // 7a: Staff slot management
+  const bs = new BaseballState();
+  assert(bs.staffSlots === 2, 'Default staff slots is 2');
+
+  const coach = COACHES.find(c => c.id === 'batting_coach');
+  assert(bs.addStaff(coach), 'Can add first staff member');
+  assert(bs.getStaff().length === 1, 'Staff length is 1 after adding');
+
+  const coach2 = COACHES.find(c => c.id === 'bench_coach');
+  assert(bs.addStaff(coach2), 'Can add second staff member');
+  assert(!bs.addStaff(COACHES[2]), 'Cannot add 3rd member with 2 slots');
+
+  // Equipment Manager unlocks slot
+  const em = COACHES.find(c => c.id === 'equipment_manager');
+  bs.removeStaff(coach2.id);
+  bs.addStaff(em);
+  assert(bs.staffSlots === 3, 'Equipment Manager unlocks +1 slot');
+
+  // 7b: getStaffByEffect filtering
+  const bs2 = new BaseballState();
+  bs2.addStaff(COACHES.find(c => c.id === 'batting_coach'));
+  bs2.addStaff(MASCOTS.find(m => m.id === 'cash_cow'));
+  const statBoosts = bs2.getStaffByEffect('team_stat_boost');
+  assert(statBoosts.length === 1, 'getStaffByEffect finds Batting Coach');
+  assert(statBoosts[0].id === 'batting_coach', 'Filtered staff has correct ID');
+  const chipStaff = bs2.getStaffByEffect('flat_chips_per_ab');
+  assert(chipStaff.length === 1 && chipStaff[0].id === 'cash_cow', 'getStaffByEffect finds Cash Cow');
+
+  // 7c: SituationalEngine error multiplier
+  let errorCount = 0;
+  const errorTrials = 5000;
+  for (let i = 0; i < errorTrials; i++) {
+    const result = SituationalEngine.check('Groundout', { inning: 1, bases: [null, null, null], outs: 0 }, 5, 3);
+    if (result.transformed && result.type === 'error') errorCount++;
+  }
+  // With 3x multiplier, base 4% → 12%, expect ~600 in 5000 trials
+  assert(errorCount > 300, `Sly Fox 3x error mult: ${errorCount}/5000 errors (expect ~600)`);
+  assert(errorCount < 1000, `Sly Fox error rate not unreasonably high: ${errorCount}`);
+
+  // Without multiplier (baseline)
+  let baseErrors = 0;
+  for (let i = 0; i < errorTrials; i++) {
+    const result = SituationalEngine.check('Groundout', { inning: 1, bases: [null, null, null], outs: 0 }, 5);
+    if (result.transformed && result.type === 'error') baseErrors++;
+  }
+  assert(errorCount > baseErrors, `3x error mult (${errorCount}) > baseline (${baseErrors})`);
+
+  // 7d: simSingleAtBat with staff mods (hit reduction)
+  const rm = new RosterManager(TEAMS[0], 0, TEAMS[1]);
+
+  let hitsNoMod = 0;
+  let hitsWithMod = 0;
+  const simTrials = 2000;
+  for (let i = 0; i < simTrials; i++) {
+    rm.opponentBatterIndex = i % 9;
+    rm.myPitcherStamina = 1.0;
+    const bases = [null, null, null];
+    const r = rm.simSingleAtBat(3, 'fastball', bases);
+    if (!r.isOut) hitsNoMod++;
+  }
+  for (let i = 0; i < simTrials; i++) {
+    rm.opponentBatterIndex = i % 9;
+    rm.myPitcherStamina = 1.0;
+    const bases = [null, null, null];
+    const r = rm.simSingleAtBat(3, 'fastball', bases, { hitReduction: 0.15, fatigueDelay: 0 });
+    if (!r.isOut) hitsWithMod++;
+  }
+  assert(hitsWithMod < hitsNoMod, `Hit reduction reduces hits: ${hitsWithMod} < ${hitsNoMod}`);
+
+  // 7e: All mascot effect types are recognized
+  const knownTypes = new Set([
+    'team_convert_high_card', 'add_mult', 'strikeout_to_walk', 'flat_chips_per_ab',
+    'ignore_pair_penalty', 'bonus_draw_on_discard', 'per_runner_chips', 'double_chips',
+    'strikeout_redraw', 'pitcher_hit_reduction', 'mult_per_inning_run', 'team_extra_base',
+    'add_hand_draw', 'error_multiplier',
+  ]);
+  for (const m of MASCOTS) {
+    assert(knownTypes.has(m.effect.type), `Mascot "${m.name}" has known effect type: ${m.effect.type}`);
+  }
+
+  // 7f: All coach effect types are recognized
+  const knownCoachTypes = new Set([
+    'team_stat_boost', 'team_add_discard', 'pitcher_hit_reduction', 'unlock_staff_slot',
+    'shop_extra_cards', 'pitcher_fatigue_delay',
+  ]);
+  for (const c of COACHES) {
+    assert(knownCoachTypes.has(c.effect.type), `Coach "${c.name}" has known effect type: ${c.effect.type}`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
 //  SUMMARY
 // ═══════════════════════════════════════════════════════
 
