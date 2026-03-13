@@ -144,6 +144,7 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this._startAtBat();
     }
+
   }
 
   // ── Scoreboard ──────────────────────────────────────────
@@ -291,6 +292,17 @@ export default class GameScene extends Phaser.Scene {
     const batter = this.rosterManager.getCurrentBatter();
     const idx = this.rosterManager.getCurrentBatterIndex();
 
+    // Update batter sprite position based on handedness
+    if (this.batterSprite) {
+      const cx = this.baseDiamondCenter.x;
+      const cy = this.baseDiamondCenter.y;
+      const r = this.baseDiamondRadius;
+      const isLefty = batter.bats === 'L';
+      this.batterSprite.setX(cx + (isLefty ? 22 : -22));
+      this.batterSprite.setY(cy + r - 5);
+      this.batterSprite.setFlipX(isLefty);
+    }
+
     this.batterNameText.setText(batter.name);
     const pos = batter.pos ? ` | ${batter.pos}` : '';
     this.batterNumText.setText(`#${idx + 1} in lineup${pos}`);
@@ -394,6 +406,12 @@ export default class GameScene extends Phaser.Scene {
     this.pitcherCtlText.setText(`CTL  ${this._statBar(pitcher.control)}`);
     this.pitcherStaText.setText(`STA  ${this._statBar(pitcher.stamina)}`);
 
+    // Update pitcher mound sprite flip for handedness
+    if (this.pitcherMoundSprite) {
+      const pitcherLefty = pitcher.throws === 'L';
+      this.pitcherMoundSprite.setFlipX(!pitcherLefty);
+    }
+
     // Trait mini-cards
     this._clearTraitSprites(this.pitcherTraitSprites);
     this.pitcherTraitSprites = [];
@@ -453,14 +471,19 @@ export default class GameScene extends Phaser.Scene {
     this.runners = [null, null, null]; // runner dots for 1st, 2nd, 3rd
     this.runnerLabels = [null, null, null]; // runner name labels
     this._prevBases = [null, null, null]; // track previous state for animations
-    const cx = 640, cy = 175;
-    const r = 65;
+    const cx = 640, cy = 195;
+    const r = 85;
     this.baseDiamondCenter = { x: cx, y: cy };
     this.baseDiamondRadius = r;
     this.basePositions = [
       { x: cx + r, y: cy },       // 1st base
       { x: cx, y: cy - r },       // 2nd base
       { x: cx - r, y: cy },       // 3rd base
+    ];
+    this.runnerOffsets = [
+      { x: 12, y: -10 },  // 1st — centered at base, offset right and up
+      { x: 0, y: -15 },   // 2nd — feet on base
+      { x: -12, y: -10 }, // 3rd — centered at base, offset left and up
     ];
     this.homePosition = { x: cx, y: cy + r };
 
@@ -503,13 +526,16 @@ export default class GameScene extends Phaser.Scene {
       this.baseGraphics.push(baseGfx);
     }
 
-    // Batter sprite at home plate
+    // Batter sprite at home plate (updated each at-bat for handedness)
     const team = this.rosterManager.getTeam();
     const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
     const batterSpriteKey = `sprite_${teamKey}_batter`;
     if (this.textures.exists(batterSpriteKey)) {
-      this.batterSprite = this.add.image(cx + 20, cy + r - 5, batterSpriteKey)
-        .setScale(2.5).setDepth(3);
+      const batter = this.rosterManager.getCurrentBatter();
+      const isLefty = batter && batter.bats === 'L';
+      const xOff = isLefty ? 22 : -22;
+      this.batterSprite = this.add.image(cx + xOff, cy + r - 5, batterSpriteKey)
+        .setScale(2.5).setDepth(3).setFlipX(isLefty);
     }
 
     // Pitcher sprite at mound (center of diamond)
@@ -517,8 +543,10 @@ export default class GameScene extends Phaser.Scene {
     const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
     const pitcherSpriteKey = `sprite_${oppKey}_pitcher`;
     if (this.textures.exists(pitcherSpriteKey)) {
+      const pitcher = this.rosterManager.getCurrentPitcher();
+      const pitcherLefty = pitcher && pitcher.throws === 'L';
       this.pitcherMoundSprite = this.add.image(cx, cy, pitcherSpriteKey)
-        .setScale(2.5).setDepth(3).setFlipX(true);
+        .setScale(2.5).setDepth(3).setFlipX(!pitcherLefty);
     }
   }
 
@@ -544,24 +572,28 @@ export default class GameScene extends Phaser.Scene {
       this.baseGraphics[i].closePath();
       this.baseGraphics[i].fillPath();
 
-      // Runner sprites
+      // Runner sprites — offset from base position
+      const ro = this.runnerOffsets[i];
+      const destX = bp.x + ro.x;
+      const destY = bp.y + ro.y;
       if (occupied && !wasOccupied) {
         // Runner arriving — animate from previous base or home
         const fromPos = i === 0 ? this.homePosition : this.basePositions[i - 1];
+        const prevRo = i === 0 ? { x: 0, y: 0 } : this.runnerOffsets[i - 1];
         if (this.runners[i]) this.runners[i].destroy();
         const teamKey = TEAM_SPRITE_KEY[this.rosterManager.getTeam()?.name] || 'usa';
         const runnerKey = `sprite_${teamKey}_runner`;
         const runner = this.textures.exists(runnerKey)
-          ? this.add.image(fromPos.x, fromPos.y, runnerKey).setScale(2.5).setDepth(3)
-          : this.add.circle(fromPos.x, fromPos.y, 10, 0xffd600).setDepth(3);
+          ? this.add.image(fromPos.x + prevRo.x, fromPos.y + prevRo.y, runnerKey).setScale(2.5).setDepth(3)
+          : this.add.circle(fromPos.x + prevRo.x, fromPos.y + prevRo.y, 10, 0xffd600).setDepth(3);
         this.runners[i] = runner;
         // Trail particles along basepath
         this._spawnRunnerTrail(fromPos, bp);
         // Tween along basepath (staggered — lead runners move first)
         this.tweens.add({
           targets: runner,
-          x: bp.x,
-          y: bp.y,
+          x: destX,
+          y: destY,
           duration: 500,
           delay: stagger,
           ease: 'Quad.easeInOut',
@@ -570,12 +602,13 @@ export default class GameScene extends Phaser.Scene {
         // Runner left — animate to next base or home
         if (this.runners[i]) {
           const toPos = i === 2 ? this.homePosition : this.basePositions[i + 1];
+          const nextRo = i === 2 ? { x: 0, y: 0 } : this.runnerOffsets[i + 1];
           this._spawnRunnerTrail(bp, toPos);
           const runnerRef = this.runners[i];
           this.tweens.add({
             targets: runnerRef,
-            x: toPos.x,
-            y: toPos.y,
+            x: toPos.x + nextRo.x,
+            y: toPos.y + nextRo.y,
             alpha: 0,
             duration: 500,
             delay: stagger,
@@ -590,8 +623,8 @@ export default class GameScene extends Phaser.Scene {
           const teamKey = TEAM_SPRITE_KEY[this.rosterManager.getTeam()?.name] || 'usa';
           const runnerKey = `sprite_${teamKey}_runner`;
           const runner = this.textures.exists(runnerKey)
-            ? this.add.image(bp.x, bp.y, runnerKey).setScale(2.5).setDepth(3)
-            : this.add.circle(bp.x, bp.y, 10, 0xffd600).setDepth(3);
+            ? this.add.image(destX, destY, runnerKey).setScale(2.5).setDepth(3)
+            : this.add.circle(destX, destY, 10, 0xffd600).setDepth(3);
           this.runners[i] = runner;
         }
       } else {
@@ -611,9 +644,10 @@ export default class GameScene extends Phaser.Scene {
       }
       if (bases[i] && typeof bases[i] === 'object' && bases[i].name) {
         const lastName = bases[i].name.split(' ').pop();
-        const labelY = i === 1 ? bp.y - 22 : bp.y - 20;
-        const label = this.add.text(bp.x, labelY, lastName, {
-          fontSize: '9px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+        const ro = this.runnerOffsets[i];
+        const labelY = bp.y + ro.y - (i === 1 ? 18 : 26);
+        const label = this.add.text(bp.x + ro.x, labelY, lastName, {
+          fontSize: '13px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
         }).setOrigin(0.5, 1).setDepth(4).setAlpha(0);
         this.tweens.add({ targets: label, alpha: 0.9, duration: 300, delay: 200 });
         this.runnerLabels[i] = label;
@@ -645,24 +679,24 @@ export default class GameScene extends Phaser.Scene {
   // ── Result Display (center) ───────────────────────────
 
   _createResultDisplay() {
-    this.resultText = this.add.text(640, 310, '', {
-      fontSize: '26px', fontFamily: 'monospace', color: '#ffffff',
+    this.resultText = this.add.text(640, 345, '', {
+      fontSize: '34px', fontFamily: 'monospace', color: '#ffffff',
+      align: 'center', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(2);
+
+    this.handNameText = this.add.text(640, 430, '', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
     }).setOrigin(0.5).setDepth(2);
 
-    this.handNameText = this.add.text(640, 345, '', {
-      fontSize: '18px', fontFamily: 'monospace', color: '#aaaaaa',
-      align: 'center',
-    }).setOrigin(0.5).setDepth(2);
-
-    // Live hand preview (shown while selecting cards)
-    this.handPreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 110, '', {
+    // Live hand preview (shown while selecting cards — shares space with result text)
+    this.handPreviewText = this.add.text(640, 345, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffd600',
       align: 'center', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(7).setAlpha(0);
 
-    // Live score preview: chips x mult = total (below hand preview, above sort buttons)
-    this.scorePreviewText = this.add.text(640, HAND_Y - CARD_H / 2 - 90, '', {
+    // Live score preview: chips x mult = total (shares space with hand name)
+    this.scorePreviewText = this.add.text(640, 370, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
     }).setOrigin(0.5).setDepth(8).setAlpha(0);
@@ -677,7 +711,7 @@ export default class GameScene extends Phaser.Scene {
   // ── Info Text ─────────────────────────────────────────
 
   _createInfoText() {
-    this.discardInfo = this.add.text(640, 365, '', {
+    this.discardInfo = this.add.text(640, 395, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#b2dfdb',
     }).setOrigin(0.5).setDepth(7);
 
@@ -743,8 +777,8 @@ export default class GameScene extends Phaser.Scene {
   // ── Buttons ───────────────────────────────────────────
 
   _createButtons() {
-    this.playBtn = this._makeButton(540, 680, 'PLAY HAND', 0x2e7d32, () => this._onPlay());
-    this.discardBtn = this._makeButton(740, 680, 'DISCARD', 0xf57f17, () => this._onDiscard());
+    this.playBtn = this._makeButton(500, 680, 'PLAY', 0x2e7d32, () => this._onPlay());
+    this.discardBtn = this._makeButton(640, 680, 'DISCARD', 0xf57f17, () => this._onDiscard());
 
     // Hand reference "?" button
     const helpBg = this.add.rectangle(1240, 680, 40, 40, 0x333333)
@@ -763,11 +797,11 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _makeButton(x, y, label, color, callback) {
-    const bg = this.add.rectangle(x, y, 160, 44, color, 0.9)
+    const bg = this.add.rectangle(x, y, 130, 40, color, 0.9)
       .setInteractive({ useHandCursor: true })
       .setDepth(3);
     const txt = this.add.text(x, y, label, {
-      fontSize: '18px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(4);
 
     bg.on('pointerover', () => { if (bg.input.enabled) bg.setAlpha(1); });
@@ -792,20 +826,19 @@ export default class GameScene extends Phaser.Scene {
   // ── Sort Buttons ───────────────────────────────────────
 
   _createSortButtons() {
-    const sortY = HAND_Y - CARD_H / 2 - 68;
+    const sortY = 680;
     const modes = [
-      { label: 'DEFAULT', mode: 'default' },
-      { label: 'RANK',    mode: 'rank' },
-      { label: 'SUIT',    mode: 'suit' },
+      { label: 'DEF', mode: 'default' },
+      { label: 'RNK', mode: 'rank' },
+      { label: 'SUT', mode: 'suit' },
     ];
 
     this.sortBtns = [];
-    const totalW = modes.length * 90;
-    const startX = 640 - totalW / 2 + 45;
+    const startX = 770;
 
     modes.forEach((m, i) => {
-      const x = startX + i * 90;
-      const bg = this.add.rectangle(x, sortY, 80, 22, 0x333333, 0.7)
+      const x = startX + i * 60;
+      const bg = this.add.rectangle(x, sortY, 52, 28, 0x333333, 0.7)
         .setStrokeStyle(1, 0x555555)
         .setInteractive({ useHandCursor: true })
         .setDepth(3);
@@ -1058,6 +1091,7 @@ export default class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: cs.suitText,  y: cs.suitY,  duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.glow,      y: cs.y,      duration: 150, ease: 'Back.easeOut' });
     } else {
+      if (this.selectedIndices.size >= (this.maxCardSelection || 5)) return;
       this.selectedIndices.add(index);
       SoundManager.cardSelect();
       cs.glow.setAlpha(0.7);
@@ -1239,7 +1273,7 @@ export default class GameScene extends Phaser.Scene {
   /** Show a score popup that floats up and fades */
   _showScorePopup(text, color, x, y) {
     const popup = this.add.text(x, y, text, {
-      fontSize: '32px', fontFamily: 'monospace', color, fontStyle: 'bold',
+      fontSize: '40px', fontFamily: 'monospace', color, fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(15).setAlpha(0);
 
     this.tweens.add({
@@ -1341,6 +1375,9 @@ export default class GameScene extends Phaser.Scene {
     this.selectedIndices.clear();
     this.handPreviewText.setText('').setAlpha(0);
     this.scorePreviewText.setText('').setAlpha(0);
+    // Show diamond sprites for at-bat
+    if (this.batterSprite) this.batterSprite.setVisible(true);
+    if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(true);
     // Clean up any leftover cascade texts
     if (this.cascadeTexts) {
       this.cascadeTexts.forEach(t => t.destroy());
@@ -1350,8 +1387,13 @@ export default class GameScene extends Phaser.Scene {
     this.discardInfo.setAlpha(1);
     this.cardEngine.newAtBat();
 
-    // Bonus discards from batter traits (e.g. Batting Gloves)
+    // Max card selection (base 5, can be boosted by traits)
     const batter = this.rosterManager.getCurrentBatter();
+    this.maxCardSelection = 5 + batter.traits
+      .filter(t => t.effect && t.effect.type === 'add_hand_size')
+      .reduce((sum, t) => sum + (t.effect.value || 1), 0);
+
+    // Bonus discards from batter traits (e.g. Batting Gloves)
     const bonusDiscards = batter.traits
       .filter(t => t.effect && t.effect.type === 'add_discard')
       .reduce((sum, t) => sum + (t.effect.value || 1), 0);
@@ -1401,6 +1443,7 @@ export default class GameScene extends Phaser.Scene {
         this._addGameLog(`${batter.name.split(' ').pop()}: HBP — free base`, '#ffab40');
         this._updateScoreboard();
         this._clearCards();
+        if (this.batterSprite) this.batterSprite.setVisible(false);
 
         this.rosterManager.advanceBatter();
         this.time.delayedCall(600, () => this._updateBatterPanel());
@@ -1502,6 +1545,7 @@ export default class GameScene extends Phaser.Scene {
         this._addGameLog(`${walkBatter.name.split(' ').pop()}: Walk (${walkCount.balls}-${walkCount.strikes})`, '#66bb6a');
         this._updateScoreboard();
         this._clearCards();
+        if (this.batterSprite) this.batterSprite.setVisible(false);
 
         this.rosterManager.advanceBatter();
         this.time.delayedCall(600, () => this._updateBatterPanel());
@@ -1867,11 +1911,14 @@ export default class GameScene extends Phaser.Scene {
       const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score, batter);
 
       let extraBase = { scored: 0, advanced: false };
-      if (handResult.extraBaseChance && !isOut) {
+      if (handResult.extraBaseChance && !isOut && handResult.outcome === 'Single') {
         extraBase = this.baseball.tryExtraBase(handResult.extraBaseChance);
       }
 
       this._clearCards();
+
+      // Hide batter sprite — they're now a runner or out
+      if (this.batterSprite) this.batterSprite.setVisible(false);
 
       let desc = outcome.description;
       if (sacrificeFlyRun > 0) desc += ` Sac fly scores a run!`;
@@ -1964,7 +2011,7 @@ export default class GameScene extends Phaser.Scene {
         if (totalRuns > 0) {
           const popupColor = totalRuns >= 4 ? '#ff6e40' : totalRuns >= 2 ? '#ffd600' : '#69f0ae';
           const popupText = totalRuns >= 4 ? `+${totalRuns} RUNS!!!` : `+${totalRuns} RUN${totalRuns > 1 ? 'S' : ''}!`;
-          this._showScorePopup(popupText, popupColor, 640, 260);
+          this._showScorePopup(popupText, popupColor, 640, 250);
         }
 
         // Chip earnings flash
@@ -2058,16 +2105,16 @@ export default class GameScene extends Phaser.Scene {
     this.cascadeTexts.forEach(t => t.destroy());
     this.cascadeTexts = [];
 
-    // Animate each step — centered inside the base diamond
-    const dCenter = this.baseDiamondCenter;
-    const totalHeight = steps.length * 22;
-    const cascadeStartY = dCenter.y - totalHeight / 2 + 11;
+    // Animate each step — left of diamond, vertically centered
+    const cascadeX = 390;
+    const totalHeight = steps.length * 24;
+    const cascadeStartY = this.baseDiamondCenter.y - totalHeight / 2;
 
     steps.forEach((step, i) => {
       this.time.delayedCall(i * stepDelay, () => {
-        const y = cascadeStartY + i * 22;
-        const fontSize = step.isFinal ? '20px' : '12px';
-        const txt = this.add.text(dCenter.x, y, step.text, {
+        const y = cascadeStartY + i * 24;
+        const fontSize = step.isFinal ? '18px' : '12px';
+        const txt = this.add.text(cascadeX, y, step.text, {
           fontSize, fontFamily: 'monospace', color: step.color,
           fontStyle: step.isFinal ? 'bold' : 'normal',
         }).setOrigin(0.5, 0.5).setDepth(10).setAlpha(0);
@@ -2222,6 +2269,9 @@ export default class GameScene extends Phaser.Scene {
     this.inputLocked = true;
     this._setButtonsEnabled(false, false);
     this._setSortButtonsVisible(false);
+    // Hide diamond sprites during transition
+    if (this.batterSprite) this.batterSprite.setVisible(false);
+    if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(false);
     const s = this.baseball.getStatus();
     const elements = [];
 
@@ -2264,6 +2314,9 @@ export default class GameScene extends Phaser.Scene {
 
   _showInningTransition() {
     this._setSortButtonsVisible(false);
+    // Hide diamond sprites during transition
+    if (this.batterSprite) this.batterSprite.setVisible(false);
+    if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(false);
     const s = this.baseball.getStatus();
     const elements = [];
 

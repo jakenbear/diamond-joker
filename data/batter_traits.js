@@ -242,4 +242,13 @@ export default [
     phase: 'post',
     effect: { type: 'add_mult', value: 6, condition: { type: 'inning_range', min: 8, max: 9 } },
   },
+  {
+    id: 'extra_glove',
+    name: 'Extra Glove',
+    description: 'Play or discard up to 6 cards instead of 5',
+    price: 40,
+    rarity: 'rare',
+    phase: 'post',
+    effect: { type: 'add_hand_size', value: 1 },
+  },
 ];

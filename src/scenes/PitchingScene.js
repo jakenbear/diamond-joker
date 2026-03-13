@@ -136,16 +136,25 @@ export default class PitchingScene extends Phaser.Scene {
     const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
     const pitcherKey = `sprite_${teamKey}_pitcher`;
     if (this.textures.exists(pitcherKey)) {
-      this.add.image(cx, cy, pitcherKey).setScale(2).setDepth(3);
+      const myPitcher = this.rosterManager.getMyPitcher();
+      const pitcherLefty = myPitcher && myPitcher.throws === 'L';
+      this.pitcherMoundSprite = this.add.image(cx, cy, pitcherKey)
+        .setScale(2).setDepth(3).setFlipX(pitcherLefty);
     }
 
-    // Opponent batter sprite at home plate
+    // Opponent batter sprite at home plate (updated each at-bat for handedness)
     const oppTeam = this.rosterManager.getOpponentTeam();
     const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
     const batterKey = `sprite_${oppKey}_batter`;
+    this._pitchDiamondCx = cx;
+    this._pitchDiamondCy = cy;
+    this._pitchDiamondSize = size;
     if (this.textures.exists(batterKey)) {
-      this.oppBatterSprite = this.add.image(cx + 18, cy + size - 5, batterKey)
-        .setScale(2).setDepth(3).setFlipX(true);
+      const oppBatter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
+      const isLefty = oppBatter && oppBatter.bats === 'L';
+      const xOff = isLefty ? 18 : -18;
+      this.oppBatterSprite = this.add.image(cx + xOff, cy + size - 5, batterKey)
+        .setScale(2).setDepth(3).setFlipX(isLefty);
     }
   }
 
@@ -361,6 +370,11 @@ export default class PitchingScene extends Phaser.Scene {
     const stamina = this.rosterManager.getMyPitcherStamina();
     const staminaPct = Math.round(stamina * 100);
 
+    // Update pitcher mound sprite flip for handedness
+    if (this.pitcherMoundSprite) {
+      this.pitcherMoundSprite.setFlipX(pitcher.throws === 'L');
+    }
+
     this.myPitcherNameText.setText(pitcher.name);
     const team = this.rosterManager.getTeam();
     const teamLabel = team ? `${team.logo} ${team.nickname}` : 'Starter';
@@ -431,6 +445,13 @@ export default class PitchingScene extends Phaser.Scene {
   _updateBatterPanel() {
     const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
     const idx = this.rosterManager.opponentBatterIndex;
+
+    // Update opponent batter sprite position based on handedness
+    if (this.oppBatterSprite) {
+      const isLefty = batter.bats === 'L';
+      this.oppBatterSprite.setX(this._pitchDiamondCx + (isLefty ? 18 : -18));
+      this.oppBatterSprite.setFlipX(isLefty);
+    }
 
     this.oppBatterNameText.setText(batter.name);
     const pos = batter.pos ? ` | ${batter.pos}` : '';
