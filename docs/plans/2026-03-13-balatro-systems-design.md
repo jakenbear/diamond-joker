@@ -124,16 +124,27 @@ Common/uncommon rarity. Show up most innings.
 ### Mascots (Wild, Game-Breaking Effects)
 Uncommon/rare rarity. ~1 offered every 2-3 shop visits.
 
-| Mascot | Price | Effect |
-|--------|-------|--------|
-| Rally Moose | 45 | +5 mult on any at-bat when losing |
-| Lucky Bat Dog | 40 | 15% chance a strikeout becomes a walk |
-| Thunder Bear | 50 | Home Runs score double chips |
-| Golden Glove Gorilla | 35 | Errors happen 3x more often (in your favor) |
-| Card Shark Parrot | 45 | Draw 9 cards instead of 8 |
-| Fireworks Fox | 40 | +3 mult for every run scored this inning |
-| Voodoo Vulture | 50 | Opponent pitcher starts with +1 fatigue per Mascot owned |
-| Ice Cream Vendor | 30 | Earn +5 bonus chips after every 3-out inning you pitch |
+Sprites: `assets/animals/mascots_4x.png` (15 animals, 3 rows of 5)
+
+| # | Sprite | Mascot | Price | Rarity | Effect |
+|---|--------|--------|-------|--------|--------|
+| 1 | Chick | Scrappy Chick | 25 | common | High Card becomes a weak single (1 chip, 1 mult) for ALL batters |
+| 2 | Rooster | Morning Rooster | 35 | uncommon | +4 mult in innings 1-3 |
+| 3 | Duck | Lucky Duck | 40 | rare | 15% chance a strikeout becomes a walk |
+| 4 | Cow | Cash Cow | 30 | common | +3 bonus chips after every at-bat |
+| 5 | Sheep | Black Sheep | 45 | rare | Pairs never degrade from "Pitcher Adjusts" |
+| 6 | Raccoon | Trash Panda | 35 | uncommon | 20% chance to steal an extra card from deck on discard |
+| 7 | Hedgehog | Spike | 40 | uncommon | +2 chips per runner on base (all batters) |
+| 8 | Bear | Thunder Bear | 50 | rare | Home Runs score double chips |
+| 9 | Cat | Nine Lives | 45 | rare | First strikeout each inning becomes a foul ball (redraw hand) |
+| 10 | Wolf | Lone Wolf | 35 | uncommon | +5 mult when bases are empty |
+| 11 | Turtle | Iron Shell | 30 | common | Your pitcher: -8% hit chance |
+| 12 | Lizard | Cold Blood | 40 | uncommon | +3 mult for every run scored this inning |
+| 13 | Frog | Leap Frog | 35 | uncommon | All batters +10% extra base chance |
+| 14 | Crab | Pinch Crab | 45 | rare | Draw 9 cards instead of 8 |
+| 15 | Fox | Sly Fox | 50 | rare | Errors happen 3x more often (in your favor) |
+
+Rarity breakdown: 3 common, 7 uncommon, 5 rare
 
 ---
 
