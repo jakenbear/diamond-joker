@@ -2213,6 +2213,41 @@ console.log('\n── Contact rescue nerf ──');
 }
 
 // ═══════════════════════════════════════════════════════
+//  PART 5: INNATE TRAIT PAIRS
+// ═══════════════════════════════════════════════════════
+
+group('5. Innate Trait Pairs');
+
+{
+  const traitIds = new Set(BATTER_TRAITS.map(t => t.id));
+
+  for (const team of TEAMS) {
+    for (const batter of team.batters) {
+      assert(
+        Array.isArray(batter.innateTraits) && batter.innateTraits.length === 2,
+        `${team.name} ${batter.name} has 2 innate trait options`
+      );
+      if (Array.isArray(batter.innateTraits)) {
+        for (const tid of batter.innateTraits) {
+          assert(
+            traitIds.has(tid),
+            `${team.name} ${batter.name} innate trait '${tid}' exists in batter_traits`
+          );
+        }
+      }
+    }
+
+    // No duplicate A/B pairs within a team
+    const pairs = team.batters.map(b => b.innateTraits.join(','));
+    const uniquePairs = new Set(pairs);
+    assert(
+      uniquePairs.size === pairs.length,
+      `${team.name} has no duplicate innate trait pairs`
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
 //  SUMMARY
 // ═══════════════════════════════════════════════════════
 
