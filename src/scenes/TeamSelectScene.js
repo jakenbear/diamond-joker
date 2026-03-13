@@ -324,7 +324,7 @@ export default class TeamSelectScene extends Phaser.Scene {
     startBg.on('pointerover', () => startBg.setFillStyle(0x388e3c));
     startBg.on('pointerout', () => startBg.setFillStyle(0x2e7d32));
     startBg.on('pointerdown', () => {
-      this.scene.start('GameScene', {
+      this.scene.start('TraitDraftScene', {
         team: this.selectedTeam,
         pitcherIndex: this.selectedPitcherIdx,
         opponentTeam: this.opponentTeam,

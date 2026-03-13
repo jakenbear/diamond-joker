@@ -104,6 +104,12 @@ export default class GameScene extends Phaser.Scene {
       const oppTeam = this._initData.opponentTeam || null;
       this.rosterManager = new RosterManager(team, pitcherIdx, oppTeam);
       this.traitManager = new TraitManager();
+      // Apply innate traits from draft (one per batter)
+      if (this._initData.innateTraits) {
+        this._initData.innateTraits.forEach((trait, i) => {
+          if (trait) this.rosterManager.equipTrait(i, trait);
+        });
+      }
       // Assign pitcher traits at game start
       const pitcherTraits = TraitManager.pickPitcherTraits();
       this.rosterManager.setPitcherTraits(pitcherTraits);

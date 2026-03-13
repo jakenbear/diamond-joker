@@ -3,6 +3,7 @@
  */
 import TitleScene from './scenes/TitleScene.js';
 import TeamSelectScene from './scenes/TeamSelectScene.js';
+import TraitDraftScene from './scenes/TraitDraftScene.js';
 import GameScene from './scenes/GameScene.js';
 import PitchingScene from './scenes/PitchingScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
@@ -14,7 +15,7 @@ const config = {
   height: 720,
   backgroundColor: 0x1b5e20,
   parent: 'game-container',
-  scene: [TitleScene, TeamSelectScene, GameScene, PitchingScene, GameOverScene, ShopScene],
+  scene: [TitleScene, TeamSelectScene, TraitDraftScene, GameScene, PitchingScene, GameOverScene, ShopScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
