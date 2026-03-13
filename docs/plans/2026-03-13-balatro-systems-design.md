@@ -249,6 +249,43 @@ Inning Loop (per inning):
 
 ---
 
+## 6. UI Changes: Staff Bar & Roster Overlay
+
+### Remove Game Log
+The scrolling game log is replaced by the new UI elements below. Outcome info (result text, hand name, runs scored) is already displayed on the diamond — the log is redundant.
+
+### Staff Bar (Always Visible)
+A row of small Coach/Mascot icons displayed along the top edge of the GameScene (and PitchingScene). Similar to Balatro's Joker bar.
+
+- Shows 2-4 slots (matching unlocked staff slots)
+- Each slot: small animal sprite (mascots) or a coach icon + abbreviated name
+- Empty slots shown as dimmed outlines
+- Hover/tap an icon to see a tooltip with the full effect description
+- Positioned above the scoreboard, spanning center of screen
+
+### Roster Button & Overlay
+A "ROSTER" button on the main game screen (near the lineup panel or bottom-left). Tapping opens a full-screen overlay showing:
+
+- **All 9 batters** in lineup order:
+  - Name, position, stats (P/C/S)
+  - Innate trait (with icon/color badge)
+  - Shop trait if equipped (with icon/color badge)
+  - "BONUS" tag if the player is a bonus player replacement
+- **Active Synergies** section at bottom:
+  - List of all unlocked synergies with their bonuses
+  - Locked synergies shown as "???" with hints
+- **Staff summary** at top:
+  - Active coaches and mascots with full descriptions
+
+Tap anywhere or press "CLOSE" to dismiss. Available during both selection phase and between at-bats (not during resolution animations).
+
+### Batter Panel Updates
+The existing batter panel (left side) already shows the current batter's name and stats. Add:
+- Small trait icons below the batter name (1-2 colored dots or abbreviations)
+- If the batter is a bonus player, show a star or highlight border
+
+---
+
 ## Balancing Notes
 
 - Pack thresholds (2 runs / 4 runs / 25 chips) are tunable

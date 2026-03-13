@@ -773,9 +773,105 @@ git commit -m "feat: integrate synergies into game flow and shop display"
 
 ---
 
-## Phase 5: Godot Sync
+## Phase 5: UI — Staff Bar, Roster Overlay, Game Log Removal
 
-### Task 5.1: Mirror All New Data Files to Godot
+### Task 5.1: Remove Game Log from GameScene
+
+**Files:**
+- Modify: `src/scenes/GameScene.js`
+
+Remove all game log rendering and `gameLogEntries` tracking. The outcome text, hand name, and scoreboard already communicate what happened each at-bat.
+
+**Step 1:** Remove `gameLogEntries` from scene data passing (GameScene, PitchingScene, ShopScene init/exit).
+**Step 2:** Remove any `_renderGameLog()` or log text objects from GameScene.
+**Step 3:** Test manually, commit.
+
+```bash
+git add src/scenes/GameScene.js src/scenes/PitchingScene.js src/scenes/ShopScene.js
+git commit -m "refactor: remove game log from all scenes"
+```
+
+---
+
+### Task 5.2: Add Staff Bar (Always Visible)
+
+**Files:**
+- Modify: `src/scenes/GameScene.js`
+- Modify: `src/scenes/PitchingScene.js`
+
+A row of Coach/Mascot icons across the top of the screen.
+
+- 2-4 slots matching `baseball.staffSlots`
+- Each filled slot: small mascot sprite (from `assets/animals/mascots_4x.png` spritesheet) or coach icon + abbreviated name
+- Empty slots: dimmed outline rectangles
+- Tap/hover shows tooltip with full effect description
+- Position: centered above scoreboard, ~y=15
+
+**Step 1:** Load mascot spritesheet in `preload()` (slice into 15 frames from the 3x5 grid).
+**Step 2:** Create `_renderStaffBar()` method that reads `this.baseball.getStaff()` and displays icons.
+**Step 3:** Call `_renderStaffBar()` in `create()` and after any staff change.
+**Step 4:** Add same bar to PitchingScene.
+**Step 5:** Test manually, commit.
+
+```bash
+git add src/scenes/GameScene.js src/scenes/PitchingScene.js
+git commit -m "feat: add always-visible staff bar to game and pitching scenes"
+```
+
+---
+
+### Task 5.3: Add Roster Overlay Button
+
+**Files:**
+- Modify: `src/scenes/GameScene.js`
+
+A "ROSTER" button on the game screen. Tapping opens a full-screen overlay:
+
+- All 9 batters in lineup order with:
+  - Name, position, stats (P/C/S)
+  - Innate trait badge (colored by rarity)
+  - Shop trait badge if equipped
+  - "BONUS" star if bonus player, with lineup effect description
+- Active Synergies section at bottom (name + bonus for each active synergy)
+- Locked synergies as "???" with hints
+- Staff summary at top (coaches + mascots with descriptions)
+- "CLOSE" button or tap-to-dismiss
+
+**Step 1:** Add "ROSTER" button near bottom-left of GameScene (e.g., x=60, y=680).
+**Step 2:** Create `_showRosterOverlay()` method that builds the overlay.
+**Step 3:** Create `_closeRosterOverlay()` to dismiss.
+**Step 4:** Test manually, commit.
+
+```bash
+git add src/scenes/GameScene.js
+git commit -m "feat: add roster overlay with traits, synergies, and staff summary"
+```
+
+---
+
+### Task 5.4: Add Trait Icons to Batter Panel
+
+**Files:**
+- Modify: `src/scenes/GameScene.js`
+
+Small visual indicators on the existing batter panel (left side):
+- 1-2 colored dots or abbreviations below batter name showing equipped traits
+- Star or highlight border if batter is a bonus player
+- Update `_updateBatterPanel()` to include these indicators
+
+**Step 1:** Modify `_updateBatterPanel()` to render trait badges.
+**Step 2:** Test manually, commit.
+
+```bash
+git add src/scenes/GameScene.js
+git commit -m "feat: add trait icons and bonus player badge to batter panel"
+```
+
+---
+
+## Phase 6: Godot Sync
+
+### Task 6.1: Mirror All New Data Files to Godot
 
 **Files:**
 - Create: `godot/scripts/data/coaches.gd`
@@ -784,7 +880,7 @@ git commit -m "feat: integrate synergies into game flow and shop display"
 - Create: `godot/scripts/data/synergies.gd`
 - Modify: `godot/scripts/data/teams.gd` (add innateTraits)
 
-### Task 5.2: Mirror New Engine Logic to Godot
+### Task 6.2: Mirror New Engine Logic to Godot
 
 **Files:**
 - Create: `godot/scripts/synergy_engine.gd`
@@ -792,7 +888,7 @@ git commit -m "feat: integrate synergies into game flow and shop display"
 - Modify: `godot/scripts/roster_manager.gd` (bonus players)
 - Modify: `godot/scripts/effect_engine.gd` (new effect handlers)
 
-### Task 5.3: Mirror New Scenes to Godot
+### Task 6.3: Mirror New Scenes to Godot
 
 **Files:**
 - Create: `godot/scenes/trait_draft_scene.tscn` + `.gd`
@@ -801,9 +897,9 @@ git commit -m "feat: integrate synergies into game flow and shop display"
 
 ---
 
-## Phase 6: Expanded Trait Pool
+## Phase 7: Expanded Trait Pool
 
-### Task 6.1: Design and Add ~40 New Batter Traits
+### Task 7.1: Design and Add ~40 New Batter Traits
 
 Expand from ~20 to 60+ traits. Categories to fill:
 - More pre-eval card manipulation traits
@@ -831,5 +927,9 @@ Each task ends with a commit. Approximate commit sequence:
 10. `feat: apply bonus player lineup effects during at-bats`
 11. `feat: add synergy data and calculation engine`
 12. `feat: integrate synergies into game flow and shop display`
-13. `feat: mirror all new systems to Godot`
-14. `feat: expand batter trait pool to 60+`
+13. `refactor: remove game log from all scenes`
+14. `feat: add always-visible staff bar to game and pitching scenes`
+15. `feat: add roster overlay with traits, synergies, and staff summary`
+16. `feat: add trait icons and bonus player badge to batter panel`
+17. `feat: mirror all new systems to Godot`
+18. `feat: expand batter trait pool to 60+`
