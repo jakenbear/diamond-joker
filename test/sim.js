@@ -12,6 +12,8 @@ import HAND_TABLE from '../data/hand_table.js';
 import TEAMS from '../data/teams.js';
 import BATTER_TRAITS from '../data/batter_traits.js';
 import PITCHER_TRAITS from '../data/pitcher_traits.js';
+import COACHES from '../data/coaches.js';
+import MASCOTS from '../data/mascots.js';
 
 // ── Test Harness ────────────────────────────────────────
 
@@ -2213,10 +2215,83 @@ console.log('\n── Contact rescue nerf ──');
 }
 
 // ═══════════════════════════════════════════════════════
-//  PART 5: INNATE TRAIT PAIRS
+//  PART 5: COACHES & MASCOTS DATA
 // ═══════════════════════════════════════════════════════
 
-group('5. Innate Trait Pairs');
+group('5a. Coaches Data');
+
+{
+  assert(COACHES.length >= 8, `At least 8 coaches defined (got ${COACHES.length})`);
+  const coachIds = new Set();
+  for (const c of COACHES) {
+    assert(c.id && c.name && c.price && c.effect, `Coach '${c.name || '?'}' has required fields`);
+    assert(c.category === 'coach', `Coach '${c.name}' has category 'coach'`);
+    assert(c.rarity, `Coach '${c.name}' has rarity`);
+    assert(!coachIds.has(c.id), `Coach ID '${c.id}' is unique`);
+    coachIds.add(c.id);
+  }
+}
+
+group('5b. Mascots Data');
+
+{
+  assert(MASCOTS.length >= 15, `At least 15 mascots defined (got ${MASCOTS.length})`);
+  const mascotIds = new Set();
+  for (const m of MASCOTS) {
+    assert(m.id && m.name && m.price && m.effect, `Mascot '${m.name || '?'}' has required fields`);
+    assert(m.category === 'mascot', `Mascot '${m.name}' has category 'mascot'`);
+    assert(typeof m.spriteIndex === 'number', `Mascot '${m.name}' has spriteIndex`);
+    assert(m.rarity, `Mascot '${m.name}' has rarity`);
+    assert(!mascotIds.has(m.id), `Mascot ID '${m.id}' is unique`);
+    mascotIds.add(m.id);
+  }
+
+  // Verify rarity distribution: 3 common, 7 uncommon, 5 rare
+  const byRarity = { common: 0, uncommon: 0, rare: 0 };
+  for (const m of MASCOTS) byRarity[m.rarity]++;
+  assert(byRarity.common === 3, `3 common mascots (got ${byRarity.common})`);
+  assert(byRarity.uncommon === 7, `7 uncommon mascots (got ${byRarity.uncommon})`);
+  assert(byRarity.rare === 5, `5 rare mascots (got ${byRarity.rare})`);
+}
+
+group('5c. Staff Slots (BaseballState)');
+
+{
+  const bs = new BaseballState();
+  bs.reset();
+  assert(bs.staffSlots === 2, 'Start with 2 staff slots');
+  assert(Array.isArray(bs.staff) && bs.staff.length === 0, 'Start with no staff');
+
+  const coach1 = { id: 'batting_coach', name: 'Batting Coach', price: 30, effect: { type: 'team_stat_boost' } };
+  const mascot1 = { id: 'thunder_bear', name: 'Thunder Bear', price: 50, effect: { type: 'double_chips' } };
+  const coach2 = { id: 'scout', name: 'Scout', price: 25, effect: { type: 'shop_extra_cards' } };
+
+  assert(bs.addStaff(coach1) === true, 'Can add first staff');
+  assert(bs.staff.length === 1, 'Staff count is 1');
+  assert(bs.addStaff(mascot1) === true, 'Can add second staff');
+  assert(bs.staff.length === 2, 'Staff count is 2');
+  assert(bs.addStaff(coach2) === false, 'Cannot exceed 2 slot limit');
+  assert(bs.staff.length === 2, 'Staff count still 2 after failed add');
+
+  // Unlock a slot
+  bs.staffSlots = 3;
+  assert(bs.addStaff(coach2) === true, 'Can add after slot unlock');
+  assert(bs.staff.length === 3, 'Staff count is 3');
+
+  // Remove
+  assert(bs.removeStaff('thunder_bear') === true, 'Can remove staff by ID');
+  assert(bs.staff.length === 2, 'Staff count after removal');
+  assert(bs.removeStaff('nonexistent') === false, 'Cannot remove nonexistent staff');
+
+  // getStaff
+  assert(bs.getStaff().length === 2, 'getStaff returns current staff');
+}
+
+// ═══════════════════════════════════════════════════════
+//  PART 6: INNATE TRAIT PAIRS
+// ═══════════════════════════════════════════════════════
+
+group('6. Innate Trait Pairs');
 
 {
   const traitIds = new Set(BATTER_TRAITS.map(t => t.id));

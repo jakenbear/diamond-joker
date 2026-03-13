@@ -44,6 +44,8 @@ export default class BaseballState {
     this._currentInningPlayerRuns = 0;
     this._atBatsThisInning = 0;  // Track at-bats for first_batter_of_inning
     this.pairsPlayedThisInning = 0;
+    this.staff = [];       // Active coaches and mascots
+    this.staffSlots = 2;   // Start with 2 slots, expandable to 4
   }
 
   /** Get total accumulated chips (currency for shop) */
@@ -56,6 +58,37 @@ export default class BaseballState {
     if (this.totalChips < amount) return false;
     this.totalChips -= amount;
     return true;
+  }
+
+  // ── Staff (Coaches & Mascots) ──────────────────────────
+
+  /** Add a coach or mascot to a staff slot. Returns false if full. */
+  addStaff(item) {
+    if (this.staff.length >= this.staffSlots) return false;
+    this.staff.push(item);
+    // Equipment Manager: auto-unlock slot on purchase
+    if (item.effect && item.effect.type === 'unlock_staff_slot') {
+      this.staffSlots = Math.min(4, this.staffSlots + item.effect.value);
+    }
+    return true;
+  }
+
+  /** Remove a staff member by ID. Returns false if not found. */
+  removeStaff(id) {
+    const idx = this.staff.findIndex(s => s.id === id);
+    if (idx === -1) return false;
+    this.staff.splice(idx, 1);
+    return true;
+  }
+
+  /** Get all active staff. */
+  getStaff() {
+    return this.staff;
+  }
+
+  /** Get staff filtered by effect type. */
+  getStaffByEffect(effectType) {
+    return this.staff.filter(s => s.effect && s.effect.type === effectType);
   }
 
   /**
