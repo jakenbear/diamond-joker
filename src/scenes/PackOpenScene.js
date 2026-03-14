@@ -5,7 +5,7 @@
  *
  * Triggered from GameScene after a strong batting half:
  *   Bronze Pack: 2+ runs → pick 1 of 2
- *   Gold Pack:   4+ runs (or 25+ chip hand) → pick 1 of 3
+ *   Gold Pack:   4+ runs (or 25+ peanut hand) → pick 1 of 3
  */
 
 import BONUS_PLAYERS from '../../data/bonus_players.js';

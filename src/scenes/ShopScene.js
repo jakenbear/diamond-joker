@@ -43,7 +43,7 @@ export default class ShopScene extends Phaser.Scene {
 
     // Chip balance
     this.add.text(640, 65,
-      `Chips: ${this.baseball.getTotalChips()}`, {
+      `Peanuts: ${this.baseball.getTotalPeanuts()}`, {
       fontSize: '20px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5);
 
@@ -124,7 +124,7 @@ export default class ShopScene extends Phaser.Scene {
 
   _createTraitCard(trait, x, y, buysLeft) {
     const colors = RARITY_COLORS[trait.rarity] || RARITY_COLORS.common;
-    const canAfford = this.baseball.getTotalChips() >= trait.price && buysLeft > 0;
+    const canAfford = this.baseball.getTotalPeanuts() >= trait.price && buysLeft > 0;
 
     const border = this.add.rectangle(x, y, 240, 280, colors.border, 0.3)
       .setStrokeStyle(3, colors.border);
@@ -150,7 +150,7 @@ export default class ShopScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     const priceColor = canAfford ? '#ffd600' : '#ff5252';
-    const priceNote = buysLeft <= 0 ? '(no buys left)' : `${trait.price} chips`;
+    const priceNote = buysLeft <= 0 ? '(no buys left)' : `${trait.price} peanuts`;
     this.add.text(x, y + 70, priceNote, {
       fontSize: '16px', fontFamily: 'monospace', color: priceColor, fontStyle: 'bold',
     }).setOrigin(0.5);
@@ -239,7 +239,7 @@ export default class ShopScene extends Phaser.Scene {
 
   _createStaffCard(item, x, y, hasSlots) {
     const colors = RARITY_COLORS[item.rarity] || RARITY_COLORS.common;
-    const canAfford = this.baseball.getTotalChips() >= item.price && hasSlots;
+    const canAfford = this.baseball.getTotalPeanuts() >= item.price && hasSlots;
     const isCoach = item.category === 'coach';
 
     // Outer border (rarity colored)
@@ -286,7 +286,7 @@ export default class ShopScene extends Phaser.Scene {
 
     // Price
     const priceColor = canAfford ? '#ffd600' : '#ff5252';
-    const priceNote = !hasSlots ? '(no slots)' : `${item.price} chips`;
+    const priceNote = !hasSlots ? '(no slots)' : `${item.price} peanuts`;
     this.add.text(x, y + 75, priceNote, {
       fontSize: '14px', fontFamily: 'monospace', color: priceColor, fontStyle: 'bold',
     }).setOrigin(0.5);
@@ -348,16 +348,16 @@ export default class ShopScene extends Phaser.Scene {
 
     sellBg.on('pointerdown', () => {
       this.baseball.removeStaff(item.id);
-      this.baseball.totalChips += sellPrice;
+      this.baseball.totalPeanuts += sellPrice;
       this._restartScene();
     });
   }
 
   _buyStaff(item) {
-    if (!this.baseball.spendChips(item.price)) return;
+    if (!this.baseball.spendPeanuts(item.price)) return;
     if (!this.baseball.addStaff(item)) {
       // Refund if slot add failed
-      this.baseball.totalChips += item.price;
+      this.baseball.totalPeanuts += item.price;
       return;
     }
 
@@ -465,7 +465,7 @@ export default class ShopScene extends Phaser.Scene {
     const player = this.rosterManager.getRoster()[playerIndex];
     const trait = this.selectedCard;
 
-    if (!this.baseball.spendChips(trait.price)) return;
+    if (!this.baseball.spendPeanuts(trait.price)) return;
 
     this.rosterManager.equipTrait(playerIndex, trait);
     this.traitManager.markOwned(trait.id);

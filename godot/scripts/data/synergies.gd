@@ -19,8 +19,8 @@ static var DATA: Array[Dictionary] = [
 		"name": "Balanced Lineup",
 		"description": "4 lefty + 4 righty batters (+ 1 either)",
 		"hint": "4L + 4R batters...",
-		"bonus": {"type": "add_chips_all", "value": 2},
-		"bonus_description": "+2 chips on all at-bats",
+		"bonus": {"type": "add_peanuts_all", "value": 2},
+		"bonus_description": "+2 peanuts on all at-bats",
 	},
 	{
 		"id": "southpaw_stack",
@@ -79,8 +79,8 @@ static var DATA: Array[Dictionary] = [
 		"name": "Corner Power",
 		"description": "1B and 3B both have 8+ power",
 		"hint": "Corner infield power...",
-		"bonus": {"type": "add_chips_on_xbh", "value": 3},
-		"bonus_description": "+3 chips on triples+",
+		"bonus": {"type": "add_peanuts_on_xbh", "value": 3},
+		"bonus_description": "+3 peanuts on triples+",
 	},
 
 	# Bonus Player Combos
@@ -107,8 +107,8 @@ static var DATA: Array[Dictionary] = [
 		"name": "Small Ball",
 		"description": "5+ batters with 7+ contact and 6+ speed",
 		"hint": "Many contact-speed players...",
-		"bonus": {"type": "add_chips_all", "value": 1},
-		"bonus_description": "+1 chip on all at-bats",
+		"bonus": {"type": "add_peanuts_all", "value": 1},
+		"bonus_description": "+1 peanut on all at-bats",
 	},
 ]
 

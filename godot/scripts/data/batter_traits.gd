@@ -54,7 +54,7 @@ static var TRAITS: Array[Dictionary] = [
 		"effect": {
 			"type": "upgrade_outcome",
 			"from": "Single", "to": "Double",
-			"add_chips": 1, "add_mult": 0.5,
+			"add_peanuts": 1, "add_mult": 0.5,
 			"new_hand_name": "Pair (Slugger!)",
 			"condition": {"type": "hand_is", "value": "Pair"},
 		},
@@ -75,7 +75,7 @@ static var TRAITS: Array[Dictionary] = [
 		"price": 20,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "prevent_outcome", "from": "Groundout", "to_outcome": "Single", "to_hand": "Pair (Contact!)", "chips": 1, "mult": 1.5},
+		"effect": {"type": "prevent_outcome", "from": "Groundout", "to_outcome": "Single", "to_hand": "Pair (Contact!)", "peanuts": 1, "mult": 1.5},
 	},
 	{
 		"id": "sacrifice_fly",
@@ -95,11 +95,11 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "hot_corner",
 		"name": "Hot Corner",
-		"description": "+2 chips per runner on base",
+		"description": "+2 peanuts per runner on base",
 		"price": 20,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "per_runner_chips", "value": 2},
+		"effect": {"type": "per_runner_peanuts", "value": 2},
 	},
 	{
 		"id": "closer",
@@ -153,17 +153,17 @@ static var TRAITS: Array[Dictionary] = [
 		"price": 20,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "convert_high_card", "new_hand_name": "Bunt Single", "chips": 1, "mult": 1.0},
+		"effect": {"type": "convert_high_card", "new_hand_name": "Bunt Single", "peanuts": 1, "mult": 1.0},
 	},
 	{
 		"id": "cleanup_crew",
 		"name": "Cleanup Crew",
-		"description": "+3 chips on Three of a Kind or better",
+		"description": "+3 peanuts on Three of a Kind or better",
 		"price": 25,
 		"rarity": "common",
 		"phase": "post",
 		"effect": {
-			"type": "add_chips", "value": 3,
+			"type": "add_peanuts", "value": 3,
 			"condition": {"type": "hand_in", "values": ["Three of a Kind", "Full House", "Four of a Kind", "Flush", "Straight", "Straight Flush", "Royal Flush"]},
 		},
 	},
@@ -256,11 +256,11 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "pressure_player",
 		"name": "Pressure Player",
-		"description": "+3 chips when losing by 1+ run",
+		"description": "+3 peanuts when losing by 1+ run",
 		"price": 20,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "add_chips", "value": 3, "condition": {"type": "losing_by", "value": 1}},
+		"effect": {"type": "add_peanuts", "value": 3, "condition": {"type": "losing_by", "value": 1}},
 	},
 	{
 		"id": "no_quit",
@@ -284,11 +284,11 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "traffic_cop",
 		"name": "Traffic Cop",
-		"description": "+4 chips per runner on base",
+		"description": "+4 peanuts per runner on base",
 		"price": 30,
 		"rarity": "uncommon",
 		"phase": "post",
-		"effect": {"type": "per_runner_chips", "value": 4},
+		"effect": {"type": "per_runner_peanuts", "value": 4},
 	},
 	{
 		"id": "bases_clearing",
@@ -422,11 +422,11 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "chip_shot",
 		"name": "Chip Shot",
-		"description": "+2 chips on Pairs and Two Pair",
+		"description": "+2 peanuts on Pairs and Two Pair",
 		"price": 15,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "add_chips", "value": 2, "condition": {"type": "hand_in", "values": ["Pair", "Two Pair"]}},
+		"effect": {"type": "add_peanuts", "value": 2, "condition": {"type": "hand_in", "values": ["Pair", "Two Pair"]}},
 	},
 	{
 		"id": "big_fly",
@@ -480,50 +480,50 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "money_ball",
 		"name": "Money Ball",
-		"description": "+2 chips on every at-bat",
+		"description": "+2 peanuts on every at-bat",
 		"price": 20,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "add_chips", "value": 2},
+		"effect": {"type": "add_peanuts", "value": 2},
 	},
 	{
 		"id": "gold_glove",
 		"name": "Gold Glove",
-		"description": "+4 chips on Three of a Kind or better",
+		"description": "+4 peanuts on Three of a Kind or better",
 		"price": 30,
 		"rarity": "uncommon",
 		"phase": "post",
 		"effect": {
-			"type": "add_chips", "value": 4,
+			"type": "add_peanuts", "value": 4,
 			"condition": {"type": "hand_in", "values": ["Three of a Kind", "Full House", "Four of a Kind", "Flush", "Straight", "Straight Flush", "Royal Flush"]},
 		},
 	},
 	{
 		"id": "penny_pincher",
 		"name": "Penny Pincher",
-		"description": "+1 chip on Pairs",
+		"description": "+1 peanut on Pairs",
 		"price": 10,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "add_chips", "value": 1, "condition": {"type": "hand_is", "value": "Pair"}},
+		"effect": {"type": "add_peanuts", "value": 1, "condition": {"type": "hand_is", "value": "Pair"}},
 	},
 	{
 		"id": "late_bloomer",
 		"name": "Late Bloomer",
-		"description": "+5 chips in innings 7-9",
+		"description": "+5 peanuts in innings 7-9",
 		"price": 30,
 		"rarity": "uncommon",
 		"phase": "post",
-		"effect": {"type": "add_chips", "value": 5, "condition": {"type": "inning_range", "min": 7, "max": 9}},
+		"effect": {"type": "add_peanuts", "value": 5, "condition": {"type": "inning_range", "min": 7, "max": 9}},
 	},
 	{
 		"id": "early_bird",
 		"name": "Early Bird",
-		"description": "+3 chips in innings 1-3",
+		"description": "+3 peanuts in innings 1-3",
 		"price": 15,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "add_chips", "value": 3, "condition": {"type": "inning_range", "min": 1, "max": 3}},
+		"effect": {"type": "add_peanuts", "value": 3, "condition": {"type": "inning_range", "min": 1, "max": 3}},
 	},
 
 	# Outcome Upgrades / Prevention
@@ -537,7 +537,7 @@ static var TRAITS: Array[Dictionary] = [
 		"effect": {
 			"type": "upgrade_outcome",
 			"from": "Single", "to": "Double",
-			"add_chips": 1, "add_mult": 0.5,
+			"add_peanuts": 1, "add_mult": 0.5,
 			"new_hand_name": "Two Pair (Ground Rule!)",
 			"condition": {"type": "hand_is", "value": "Two Pair"},
 		},
@@ -552,7 +552,7 @@ static var TRAITS: Array[Dictionary] = [
 		"effect": {
 			"type": "upgrade_outcome",
 			"from": "Double", "to": "Triple",
-			"add_chips": 2, "add_mult": 1,
+			"add_peanuts": 2, "add_mult": 1,
 			"new_hand_name": "Straight (Legged Out!)",
 			"condition": {"type": "hand_is", "value": "Straight"},
 		},
@@ -564,7 +564,7 @@ static var TRAITS: Array[Dictionary] = [
 		"price": 25,
 		"rarity": "uncommon",
 		"phase": "post",
-		"effect": {"type": "prevent_outcome", "from": "Groundout", "to_outcome": "Single", "to_hand": "Error!", "chips": 1, "mult": 1},
+		"effect": {"type": "prevent_outcome", "from": "Groundout", "to_outcome": "Single", "to_hand": "Error!", "peanuts": 1, "mult": 1},
 	},
 	{
 		"id": "foul_fighter",
@@ -573,7 +573,7 @@ static var TRAITS: Array[Dictionary] = [
 		"price": 20,
 		"rarity": "common",
 		"phase": "post",
-		"effect": {"type": "convert_high_card", "new_hand_name": "Foul Fighter", "chips": 1, "mult": 1},
+		"effect": {"type": "convert_high_card", "new_hand_name": "Foul Fighter", "peanuts": 1, "mult": 1},
 	},
 
 	# Inning-Specific
@@ -627,14 +627,14 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "insurance_run",
 		"name": "Insurance Run",
-		"description": "+2 chips and +1 mult with 0 outs",
+		"description": "+2 peanuts and +1 mult with 0 outs",
 		"price": 25,
 		"rarity": "uncommon",
 		"phase": "post",
 		"effect": {
 			"type": "compound",
 			"effects": [
-				{"type": "add_chips", "value": 2, "condition": {"type": "outs_eq", "value": 0}},
+				{"type": "add_peanuts", "value": 2, "condition": {"type": "outs_eq", "value": 0}},
 				{"type": "add_mult", "value": 1, "condition": {"type": "outs_eq", "value": 0}},
 			],
 		},
@@ -642,11 +642,11 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "tape_measure",
 		"name": "Tape Measure",
-		"description": "+5 chips on Home Runs",
+		"description": "+5 peanuts on Home Runs",
 		"price": 30,
 		"rarity": "uncommon",
 		"phase": "post",
-		"effect": {"type": "add_chips", "value": 5, "condition": {"type": "outcome_is", "value": "Home Run"}},
+		"effect": {"type": "add_peanuts", "value": 5, "condition": {"type": "outcome_is", "value": "Home Run"}},
 	},
 	{
 		"id": "iron_will",
@@ -657,7 +657,7 @@ static var TRAITS: Array[Dictionary] = [
 		"phase": "post",
 		"effect": {
 			"type": "prevent_outcome", "from": "Flyout", "to_outcome": "Single",
-			"to_hand": "Flyout (Iron Will!)", "chips": 1, "mult": 1.5,
+			"to_hand": "Flyout (Iron Will!)", "peanuts": 1, "mult": 1.5,
 		},
 	},
 ]

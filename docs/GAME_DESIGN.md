@@ -11,7 +11,7 @@
 **Resolution:** 1280×720
 **Session Length:** ~20–30 minutes
 
-You pick a national team, face an opponent across 9 innings. Each at-bat, you're dealt 8 cards—play a poker hand to determine the outcome. Better hands = better hits. Between innings, spend earned chips at the shop to equip trait cards that bend the rules in your favor.
+You pick a national team, face an opponent across 9 innings. Each at-bat, you're dealt 8 cards—play a poker hand to determine the outcome. Better hands = better hits. Between innings, spend earned peanuts at the shop to equip trait cards that bend the rules in your favor.
 
 ---
 
@@ -22,7 +22,7 @@ Title Screen → Team Select → [Inning Loop] → Game Over
 
 Inning Loop (per inning):
   1. Player bats (GameScene) — play cards until 3 outs
-  2. Shop (ShopScene) — buy trait cards with chips
+  2. Shop (ShopScene) — buy trait cards with peanuts
   3. Opponent bats (PitchingScene) — pick pitches until 3 outs
   4. Next inning (or Game Over after 9+)
 ```
@@ -48,7 +48,7 @@ When the deck runs low, the discard pile is reshuffled back in.
 
 ### Hand Rankings → Baseball Outcomes
 
-| Hand | Baseball Outcome | Chips | Mult | Score |
+| Hand | Baseball Outcome | Peanuts | Mult | Score |
 |------|-----------------|-------|------|-------|
 | Royal Flush | Home Run (guaranteed) | 15 | 20 | 300 |
 | Straight Flush | 80% HR / 15% Triple / 5% Double | 10 | 10 | 100 |
@@ -61,7 +61,7 @@ When the deck runs low, the discard pile is reshuffled back in.
 | Pair | Single | 1 | 1.5 | 1.5 |
 | High Card | Strikeout | 0 | 1 | 0 |
 
-**Score = floor(Chips × Mult)** — this becomes your chip income for the shop.
+**Score = floor(Peanuts × Mult)** — this becomes your peanut income for the shop.
 
 ### Hand Evaluation Rules
 - Straights and Flushes require exactly 5 cards
@@ -84,7 +84,7 @@ When the deck runs low, the discard pile is reshuffled back in.
 6. Hand is evaluated → baseball outcome determined
 7. Batter/pitcher traits applied
 8. Situational plays checked (double play, error, etc.)
-9. Runners advance, runs score, chips earned
+9. Runners advance, runs score, peanuts earned
 10. Next batter (9-player lineup cycles)
 
 ### Rank Quality — The Pair Gamble
@@ -106,7 +106,7 @@ outChance = 0.80 - (pairRank - 2) × 0.06 + twoStrikePenalty + pairPenalty
 | Aces | 8% | 92% |
 
 - Two-strike penalty: +10%
-- Face card pairs (10+): bonus chips = pairRank - 9
+- Face card pairs (10+): bonus peanuts = pairRank - 9
 
 **Two Pair:** 20% out chance on low pairs (2–5). 50/50 groundout/flyout.
 **Three of a Kind:** 10% out chance on low ranks. Always flyout on failure.
@@ -138,7 +138,7 @@ saveChance = batter.contact × 0.04
 A contact-10 batter rescues 40% of failed pairs back to singles.
 
 ### Batter Stat Bonuses (On Hit)
-- **Power:** +max(0, power - 5) bonus chips
+- **Power:** +max(0, power - 5) bonus peanuts
 - **Contact:** +contact/10 bonus mult
 - **Speed:** speed × 5% chance for an extra base
 
@@ -202,7 +202,7 @@ ballChance = remaining × (1.0 - base strikeChance)
 
 Your count when you PLAY the hand affects scoring:
 
-| Count | Chips | Mult | Notes |
+| Count | Peanuts | Mult | Notes |
 |-------|-------|------|-------|
 | 3-0 | +2 | +1.0 | Patient eye rewarded |
 | 2-0 | +1 | +0.5 | Ahead in count |
@@ -304,7 +304,7 @@ Low-control pitchers risk walks when throwing breaking balls.
 **Batters:**
 | Stat | Effect |
 |------|--------|
-| Power | Bonus chips on hits, XBH chance |
+| Power | Bonus peanuts on hits, XBH chance |
 | Contact | Bonus mult on hits, pair rescue chance |
 | Speed | Extra base chance, DP escape |
 
@@ -324,7 +324,7 @@ Low-control pitchers risk walks when throwing breaking balls.
 ## Trait System
 
 ### How It Works
-1. Buy trait cards at the shop with chips
+1. Buy trait cards at the shop with peanuts
 2. Assign to a specific player on your roster
 3. Each player holds max 2 traits
 4. Traits activate automatically during at-bats
@@ -337,9 +337,9 @@ Low-control pitchers risk walks when throwing breaking balls.
 
 | Rarity | Weight | Price |
 |--------|--------|-------|
-| Common | 3× | 20–25 chips |
-| Uncommon | 2× | 25–35 chips |
-| Rare | 1× | 35–45 chips |
+| Common | 3× | 20–25 peanuts |
+| Uncommon | 2× | 25–35 peanuts |
+| Rare | 1× | 35–45 peanuts |
 
 ### Batter Traits
 
@@ -358,14 +358,14 @@ Low-control pitchers risk walks when throwing breaking balls.
 | Eye of the Tiger | Common | 25 | +3 mult with 2 outs |
 | Contact Lens | Common | 20 | Low pairs never become groundouts |
 | Sacrifice Fly | Uncommon | 25 | Strikeouts with runner on 3rd score a run |
-| Hot Corner | Common | 20 | +2 chips per runner on base |
+| Hot Corner | Common | 20 | +2 peanuts per runner on base |
 | Closer | Uncommon | 30 | +5 mult in innings 7–9 |
 | Stolen Base | Uncommon | 25 | Runner on 1st auto-advances before at-bat |
 | Grand Ambition | Rare | 45 | +10 mult when bases loaded |
 | Batting Gloves | Uncommon | 35 | +1 discard per at-bat (2 → 3) |
 | Rally Cap | Uncommon | 30 | +4 mult when losing by 2+ runs |
 | Bunt Single | Common | 20 | High Card becomes weak single (1 chip, 1 mult) |
-| Cleanup Crew | Common | 25 | +3 chips on Three of a Kind or better |
+| Cleanup Crew | Common | 25 | +3 peanuts on Three of a Kind or better |
 | Walk Machine | Rare | 40 | Every at-bat starts with 1 ball (1-0 count) |
 | Dugout Fire | Uncommon | 30 | +2 mult per out this inning |
 | Lead-Off King | Common | 20 | +3 mult as first batter of inning |
@@ -377,12 +377,12 @@ These are assigned to the opposing pitcher and affect YOUR at-bats:
 
 | Trait | Effect |
 |-------|--------|
-| Heater | Low pairs auto-groundout; triples+ get +2 chips |
+| Heater | Low pairs auto-groundout; triples+ get +2 peanuts |
 | Curveball | 30% chance highest card loses 3 ranks |
 | Slider | -1 mult on all hands; -2 mult with 2 outs |
 | Knuckleball | Face cards (J/Q/K) lose 2 ranks |
 | Intimidation | -2 mult at 0 outs; +2 mult at 2 outs |
-| Painted Corner | High pairs/two pair get -1 chip |
+| Painted Corner | High pairs/two pair get -1 peanut |
 | Changeup | 25% chance two cards swap ranks |
 | Closer's Instinct | -3 mult in innings 7–9 |
 
@@ -440,7 +440,7 @@ After your batting half, before opponent bats. Once per inning, innings 1–9.
 ### Flow
 1. 3 random trait cards displayed (weighted by rarity)
 2. Buy a card → assign to a roster player (max 2 traits each)
-3. Chips deducted, shop refreshes if buys remain
+3. Peanuts deducted, shop refreshes if buys remain
 4. Hit "Done" to continue to opponent's half
 
 No duplicate traits offered (already-owned traits excluded).
@@ -450,17 +450,17 @@ No duplicate traits offered (already-owned traits excluded).
 ## Chip Economy
 
 ### Earning
-- Every at-bat: floor(chips × mult) from the played hand
+- Every at-bat: floor(peanuts × mult) from the played hand
 - Bonuses from batter stats, count modifiers, trait effects
 
 ### Spending
-- Trait cards at the shop (20–45 chips each)
-- Chips persist across the entire game (not reset per inning)
+- Trait cards at the shop (20–45 peanuts each)
+- Peanuts persist across the entire game (not reset per inning)
 
 ### Rough Progression
-- Innings 1–3: ~50–75 chips (enough for 1 trait)
-- Innings 4–6: ~100–150 chips (equip 2–3 players)
-- Innings 7–9: ~150–250 chips (build synergies)
+- Innings 1–3: ~50–75 peanuts (enough for 1 trait)
+- Innings 4–6: ~100–150 peanuts (equip 2–3 players)
+- Innings 7–9: ~150–250 peanuts (build synergies)
 
 ---
 

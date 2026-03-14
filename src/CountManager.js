@@ -9,13 +9,13 @@
  */
 
 const COUNT_MODIFIERS = {
-  '3-0': { chipsMod: 2, multMod: 1.0 },
-  '2-0': { chipsMod: 1, multMod: 0.5 },
-  '3-1': { chipsMod: 1, multMod: 0.5 },
-  '3-2': { chipsMod: 0, multMod: 0.5 },
-  '0-1': { chipsMod: 0, multMod: -0.2 },
-  '1-2': { chipsMod: 0, multMod: -0.3 },
-  '0-2': { chipsMod: -1, multMod: -0.5 },
+  '3-0': { peanutsMod: 2, multMod: 1.0 },
+  '2-0': { peanutsMod: 1, multMod: 0.5 },
+  '3-1': { peanutsMod: 1, multMod: 0.5 },
+  '3-2': { peanutsMod: 0, multMod: 0.5 },
+  '0-1': { peanutsMod: 0, multMod: -0.2 },
+  '1-2': { peanutsMod: 0, multMod: -0.3 },
+  '0-2': { peanutsMod: -1, multMod: -0.5 },
 };
 
 export default class CountManager {
@@ -89,7 +89,7 @@ export default class CountManager {
 
   getCountModifiers() {
     const key = `${this.balls}-${this.strikes}`;
-    return COUNT_MODIFIERS[key] || { chipsMod: 0, multMod: 0 };
+    return COUNT_MODIFIERS[key] || { peanutsMod: 0, multMod: 0 };
   }
 
   isWalk() {

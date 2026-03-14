@@ -139,7 +139,7 @@ export default class GameScene extends Phaser.Scene {
     this.selectedIndices = new Set();
     this.cardSprites = [];
     this.inputLocked = false;
-    this._maxChipsThisInning = 0;
+    this._maxPeanutsThisInning = 0;
     this.activeSynergies = SynergyEngine.calculate(this.rosterManager.getRoster());
     this.baseGraphics = [];
     this.batterTraitSprites = [];
@@ -181,7 +181,7 @@ export default class GameScene extends Phaser.Scene {
   _createScoreboard() {
     this.add.rectangle(640, 25, 1280, 50, 0x0d3311).setDepth(0);
 
-    // Score + Chips (vertically centered in bar)
+    // Score + Peanuts (vertically centered in bar)
     this.scoreText = this.add.text(640, 13, '', {
       fontSize: '20px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(1);
@@ -198,7 +198,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.countManager = new CountManager();
 
-    this.chipBalanceText = this.add.text(640, 6, '', {
+    this.peanutBalanceText = this.add.text(640, 6, '', {
       fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(1).setVisible(false);
 
@@ -211,7 +211,7 @@ export default class GameScene extends Phaser.Scene {
     const playerName = playerTeam ? playerTeam.id : 'YOU';
     const oppTeam = this.rosterManager.getOpponentTeam();
     const oppName = oppTeam ? oppTeam.id : 'OPP';
-    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}    Chips: ${s.totalChips}`);
+    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}    Peanuts: ${s.totalPeanuts}`);
 
     // Line 2 left: INN + Outs
     const outDots = [];
@@ -696,7 +696,7 @@ export default class GameScene extends Phaser.Scene {
       align: 'center', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(7).setAlpha(0);
 
-    // Live score preview: chips x mult = total (shares space with hand name)
+    // Live score preview: peanuts x mult = total (shares space with hand name)
     this.scorePreviewText = this.add.text(640, 370, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
@@ -1395,29 +1395,29 @@ export default class GameScene extends Phaser.Scene {
     this.handPreviewText.setColor(color);
     this.handPreviewText.setAlpha(1);
 
-    // Live chips x mult display
+    // Live peanuts x mult display
     let scorePreview = '';
     if (isDefiniteOut) {
       scorePreview = 'OUT';
       this.scorePreviewText.setColor('#ff5252');
-    } else if (isRiskyOut || result.chips > 0) {
-      // For risky outs (low pair Groundout/Flyout), look up the original hand's chips/mult
-      let baseChips = result.chips;
+    } else if (isRiskyOut || result.peanuts > 0) {
+      // For risky outs (low pair Groundout/Flyout), look up the original hand's peanuts/mult
+      let basePeanuts = result.peanuts;
       let baseMult = result.mult;
       if (isRiskyOut && result.originalHand) {
         const entry = HAND_TABLE.find(h => h.handName === result.originalHand);
-        if (entry) { baseChips = entry.chips; baseMult = entry.mult; }
+        if (entry) { basePeanuts = entry.peanuts; baseMult = entry.mult; }
       }
       const batter = this.rosterManager.getCurrentBatter();
       const powerBonus = Math.max(0, batter.power - 5);
       const contactBonus = batter.contact / 10;
-      const totalChips = baseChips + powerBonus;
+      const totalPeanuts = basePeanuts + powerBonus;
       const totalMult = Math.round((baseMult + contactBonus) * 10) / 10;
-      const total = Math.round(totalChips * totalMult);
+      const total = Math.round(totalPeanuts * totalMult);
 
-      const chipsStr = Number.isInteger(totalChips) ? totalChips : totalChips.toFixed(1);
+      const peanutsStr = Number.isInteger(totalPeanuts) ? totalPeanuts : totalPeanuts.toFixed(1);
       const multStr = Number.isInteger(totalMult) ? totalMult : totalMult.toFixed(1);
-      scorePreview = `${chipsStr} chips x ${multStr} mult = ${total}`;
+      scorePreview = `${peanutsStr} peanuts x ${multStr} mult = ${total}`;
       if (isRiskyOut) scorePreview += ' (if hit)';
 
       const tags = [];
@@ -1534,7 +1534,7 @@ export default class GameScene extends Phaser.Scene {
       }).setDepth(21);
       els.push(outcome);
 
-      const stats = this.add.text(810, y, `${h.chips}c x${h.mult}`, {
+      const stats = this.add.text(810, y, `${h.peanuts}c x${h.mult}`, {
         fontSize: '12px', fontFamily: 'monospace', color: '#666666',
       }).setDepth(21);
       els.push(stats);
@@ -1908,7 +1908,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Detect pitcher post-modifier effects (we'll track after eval)
     let pitcherPostMessage = '';
-    let pitcherPostPenalty = { chips: 0, mult: 0 };
+    let pitcherPostPenalty = { peanuts: 0, mult: 0 };
 
     // Track batter post-modifier effects
     let batterPostMessage = '';
@@ -1925,9 +1925,9 @@ export default class GameScene extends Phaser.Scene {
           pitcherPostPenalty.mult = before.mult - r.mult;
           effects.push(`-${(before.mult - r.mult).toFixed(1)} mult`);
         }
-        if (r.chips < before.chips) {
-          pitcherPostPenalty.chips = before.chips - r.chips;
-          effects.push(`-${before.chips - r.chips} chips`);
+        if (r.peanuts < before.peanuts) {
+          pitcherPostPenalty.peanuts = before.peanuts - r.peanuts;
+          effects.push(`-${before.peanuts - r.peanuts} peanuts`);
         }
         if (r.mult > before.mult) effects.push(`+${(r.mult - before.mult).toFixed(1)} mult`);
         if (effects.length > 0) {
@@ -1944,7 +1944,7 @@ export default class GameScene extends Phaser.Scene {
         const effects = [];
         if (r.outcome !== before.outcome) effects.push(`${before.outcome}\u2192${r.outcome}`);
         if (r.mult > before.mult) effects.push(`+${(r.mult - before.mult).toFixed(1)} mult`);
-        if (r.chips > before.chips) effects.push(`+${r.chips - before.chips} chips`);
+        if (r.peanuts > before.peanuts) effects.push(`+${r.peanuts - before.peanuts} peanuts`);
         if (r.mult < before.mult) effects.push(`${(r.mult - before.mult).toFixed(1)} mult`);
         if (effects.length > 0) {
           const traitNames = batter.traits
@@ -1990,10 +1990,10 @@ export default class GameScene extends Phaser.Scene {
     const totalCountMult = countMods.multMod + firstPitchBonus;
 
     const isHitForCount = handResult.outcome !== 'Strikeout' && handResult.outcome !== 'Groundout' && handResult.outcome !== 'Flyout';
-    if (isHitForCount && (countMods.chipsMod !== 0 || totalCountMult !== 0)) {
-      handResult.chips = Math.max(0, handResult.chips + countMods.chipsMod);
+    if (isHitForCount && (countMods.peanutsMod !== 0 || totalCountMult !== 0)) {
+      handResult.peanuts = Math.max(0, handResult.peanuts + countMods.peanutsMod);
       handResult.mult = Math.round(Math.max(1, handResult.mult + totalCountMult) * 10) / 10;
-      handResult.score = Math.round(handResult.chips * handResult.mult);
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
     }
 
     // Apply team stat boosts from staff (Batting Coach etc.)
@@ -2035,7 +2035,7 @@ export default class GameScene extends Phaser.Scene {
     // like Slugger Serum (Pair Single→Double) can trigger on the rescued hit
     if (batterBonuses.contactSave && batterPostMod) {
       handResult = batterPostMod(handResult, gameState);
-      handResult.score = Math.round(handResult.chips * handResult.mult);
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
     }
 
     handResult = this.rosterManager.applyPitcherModifiers(handResult, gameState);
@@ -2209,9 +2209,9 @@ export default class GameScene extends Phaser.Scene {
     this._deferBaseUpdate = true;
 
     this.time.delayedCall(resolveStart, () => {
-      // Track max chip hand this inning for pack triggers
-      if (handResult.score > this._maxChipsThisInning) {
-        this._maxChipsThisInning = handResult.score;
+      // Track max peanut hand this inning for pack triggers
+      if (handResult.score > this._maxPeanutsThisInning) {
+        this._maxPeanutsThisInning = handResult.score;
       }
       const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score, batter);
 
@@ -2342,25 +2342,25 @@ export default class GameScene extends Phaser.Scene {
   _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg, staffBonuses = null, lineupBonuses = null, synergyBonuses = null) {
     const steps = [];
     const stepDelay = 350;
-    let runningChips = handResult.chips - bonuses.powerChips + pitcherPenalty.chips;
+    let runningPeanuts = handResult.peanuts - bonuses.powerPeanuts + pitcherPenalty.peanuts;
     let runningMult = handResult.mult - bonuses.contactMult + pitcherPenalty.mult;
 
     // Ensure running values don't go below the base hand values
-    const baseChips = runningChips;
+    const basePeanuts = runningPeanuts;
     const baseMult = Math.round(runningMult * 10) / 10;
 
     // Step 1: Base hand
     steps.push({
-      text: `${handResult.handName} \u2192 ${baseChips} chip${baseChips !== 1 ? 's' : ''} x ${baseMult.toFixed(1)}`,
+      text: `${handResult.handName} \u2192 ${basePeanuts} peanut${basePeanuts !== 1 ? 's' : ''} x ${baseMult.toFixed(1)}`,
       color: '#ffd600',
     });
 
     // Step 2: Power bonus (if any)
-    if (bonuses.powerChips > 0) {
-      runningChips += bonuses.powerChips;
+    if (bonuses.powerPeanuts > 0) {
+      runningPeanuts += bonuses.powerPeanuts;
       const batter = this.rosterManager.getCurrentBatter();
       steps.push({
-        text: `+${bonuses.powerChips} chips (PWR ${batter.power})`,
+        text: `+${bonuses.powerPeanuts} peanuts (PWR ${batter.power})`,
         color: '#ff8a65',
       });
     }
@@ -2384,15 +2384,15 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Step 5: Pitcher penalty (if any)
-    if (pitcherPenalty.chips > 0 || pitcherPenalty.mult > 0) {
+    if (pitcherPenalty.peanuts > 0 || pitcherPenalty.mult > 0) {
       const parts = [];
       if (pitcherPenalty.mult > 0) {
         runningMult = Math.round((runningMult - pitcherPenalty.mult) * 10) / 10;
         parts.push(`-${pitcherPenalty.mult.toFixed(1)}x`);
       }
-      if (pitcherPenalty.chips > 0) {
-        runningChips -= pitcherPenalty.chips;
-        parts.push(`-${pitcherPenalty.chips} chips`);
+      if (pitcherPenalty.peanuts > 0) {
+        runningPeanuts -= pitcherPenalty.peanuts;
+        parts.push(`-${pitcherPenalty.peanuts} peanuts`);
       }
       steps.push({
         text: `${parts.join(' ')} (Pitcher)`,
@@ -2472,11 +2472,11 @@ export default class GameScene extends Phaser.Scene {
     return steps.length * stepDelay + 350;
   }
 
-  /** Flash chip earnings below chip balance */
+  /** Flash peanut earnings below peanut balance */
   _showChipEarnings(amount) {
-    const chipBal = this.chipBalanceText;
-    const startY = chipBal.y + 18;
-    const popup = this.add.text(chipBal.x, startY, `+${amount}`, {
+    const peanutBal = this.peanutBalanceText;
+    const startY = peanutBal.y + 18;
+    const popup = this.add.text(peanutBal.x, startY, `+${amount}`, {
       fontSize: '20px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5, 0).setDepth(15).setAlpha(0);
 
@@ -2497,15 +2497,15 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Animate chip counter rolling from current to target value */
+  /** Animate peanut counter rolling from current to target value */
   _animateChipCounter(target) {
-    const current = this._displayedChips ?? target;
+    const current = this._displayedPeanuts ?? target;
     if (current === target) {
-      this.chipBalanceText.setText(`Chips: ${target}`);
-      this._displayedChips = target;
+      this.peanutBalanceText.setText(`Peanuts: ${target}`);
+      this._displayedPeanuts = target;
       return;
     }
-    this._displayedChips = target;
+    this._displayedPeanuts = target;
     const obj = { val: current };
     this.tweens.add({
       targets: obj,
@@ -2513,7 +2513,7 @@ export default class GameScene extends Phaser.Scene {
       duration: 500,
       ease: 'Quad.easeOut',
       onUpdate: () => {
-        this.chipBalanceText.setText(`Chips: ${Math.round(obj.val)}`);
+        this.peanutBalanceText.setText(`Peanuts: ${Math.round(obj.val)}`);
       },
     });
   }
@@ -2571,11 +2571,11 @@ export default class GameScene extends Phaser.Scene {
 
   // ── Staff Effect Processor ─────────────────────────────────
   // Data-driven: loops over active staff and applies effects by type.
-  // Returns { chipBonus, multBonus, outcomeChanged, messages[] }
+  // Returns { peanutBonus, multBonus, outcomeChanged, messages[] }
 
   _applyStaffEffects(handResult, gameState) {
     const staff = this.baseball.getStaff();
-    const bonuses = { chipBonus: 0, multBonus: 0, outcomeChanged: false, messages: [], errorMult: 1, extraBaseBonus: 0 };
+    const bonuses = { peanutBonus: 0, multBonus: 0, outcomeChanged: false, messages: [], errorMult: 1, extraBaseBonus: 0 };
     if (staff.length === 0) return bonuses;
 
     for (const s of staff) {
@@ -2612,30 +2612,30 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // ── Chip bonuses ──
-        case 'flat_chips_per_ab': {
-          bonuses.chipBonus += eff.value;
-          bonuses.messages.push({ text: `+${eff.value} chips (${s.name})`, color: '#ffd600' });
+        case 'flat_peanuts_per_ab': {
+          bonuses.peanutBonus += eff.value;
+          bonuses.messages.push({ text: `+${eff.value} peanuts (${s.name})`, color: '#ffd600' });
           break;
         }
-        case 'per_runner_chips': {
+        case 'per_runner_peanuts': {
           const runners = gameState.bases.filter(b => b).length;
           if (runners > 0) {
             const bonus = eff.value * runners;
-            bonuses.chipBonus += bonus;
-            bonuses.messages.push({ text: `+${bonus} chips (${s.name}, ${runners} on)`, color: '#ffd600' });
+            bonuses.peanutBonus += bonus;
+            bonuses.messages.push({ text: `+${bonus} peanuts (${s.name}, ${runners} on)`, color: '#ffd600' });
           }
           break;
         }
 
-        // ── Double chips (conditional) ──
-        case 'double_chips': {
+        // ── Double peanuts (conditional) ──
+        case 'double_peanuts': {
           let applies = false;
           if (eff.condition && eff.condition.type === 'outcome_is') {
             applies = handResult.outcome === eff.condition.value;
           }
           if (applies) {
-            bonuses.chipBonus += handResult.chips;
-            bonuses.messages.push({ text: `x2 chips! (${s.name})`, color: '#ff6e40' });
+            bonuses.peanutBonus += handResult.peanuts;
+            bonuses.messages.push({ text: `x2 peanuts! (${s.name})`, color: '#ff6e40' });
           }
           break;
         }
@@ -2644,9 +2644,9 @@ export default class GameScene extends Phaser.Scene {
         case 'team_convert_high_card': {
           if (handResult.handName === 'High Card' && handResult.outcome === 'Strikeout') {
             handResult.outcome = 'Single';
-            handResult.chips = Math.max(handResult.chips, eff.chips || 1);
+            handResult.peanuts = Math.max(handResult.peanuts, eff.peanuts || 1);
             handResult.mult = Math.max(handResult.mult, eff.mult || 1);
-            handResult.score = Math.round(handResult.chips * handResult.mult);
+            handResult.score = Math.round(handResult.peanuts * handResult.mult);
             bonuses.outcomeChanged = true;
             bonuses.messages.push({ text: `High Card → Single! (${s.name})`, color: '#69f0ae' });
           }
@@ -2693,11 +2693,11 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Apply chip/mult bonuses to handResult
-    if (bonuses.chipBonus > 0 || bonuses.multBonus > 0) {
-      handResult.chips += bonuses.chipBonus;
+    // Apply peanut/mult bonuses to handResult
+    if (bonuses.peanutBonus > 0 || bonuses.multBonus > 0) {
+      handResult.peanuts += bonuses.peanutBonus;
       handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
-      handResult.score = Math.round(handResult.chips * handResult.mult);
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
     }
 
     return bonuses;
@@ -2705,11 +2705,11 @@ export default class GameScene extends Phaser.Scene {
 
   // ── Bonus Player Lineup Effect Processor ──────────────
   // Applies passive effects from bonus players in the lineup.
-  // Returns { chipBonus, multBonus, messages[], extraBaseBonus, pairOutReduction, contactSaveBoost }
+  // Returns { peanutBonus, multBonus, messages[], extraBaseBonus, pairOutReduction, contactSaveBoost }
 
   _applyLineupEffects(handResult, gameState) {
     const effects = this.rosterManager.getActiveLineupEffects();
-    const bonuses = { chipBonus: 0, multBonus: 0, messages: [], extraBaseBonus: 0, pairOutReduction: 0, contactSaveBoost: 0 };
+    const bonuses = { peanutBonus: 0, multBonus: 0, messages: [], extraBaseBonus: 0, pairOutReduction: 0, contactSaveBoost: 0 };
     if (effects.length === 0) return bonuses;
 
     const isHit = !['Strikeout', 'Groundout', 'Flyout', 'Double Play', "Fielder's Choice"].includes(handResult.outcome);
@@ -2717,10 +2717,10 @@ export default class GameScene extends Phaser.Scene {
 
     for (const eff of effects) {
       switch (eff.type) {
-        case 'team_add_chips_on_xbh': {
+        case 'team_add_peanuts_on_xbh': {
           if (isXBH) {
-            bonuses.chipBonus += eff.value;
-            bonuses.messages.push({ text: `+${eff.value} chip (XBH bonus)`, color: '#ffd600' });
+            bonuses.peanutBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} peanut (XBH bonus)`, color: '#ffd600' });
           }
           break;
         }
@@ -2748,10 +2748,10 @@ export default class GameScene extends Phaser.Scene {
           }
           break;
         }
-        case 'team_strikeout_chips': {
+        case 'team_strikeout_peanuts': {
           if (handResult.outcome === 'Strikeout') {
-            bonuses.chipBonus += eff.value;
-            bonuses.messages.push({ text: `+${eff.value} chips (K bonus)`, color: '#ffd600' });
+            bonuses.peanutBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} peanuts (K bonus)`, color: '#ffd600' });
           }
           break;
         }
@@ -2771,10 +2771,10 @@ export default class GameScene extends Phaser.Scene {
           }
           break;
         }
-        case 'team_late_inning_chips': {
+        case 'team_late_inning_peanuts': {
           if (gameState.inning >= 7) {
-            bonuses.chipBonus += eff.value;
-            bonuses.messages.push({ text: `+${eff.value} chips (late inning)`, color: '#ffd600' });
+            bonuses.peanutBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} peanuts (late inning)`, color: '#ffd600' });
           }
           break;
         }
@@ -2787,11 +2787,11 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Apply chip/mult bonuses
-    if (bonuses.chipBonus > 0 || bonuses.multBonus > 0) {
-      handResult.chips += bonuses.chipBonus;
+    // Apply peanut/mult bonuses
+    if (bonuses.peanutBonus > 0 || bonuses.multBonus > 0) {
+      handResult.peanuts += bonuses.peanutBonus;
       handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
-      handResult.score = Math.round(handResult.chips * handResult.mult);
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
     }
 
     return bonuses;
@@ -2801,7 +2801,7 @@ export default class GameScene extends Phaser.Scene {
   // Applies bonuses from active lineup synergies.
 
   _applySynergyEffects(handResult, gameState) {
-    const bonuses = { chipBonus: 0, multBonus: 0, messages: [], extraBaseBonus: 0, pairOutReduction: 0 };
+    const bonuses = { peanutBonus: 0, multBonus: 0, messages: [], extraBaseBonus: 0, pairOutReduction: 0 };
     if (!this.activeSynergies || this.activeSynergies.length === 0) return bonuses;
 
     const batter = this.rosterManager.getCurrentBatter();
@@ -2815,9 +2815,9 @@ export default class GameScene extends Phaser.Scene {
           bonuses.messages.push({ text: `+${eff.value}x (${syn.name})`, color: '#ce93d8' });
           break;
         }
-        case 'add_chips_all': {
-          bonuses.chipBonus += eff.value;
-          bonuses.messages.push({ text: `+${eff.value} chips (${syn.name})`, color: '#ce93d8' });
+        case 'add_peanuts_all': {
+          bonuses.peanutBonus += eff.value;
+          bonuses.messages.push({ text: `+${eff.value} peanuts (${syn.name})`, color: '#ce93d8' });
           break;
         }
         case 'add_mult_on_hr': {
@@ -2842,10 +2842,10 @@ export default class GameScene extends Phaser.Scene {
           bonuses.extraBaseBonus += eff.value;
           break;
         }
-        case 'add_chips_on_xbh': {
+        case 'add_peanuts_on_xbh': {
           if (['Triple', 'Home Run'].includes(handResult.outcome)) {
-            bonuses.chipBonus += eff.value;
-            bonuses.messages.push({ text: `+${eff.value} chips (${syn.name})`, color: '#ce93d8' });
+            bonuses.peanutBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} peanuts (${syn.name})`, color: '#ce93d8' });
           }
           break;
         }
@@ -2856,10 +2856,10 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    if (bonuses.chipBonus > 0 || bonuses.multBonus > 0) {
-      handResult.chips += bonuses.chipBonus;
+    if (bonuses.peanutBonus > 0 || bonuses.multBonus > 0) {
+      handResult.peanuts += bonuses.peanutBonus;
       handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
-      handResult.score = Math.round(handResult.chips * handResult.mult);
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
     }
 
     return bonuses;
@@ -2907,7 +2907,7 @@ export default class GameScene extends Phaser.Scene {
     if (!canGetPack) return null;
 
     const runsThisInning = this.baseball.getStatus().currentInningPlayerRuns;
-    const hadBigHand = this._maxChipsThisInning >= 25;
+    const hadBigHand = this._maxPeanutsThisInning >= 25;
 
     if (runsThisInning >= 4 || hadBigHand) return 'gold';
     if (runsThisInning >= 2) return 'bronze';

@@ -188,12 +188,12 @@ export default class CardEngine {
     // Add a readable description of what was played
     entry.playedDescription = CardEngine._describePlay(evalCards, entry.handName);
 
-    entry.score = Math.round(entry.chips * entry.mult);
+    entry.score = Math.round(entry.peanuts * entry.mult);
 
     // Apply post-modifier (trait cards that change the outcome)
     if (postModifier && gameState) {
       const modified = postModifier(entry, gameState);
-      modified.score = Math.round(modified.chips * modified.mult);
+      modified.score = Math.round(modified.peanuts * modified.mult);
       return modified;
     }
 
@@ -272,7 +272,7 @@ export default class CardEngine {
   /**
    * Apply rank-scaled quality rules.
    * Low ranks (2-5) risk groundout/flyout, scaled by hand strength.
-   * High ranks (10-A) get bonus chips.
+   * High ranks (10-A) get bonus peanuts.
    *   Pair:            ~40% out (60% groundout, 40% flyout)
    *   Two Pair:        20% out (50/50 groundout/flyout)
    *   Three of a Kind: 10% out (flyout)
@@ -294,7 +294,7 @@ export default class CardEngine {
         return {
           handName: outType,
           outcome: outType,
-          chips: 0,
+          peanuts: 0,
           mult: 1,
           score: 0,
           wasGroundout: true,
@@ -302,10 +302,10 @@ export default class CardEngine {
           pairRank,
         };
       }
-      // Survived — high ranks still get bonus chips
+      // Survived — high ranks still get bonus peanuts
       if (pairRank >= 10) {
         const bonus = pairRank - 9;
-        return { ...entry, chips: entry.chips + bonus };
+        return { ...entry, peanuts: entry.peanuts + bonus };
       }
       return null;
     }
@@ -318,7 +318,7 @@ export default class CardEngine {
         return {
           handName: outType,
           outcome: outType,
-          chips: 0,
+          peanuts: 0,
           mult: 1,
           score: 0,
           wasGroundout: true,
@@ -327,10 +327,10 @@ export default class CardEngine {
       }
     }
 
-    // High rank: 10-14 → Bonus chips (Two Pair / Three of a Kind)
+    // High rank: 10-14 → Bonus peanuts (Two Pair / Three of a Kind)
     if (pairRank >= 10) {
       const bonus = pairRank - 9;
-      return { ...entry, chips: entry.chips + bonus };
+      return { ...entry, peanuts: entry.peanuts + bonus };
     }
 
     return null;

@@ -61,37 +61,37 @@ group('1a. Hand Evaluation');
   const royalFlush = makeCards([[10,'H'],[11,'H'],[12,'H'],[13,'H'],[14,'H']]);
   const r = CardEngine.evaluateHand(royalFlush);
   assert(r.handName === 'Royal Flush', 'Royal Flush detected');
-  assert(r.chips === 15 && r.mult === 20, 'Royal Flush chips/mult match HAND_TABLE');
+  assert(r.peanuts === 15 && r.mult === 20, 'Royal Flush peanuts/mult match HAND_TABLE');
 }
 {
   const sf = makeCards([[5,'S'],[6,'S'],[7,'S'],[8,'S'],[9,'S']]);
   const r = CardEngine.evaluateHand(sf);
   assert(r.handName === 'Straight Flush', 'Straight Flush detected');
-  assert(r.chips === 10 && r.mult === 10, 'Straight Flush chips/mult');
+  assert(r.peanuts === 10 && r.mult === 10, 'Straight Flush peanuts/mult');
 }
 {
   const foak = makeCards([[7,'H'],[7,'D'],[7,'C'],[7,'S'],[3,'H']]);
   const r = CardEngine.evaluateHand(foak);
   assert(r.handName === 'Four of a Kind', 'Four of a Kind detected');
-  assert(r.chips === 6 && r.mult === 6, 'Four of a Kind chips/mult');
+  assert(r.peanuts === 6 && r.mult === 6, 'Four of a Kind peanuts/mult');
 }
 {
   const fh = makeCards([[9,'H'],[9,'D'],[9,'C'],[4,'S'],[4,'H']]);
   const r = CardEngine.evaluateHand(fh);
   assert(r.handName === 'Full House', 'Full House detected');
-  assert(r.chips === 3 && r.mult === 2.5, 'Full House chips/mult');
+  assert(r.peanuts === 3 && r.mult === 2.5, 'Full House peanuts/mult');
 }
 {
   const flush = makeCards([[2,'D'],[5,'D'],[8,'D'],[11,'D'],[13,'D']]);
   const r = CardEngine.evaluateHand(flush);
   assert(r.handName === 'Flush', 'Flush detected');
-  assert(r.chips === 5 && r.mult === 5, 'Flush chips/mult');
+  assert(r.peanuts === 5 && r.mult === 5, 'Flush peanuts/mult');
 }
 {
   const straight = makeCards([[6,'H'],[7,'D'],[8,'C'],[9,'S'],[10,'H']]);
   const r = CardEngine.evaluateHand(straight);
   assert(r.handName === 'Straight', 'Straight detected');
-  assert(r.chips === 4 && r.mult === 4, 'Straight chips/mult');
+  assert(r.peanuts === 4 && r.mult === 4, 'Straight peanuts/mult');
 }
 {
   // Ace-low straight: A-2-3-4-5
@@ -104,14 +104,14 @@ group('1a. Hand Evaluation');
   const r = CardEngine.evaluateHand(tok);
   // rank 6 is mid-range, no quality modification
   assert(r.handName === 'Three of a Kind', 'Three of a Kind detected');
-  assert(r.chips === 3 && r.mult === 3, 'Three of a Kind chips/mult');
+  assert(r.peanuts === 3 && r.mult === 3, 'Three of a Kind peanuts/mult');
 }
 {
   // Two Pair with mid-range ranks (no quality modification)
   const tp = makeCards([[8,'H'],[8,'D'],[9,'C'],[9,'S'],[2,'H']]);
   const r = CardEngine.evaluateHand(tp);
   assert(r.handName === 'Two Pair', 'Two Pair detected');
-  assert(r.chips === 2 && r.mult === 2, 'Two Pair chips/mult');
+  assert(r.peanuts === 2 && r.mult === 2, 'Two Pair peanuts/mult');
 }
 {
   // Pair with Aces (high rank, low groundout chance ~8%)
@@ -121,8 +121,8 @@ group('1a. Hand Evaluation');
     const pair = makeCards([[14,'H'],[14,'D'],[3,'C'],[5,'S'],[7,'H']]);
     const r = CardEngine.evaluateHand(pair);
     if (r.handName === 'Pair') {
-      // Aces get +5 bonus chips: base 1 + 5 = 6
-      assert(r.chips === 6 && r.mult === 1.5, 'Pair chips/mult (Aces: 6 chips, 1.5 mult)');
+      // Aces get +5 bonus peanuts: base 1 + 5 = 6
+      assert(r.peanuts === 6 && r.mult === 1.5, 'Pair peanuts/mult (Aces: 6 peanuts, 1.5 mult)');
       found = true;
       break;
     }
@@ -133,7 +133,7 @@ group('1a. Hand Evaluation');
   const hc = makeCards([[2,'H'],[5,'D'],[8,'C'],[11,'S'],[13,'H']]);
   const r = CardEngine.evaluateHand(hc);
   assert(r.handName === 'High Card', 'High Card detected');
-  assert(r.chips === 0 && r.mult === 1, 'High Card chips/mult');
+  assert(r.peanuts === 0 && r.mult === 1, 'High Card peanuts/mult');
 }
 {
   // 2-card selection → Pair (Aces to minimize groundout chance)
@@ -166,10 +166,10 @@ group('1a. Hand Evaluation');
   assert(found, 'playedDescription test: got Pair within 50 tries');
 }
 {
-  // score = chips * mult
+  // score = peanuts * mult
   const straight = makeCards([[6,'H'],[7,'D'],[8,'C'],[9,'S'],[10,'H']]);
   const r = CardEngine.evaluateHand(straight);
-  assert(r.score === Math.round(r.chips * r.mult), 'score = chips * mult');
+  assert(r.score === Math.round(r.peanuts * r.mult), 'score = peanuts * mult');
 }
 
 // ── 1b. Rank Quality ────────────────────────────────────
@@ -237,14 +237,14 @@ group('1b. Rank Quality (statistical, N=1000)');
   assertClose(rate, 0.03, 0.18, `Low Three of a Kind flyout rate ~10%`);
 }
 {
-  // High pair bonus chips still apply when pair survives out check
+  // High pair bonus peanuts still apply when pair survives out check
   // Run many trials to get one that survives (Aces have 92% survival)
   let found = false;
   for (let i = 0; i < 100; i++) {
     const tens = makeCards([[10,'H'],[10,'D'],[3,'C'],[5,'S'],[7,'H']]);
     const r10 = CardEngine.evaluateHand(tens);
     if (r10.handName === 'Pair') {
-      assert(r10.chips === HAND_TABLE[8].chips + 1, 'Pair of 10s (when surviving): +1 bonus chip');
+      assert(r10.peanuts === HAND_TABLE[8].peanuts + 1, 'Pair of 10s (when surviving): +1 bonus chip');
       found = true;
       break;
     }
@@ -277,7 +277,7 @@ group('1b. Rank Quality (statistical, N=1000)');
     // Force batter to have contact=3
     rm.roster[0] = { ...rm.roster[0], contact: 3 };
     const groundoutResult = {
-      outcome: 'Groundout', handName: 'Groundout', chips: 0, mult: 1, score: 0,
+      outcome: 'Groundout', handName: 'Groundout', peanuts: 0, mult: 1, score: 0,
       wasGroundout: true, originalHand: 'Pair', pairRank: 6,
     };
     const { bonuses } = rm.applyBatterModifiers(groundoutResult, { inning: 1 });
@@ -287,7 +287,7 @@ group('1b. Rank Quality (statistical, N=1000)');
     const rm = new RosterManager(canada, 0, usa);
     rm.roster[0] = { ...rm.roster[0], contact: 9 };
     const groundoutResult = {
-      outcome: 'Groundout', handName: 'Groundout', chips: 0, mult: 1, score: 0,
+      outcome: 'Groundout', handName: 'Groundout', peanuts: 0, mult: 1, score: 0,
       wasGroundout: true, originalHand: 'Pair', pairRank: 6,
     };
     const { bonuses } = rm.applyBatterModifiers(groundoutResult, { inning: 1 });
@@ -370,11 +370,11 @@ group('1d. Batter Modifiers');
   assert(batter.name === 'Moose Leblanc', 'Current batter is first in lineup');
 
   // Hit result
-  const hitResult = { outcome: 'Single', handName: 'Pair', chips: 1, mult: 1.5, score: 2 };
+  const hitResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5, score: 2 };
   const { result, bonuses } = rm.applyBatterModifiers(hitResult, { inning: 1 });
 
   // power=5 → powerBonus = max(0, 5-5) = 0
-  assert(bonuses.powerChips === 0, 'Power 5 → +0 chips on hits');
+  assert(bonuses.powerPeanuts === 0, 'Power 5 → +0 peanuts on hits');
 
   // contact=8 → contactBonus = 8/10 = 0.8
   assert(bonuses.contactMult === 0.8, 'Contact 8 → +0.8 mult on hits');
@@ -393,19 +393,19 @@ group('1d. Batter Modifiers');
   const batter = rm.getCurrentBatter();
   assert(batter.name === 'Buck Fournier', 'Advance to Buck Fournier');
 
-  const hitResult = { outcome: 'Double', handName: 'Two Pair', chips: 2, mult: 2, score: 4 };
+  const hitResult = { outcome: 'Double', handName: 'Two Pair', peanuts: 2, mult: 2, score: 4 };
   const { result, bonuses } = rm.applyBatterModifiers(hitResult, { inning: 1 });
-  assert(bonuses.powerChips === 4, 'Power 9 → +4 chips on hits');
+  assert(bonuses.powerPeanuts === 4, 'Power 9 → +4 peanuts on hits');
 }
 {
   // Outs return unmodified result with zero bonuses
   const canada = TEAMS.find(t => t.id === 'CAN');
   const usa = TEAMS.find(t => t.id === 'USA');
   const rm = new RosterManager(canada, 0, usa);
-  const outResult = { outcome: 'Strikeout', handName: 'High Card', chips: 0, mult: 1, score: 0 };
+  const outResult = { outcome: 'Strikeout', handName: 'High Card', peanuts: 0, mult: 1, score: 0 };
   const { result, bonuses } = rm.applyBatterModifiers(outResult, { inning: 1 });
-  assert(bonuses.powerChips === 0 && bonuses.contactMult === 0, 'Outs: zero bonuses');
-  assert(result.chips === 0, 'Outs: chips unmodified');
+  assert(bonuses.powerPeanuts === 0 && bonuses.contactMult === 0, 'Outs: zero bonuses');
+  assert(result.peanuts === 0, 'Outs: peanuts unmodified');
 }
 
 // ── 1e. Pitcher Modifiers ──────────────────────────────
@@ -427,12 +427,12 @@ group('1e. Pitcher Modifiers');
   const rm = new RosterManager(canada, 0, usa);
 
   // Velocity/control penalties on hits
-  const hitResult = { outcome: 'Single', handName: 'Pair', chips: 5, mult: 3, score: 15 };
+  const hitResult = { outcome: 'Single', handName: 'Pair', peanuts: 5, mult: 3, score: 15 };
   const modified = rm.applyPitcherModifiers(hitResult, { inning: 1 });
   // Pitcher is USA's ace: Viper Knox (velocity=10, control=4)
-  // velPenalty = max(0, (10*1.0) - 6) = 4, chips = max(0, 5 - floor(4/2)) = 5-2 = 3
+  // velPenalty = max(0, (10*1.0) - 6) = 4, peanuts = max(0, 5 - floor(4/2)) = 5-2 = 3
   // controlPenalty = (4*1.0) * 0.05 = 0.2, mult = max(1, 3 - 0.2) = 2.8
-  assert(modified.chips === 3, 'Pitcher velocity penalty applied to Singles');
+  assert(modified.peanuts === 3, 'Pitcher velocity penalty applied to Singles');
   assert(modified.mult === 2.8, 'Pitcher control penalty applied');
 }
 {
@@ -450,9 +450,9 @@ group('1e. Pitcher Modifiers');
   const canada = TEAMS.find(t => t.id === 'CAN');
   const usa = TEAMS.find(t => t.id === 'USA');
   const rm = new RosterManager(canada, 0, usa);
-  const hitResult = { outcome: 'Double', handName: 'Two Pair', chips: 4, mult: 3, score: 12 };
+  const hitResult = { outcome: 'Double', handName: 'Two Pair', peanuts: 4, mult: 3, score: 12 };
   const modified = rm.applyPitcherModifiers(hitResult, { inning: 1 });
-  assert(modified.score === Math.round(modified.chips * modified.mult), 'Score recalculated after pitcher penalties');
+  assert(modified.score === Math.round(modified.peanuts * modified.mult), 'Score recalculated after pitcher penalties');
 }
 
 // ── 1f. Trait Effects via EffectEngine ─────────────────
@@ -475,7 +475,7 @@ group('1f. Trait Effects via EffectEngine');
 }
 {
   // Post: add_mult with outs_eq: 2 fires only at 2 outs
-  const evalResult = { outcome: 'Single', handName: 'Pair', chips: 1, mult: 1.5 };
+  const evalResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 };
   const effect = { type: 'add_mult', value: 3, condition: { type: 'outs_eq', value: 2 } };
 
   const at0 = EffectEngine.applyPost(evalResult, effect, { outs: 0 });
@@ -486,22 +486,22 @@ group('1f. Trait Effects via EffectEngine');
 }
 {
   // Post: upgrade_outcome (Single→Double when hand_is Pair)
-  const evalResult = { outcome: 'Single', handName: 'Pair', chips: 1, mult: 1.5 };
+  const evalResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 };
   const effect = {
     type: 'upgrade_outcome', from: 'Single', to: 'Double',
-    addChips: 1, addMult: 0.5, newHandName: 'Pair (Slugger!)',
+    addPeanuts: 1, addMult: 0.5, newHandName: 'Pair (Slugger!)',
     condition: { type: 'hand_is', value: 'Pair' },
   };
   const r = EffectEngine.applyPost(evalResult, effect, {});
   assert(r.outcome === 'Double', 'upgrade_outcome: Single → Double');
-  assert(r.chips === 2 && r.mult === 2, 'upgrade_outcome: chips/mult adjusted');
+  assert(r.peanuts === 2 && r.mult === 2, 'upgrade_outcome: peanuts/mult adjusted');
 }
 {
   // Post: prevent_outcome (Groundout→Single)
-  const evalResult = { outcome: 'Groundout', handName: 'Groundout', chips: 0, mult: 1 };
+  const evalResult = { outcome: 'Groundout', handName: 'Groundout', peanuts: 0, mult: 1 };
   const effect = {
     type: 'prevent_outcome', from: 'Groundout',
-    toOutcome: 'Single', toHand: 'Pair (Contact!)', chips: 1, mult: 1.5,
+    toOutcome: 'Single', toHand: 'Pair (Contact!)', peanuts: 1, mult: 1.5,
   };
   const r = EffectEngine.applyPost(evalResult, effect, {});
   assert(r.outcome === 'Single', 'prevent_outcome: Groundout → Single');
@@ -509,7 +509,7 @@ group('1f. Trait Effects via EffectEngine');
 }
 {
   // Post: set_flag (sacrificeFly)
-  const evalResult = { outcome: 'Strikeout', handName: 'High Card', chips: 0, mult: 1 };
+  const evalResult = { outcome: 'Strikeout', handName: 'High Card', peanuts: 0, mult: 1 };
   const effect = {
     type: 'set_flag', flag: 'sacrificeFly',
     condition: { type: 'and', conditions: [
@@ -528,7 +528,7 @@ group('1f. Trait Effects via EffectEngine');
 }
 {
   // Compound effects chain correctly
-  const evalResult = { outcome: 'Single', handName: 'Pair', chips: 1, mult: 1.5 };
+  const evalResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 };
   const effect = {
     type: 'compound',
     effects: [
@@ -778,11 +778,11 @@ group('1g. BaseballState');
   assert(!!bs.bases[1], 'processStolenBase: runner now on 2nd');
 }
 {
-  // Chips accumulate from hand scores
+  // Peanuts accumulate from hand scores
   const bs = new BaseballState();
   bs.resolveOutcome('Single', 10);
   bs.resolveOutcome('Double', 20);
-  assert(bs.totalChips === 30, 'Chips accumulate from hand scores');
+  assert(bs.totalPeanuts === 30, 'Chips accumulate from hand scores');
 }
 {
   // 9 innings of 3 outs each → GAME_OVER (force opponent to score different)
@@ -940,8 +940,8 @@ group('1f-extra. Trait Combo Interactions');
   const pitcherPost = TraitManager.buildPitcherPostModifier([heater]);
   const batterPost = TraitManager.buildPostModifier([contactLens]);
 
-  const evalResult = { outcome: 'Single', handName: 'Pair', chips: 1, mult: 1.5, score: 2 };
-  // Pitcher post runs first: heater forces groundout on low Pair (chips <= 1)
+  const evalResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5, score: 2 };
+  // Pitcher post runs first: heater forces groundout on low Pair (peanuts <= 1)
   let result = pitcherPost(evalResult, {});
   assert(result.outcome === 'Groundout', 'Heater forces groundout on low Pair');
   // Batter post runs second: contact_lens converts Groundout back to Single
@@ -952,24 +952,24 @@ group('1f-extra. Trait Combo Interactions');
   // heater without contact_lens: Groundout sticks on low pair
   const heater = PITCHER_TRAITS.find(t => t.id === 'heater');
   const pitcherPost = TraitManager.buildPitcherPostModifier([heater]);
-  const evalResult = { outcome: 'Single', handName: 'Pair', chips: 1, mult: 1.5, score: 2 };
+  const evalResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5, score: 2 };
   const result = pitcherPost(evalResult, {});
   assert(result.outcome === 'Groundout', 'Heater without contact_lens: groundout sticks');
 }
 {
-  // heater bonus on strong hands: +2 chips on Three of a Kind
+  // heater bonus on strong hands: +2 peanuts on Three of a Kind
   const heater = PITCHER_TRAITS.find(t => t.id === 'heater');
   const pitcherPost = TraitManager.buildPitcherPostModifier([heater]);
-  const evalResult = { outcome: 'Triple', handName: 'Three of a Kind', chips: 3, mult: 3, score: 9 };
+  const evalResult = { outcome: 'Triple', handName: 'Three of a Kind', peanuts: 3, mult: 3, score: 9 };
   const result = pitcherPost(evalResult, {});
-  assert(result.chips === 5, 'Heater: +2 chips on Three of a Kind');
+  assert(result.peanuts === 5, 'Heater: +2 peanuts on Three of a Kind');
 }
 {
   // slugger_serum + eye_of_the_tiger: Upgrade outcome + add_mult stack
   const slugger = BATTER_TRAITS.find(t => t.id === 'slugger_serum');
   const eye = BATTER_TRAITS.find(t => t.id === 'eye_of_the_tiger');
   const batterPost = TraitManager.buildPostModifier([slugger, eye]);
-  const evalResult = { outcome: 'Single', handName: 'Pair', chips: 1, mult: 1.5, score: 2 };
+  const evalResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5, score: 2 };
   const result = batterPost(evalResult, { outs: 2 });
   assert(result.outcome === 'Double', 'Slugger upgrades Single → Double');
   // slugger adds +0.5 mult (1.5 → 2.0), eye adds +3 (2.0 → 5.0)
@@ -979,10 +979,10 @@ group('1f-extra. Trait Combo Interactions');
   // contact_lens no-op: When no groundout happens, contact_lens does nothing
   const contactLens = BATTER_TRAITS.find(t => t.id === 'contact_lens');
   const batterPost = TraitManager.buildPostModifier([contactLens]);
-  const evalResult = { outcome: 'Double', handName: 'Two Pair', chips: 2, mult: 2, score: 4 };
+  const evalResult = { outcome: 'Double', handName: 'Two Pair', peanuts: 2, mult: 2, score: 4 };
   const result = batterPost(evalResult, {});
   assert(result.outcome === 'Double', 'Contact lens no-op: Double stays Double');
-  assert(result.chips === 2 && result.mult === 2, 'Contact lens no-op: chips/mult unchanged');
+  assert(result.peanuts === 2 && result.mult === 2, 'Contact lens no-op: peanuts/mult unchanged');
 }
 
 // ── 1g-extra. Walk-Off Wins ──────────────────────────────
@@ -1076,20 +1076,20 @@ group('1g-extra. Shop Flow');
   assert(bs.getShopBuyLimit() === 3, 'Buy limit = 3 at inning 8');
 }
 {
-  // spendChips fails with insufficient funds
+  // spendPeanuts fails with insufficient funds
   const bs = new BaseballState();
-  bs.totalChips = 10;
-  const ok = bs.spendChips(15);
-  assert(ok === false, 'spendChips fails with insufficient funds');
-  assert(bs.totalChips === 10, 'Chips unchanged after failed spend');
+  bs.totalPeanuts = 10;
+  const ok = bs.spendPeanuts(15);
+  assert(ok === false, 'spendPeanuts fails with insufficient funds');
+  assert(bs.totalPeanuts === 10, 'Chips unchanged after failed spend');
 }
 {
-  // spendChips deducts correctly
+  // spendPeanuts deducts correctly
   const bs = new BaseballState();
-  bs.totalChips = 50;
-  const ok = bs.spendChips(20);
-  assert(ok === true, 'spendChips succeeds with sufficient funds');
-  assert(bs.totalChips === 30, 'Chips deducted correctly (50 - 20 = 30)');
+  bs.totalPeanuts = 50;
+  const ok = bs.spendPeanuts(20);
+  assert(ok === true, 'spendPeanuts succeeds with sufficient funds');
+  assert(bs.totalPeanuts === 30, 'Chips deducted correctly (50 - 20 = 30)');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1379,7 +1379,7 @@ group('2a. Single Game Walkthrough (smart brain)');
   const result = bs.getResult();
   assert(typeof result.playerScore === 'number' && !isNaN(result.playerScore), 'Player score is a number');
   assert(typeof result.opponentScore === 'number' && !isNaN(result.opponentScore), 'Opponent score is a number');
-  assert(typeof result.totalChips === 'number' && !isNaN(result.totalChips), 'Total chips is a number');
+  assert(typeof result.totalPeanuts === 'number' && !isNaN(result.totalPeanuts), 'Total peanuts is a number');
   assert(safetyCounter < maxAtBats, `Game completed within ${maxAtBats} at-bats (took ${safetyCounter})`);
 }
 
@@ -1393,7 +1393,7 @@ group('2b. Statistical Sim — smart brain (N=100 games)');
   let totalPlayerRuns = 0;
   let totalOpponentRuns = 0;
   let wins = 0;
-  let totalChipsEarned = 0;
+  let totalPeanutsEarned = 0;
   const outcomeCount = {};
   let totalAtBats = 0;
 
@@ -1438,7 +1438,7 @@ group('2b. Statistical Sim — smart brain (N=100 games)');
       if (res) {
         totalPlayerRuns += res.playerScore;
         totalOpponentRuns += res.opponentScore;
-        totalChipsEarned += res.totalChips;
+        totalPeanutsEarned += res.totalPeanuts;
         if (res.won) wins++;
       }
     } catch (e) {
@@ -1455,7 +1455,7 @@ group('2b. Statistical Sim — smart brain (N=100 games)');
   console.log(`  Avg player runs/game:   ${(totalPlayerRuns / N_GAMES).toFixed(1)}`);
   console.log(`  Avg opponent runs/game: ${(totalOpponentRuns / N_GAMES).toFixed(1)}`);
   console.log(`  Player win rate:        ${((wins / N_GAMES) * 100).toFixed(1)}%`);
-  console.log(`  Avg chips earned:       ${(totalChipsEarned / N_GAMES).toFixed(0)}`);
+  console.log(`  Avg peanuts earned:       ${(totalPeanutsEarned / N_GAMES).toFixed(0)}`);
   console.log(`  Avg at-bats/game:       ${(totalAtBats / N_GAMES).toFixed(1)}`);
   console.log(`\n  \x1b[1mOutcome breakdown:\x1b[0m`);
   const sorted = Object.entries(outcomeCount).sort((a, b) => b[1] - a[1]);
@@ -1475,7 +1475,7 @@ group('2c. Statistical Sim — average brain (N=100 games)');
   let totalPlayerRuns = 0;
   let totalOpponentRuns = 0;
   let wins = 0;
-  let totalChipsEarned = 0;
+  let totalPeanutsEarned = 0;
   const outcomeCount = {};
   let totalAtBats = 0;
 
@@ -1519,7 +1519,7 @@ group('2c. Statistical Sim — average brain (N=100 games)');
       if (res) {
         totalPlayerRuns += res.playerScore;
         totalOpponentRuns += res.opponentScore;
-        totalChipsEarned += res.totalChips;
+        totalPeanutsEarned += res.totalPeanuts;
         if (res.won) wins++;
       }
     } catch (e) {
@@ -1535,7 +1535,7 @@ group('2c. Statistical Sim — average brain (N=100 games)');
   console.log(`  Avg player runs/game:   ${(totalPlayerRuns / N_GAMES).toFixed(1)}`);
   console.log(`  Avg opponent runs/game: ${(totalOpponentRuns / N_GAMES).toFixed(1)}`);
   console.log(`  Player win rate:        ${((wins / N_GAMES) * 100).toFixed(1)}%`);
-  console.log(`  Avg chips earned:       ${(totalChipsEarned / N_GAMES).toFixed(0)}`);
+  console.log(`  Avg peanuts earned:       ${(totalPeanutsEarned / N_GAMES).toFixed(0)}`);
   console.log(`  Avg at-bats/game:       ${(totalAtBats / N_GAMES).toFixed(1)}`);
   console.log(`\n  \x1b[1mOutcome breakdown:\x1b[0m`);
   const sorted2 = Object.entries(outcomeCount).sort((a, b) => b[1] - a[1]);
@@ -1655,31 +1655,31 @@ group('Count System: Count Modifiers');
 {
   const cm = new CountManager();
   const mods = cm.getCountModifiers();
-  assert(mods.chipsMod === 0 && mods.multMod === 0, '0-0 count: neutral modifiers');
+  assert(mods.peanutsMod === 0 && mods.multMod === 0, '0-0 count: neutral modifiers');
 }
 {
   const cm = new CountManager();
   cm.balls = 3;
   cm.strikes = 0;
   const mods = cm.getCountModifiers();
-  assert(mods.chipsMod === 2 && mods.multMod === 1.0, '3-0 count: +2 chips, +1.0 mult');
+  assert(mods.peanutsMod === 2 && mods.multMod === 1.0, '3-0 count: +2 peanuts, +1.0 mult');
 }
 {
   const cm = new CountManager();
   cm.balls = 0;
   cm.strikes = 2;
   const mods = cm.getCountModifiers();
-  assert(mods.chipsMod === -1 && mods.multMod === -0.5, '0-2 count: -1 chips, -0.5 mult');
+  assert(mods.peanutsMod === -1 && mods.multMod === -0.5, '0-2 count: -1 peanuts, -0.5 mult');
 }
 {
   // All count modifier keys exist (7 non-neutral entries in new system)
   const expectedKeys = ['3-0','2-0','3-1','3-2','0-1','1-2','0-2'];
   const allExist = expectedKeys.every(k => COUNT_MODIFIERS[k] !== undefined);
   assert(allExist, 'All 7 count modifier entries exist');
-  // Neutral counts (0-0, 1-1, etc.) fall through to default {chipsMod:0, multMod:0}
+  // Neutral counts (0-0, 1-1, etc.) fall through to default {peanutsMod:0, multMod:0}
   const cm = new CountManager();
   const neutral = cm.getCountModifiers();
-  assert(neutral.chipsMod === 0 && neutral.multMod === 0, '0-0 count returns neutral defaults');
+  assert(neutral.peanutsMod === 0 && neutral.multMod === 0, '0-0 count returns neutral defaults');
 }
 
 group('Count System: Two-Strike Groundout Penalty');
@@ -2225,7 +2225,7 @@ console.log('\n── Contact rescue nerf ──');
   for (let i = 0; i < trials; i++) {
     const fakeResult = {
       wasGroundout: true, originalHand: 'Pair', pairRank: 10,
-      outcome: 'Groundout', handName: 'Groundout', chips: 0, mult: 1, score: 0,
+      outcome: 'Groundout', handName: 'Groundout', peanuts: 0, mult: 1, score: 0,
     };
     const { bonuses } = rm.applyBatterModifiers(fakeResult, {});
     if (bonuses.contactSave) saves++;
@@ -2286,7 +2286,7 @@ group('5c. Staff Slots (BaseballState)');
   assert(Array.isArray(bs.staff) && bs.staff.length === 0, 'Start with no staff');
 
   const coach1 = { id: 'batting_coach', name: 'Batting Coach', price: 30, effect: { type: 'team_stat_boost' } };
-  const mascot1 = { id: 'thunder_bear', name: 'Thunder Bear', price: 50, effect: { type: 'double_chips' } };
+  const mascot1 = { id: 'thunder_bear', name: 'Thunder Bear', price: 50, effect: { type: 'double_peanuts' } };
   const coach2 = { id: 'scout', name: 'Scout', price: 25, effect: { type: 'shop_extra_cards' } };
 
   assert(bs.addStaff(coach1) === true, 'Can add first staff');
@@ -2377,8 +2377,8 @@ console.log('\n\x1b[1m── Part 7: Staff Effect Integration ──\x1b[0m');
   const statBoosts = bs2.getStaffByEffect('team_stat_boost');
   assert(statBoosts.length === 1, 'getStaffByEffect finds Batting Coach');
   assert(statBoosts[0].id === 'batting_coach', 'Filtered staff has correct ID');
-  const chipStaff = bs2.getStaffByEffect('flat_chips_per_ab');
-  assert(chipStaff.length === 1 && chipStaff[0].id === 'cash_cow', 'getStaffByEffect finds Cash Cow');
+  const peanutStaff = bs2.getStaffByEffect('flat_peanuts_per_ab');
+  assert(peanutStaff.length === 1 && peanutStaff[0].id === 'cash_cow', 'getStaffByEffect finds Cash Cow');
 
   // 7c: SituationalEngine error multiplier
   let errorCount = 0;
@@ -2423,8 +2423,8 @@ console.log('\n\x1b[1m── Part 7: Staff Effect Integration ──\x1b[0m');
 
   // 7e: All mascot effect types are recognized
   const knownTypes = new Set([
-    'team_convert_high_card', 'add_mult', 'strikeout_to_walk', 'flat_chips_per_ab',
-    'ignore_pair_penalty', 'bonus_draw_on_discard', 'per_runner_chips', 'double_chips',
+    'team_convert_high_card', 'add_mult', 'strikeout_to_walk', 'flat_peanuts_per_ab',
+    'ignore_pair_penalty', 'bonus_draw_on_discard', 'per_runner_peanuts', 'double_peanuts',
     'strikeout_redraw', 'pitcher_hit_reduction', 'mult_per_inning_run', 'team_extra_base',
     'add_hand_draw', 'error_multiplier',
   ]);
@@ -2475,9 +2475,9 @@ console.log('\n\x1b[1m── Part 8: Bonus Players & Card Packs ──\x1b[0m');
 
   // 8b: Lineup effect types are valid
   const knownLineupTypes = new Set([
-    'team_add_chips_on_xbh', 'team_pair_out_reduction', 'team_extra_base_chance',
-    'team_power_mult', 'team_add_mult_on_hit', 'team_strikeout_chips',
-    'team_first_pitch_mult', 'team_runner_mult', 'team_late_inning_chips',
+    'team_add_peanuts_on_xbh', 'team_pair_out_reduction', 'team_extra_base_chance',
+    'team_power_mult', 'team_add_mult_on_hit', 'team_strikeout_peanuts',
+    'team_first_pitch_mult', 'team_runner_mult', 'team_late_inning_peanuts',
     'team_contact_save_boost',
   ]);
   for (const bp of BONUS_PLAYERS) {
@@ -2716,8 +2716,8 @@ console.log('\n\x1b[1m--- Part 9: Player Synergies ---\x1b[0m');
 // 9n: Bonus type coverage — all synergy bonus types are recognized
 {
   const knownTypes = new Set([
-    'add_mult_all', 'add_chips_all', 'add_mult_on_hr', 'add_mult_lefty',
-    'team_pair_out_reduction', 'team_extra_base_chance', 'add_chips_on_xbh',
+    'add_mult_all', 'add_peanuts_all', 'add_mult_on_hr', 'add_mult_lefty',
+    'team_pair_out_reduction', 'team_extra_base_chance', 'add_peanuts_on_xbh',
     'pitcher_control_reduction', 'pitcher_hit_reduction', 'bonus_player_stat_boost',
   ]);
   for (const s of SYNERGIES) {
@@ -3199,7 +3199,7 @@ group('13. Score Integrity — Runs Match playerScore');
   const bs = new BaseballState();
   bs.resolveOutcome('Single', 50);
   bs.resolveOutcome('Double', 75);
-  assert(bs.totalChips === 125, 'Chips accumulate from hand scores: 50+75=125');
+  assert(bs.totalPeanuts === 125, 'Chips accumulate from hand scores: 50+75=125');
 }
 
 {
@@ -3439,13 +3439,13 @@ group('19. Hand Table Integrity');
 
   // Each entry has required fields
   for (const h of HAND_TABLE) {
-    assert(h.chips !== undefined, `"${h.handName}" has chips`);
+    assert(h.peanuts !== undefined, `"${h.handName}" has peanuts`);
     assert(h.mult !== undefined, `"${h.handName}" has mult`);
     assert(h.outcome !== undefined, `"${h.handName}" has outcome`);
   }
 
-  // Better hands have better outcomes (higher chips or better outcome)
-  assert(HAND_TABLE[0].chips >= HAND_TABLE[9].chips, 'Royal Flush chips >= High Card chips');
+  // Better hands have better outcomes (higher peanuts or better outcome)
+  assert(HAND_TABLE[0].peanuts >= HAND_TABLE[9].peanuts, 'Royal Flush peanuts >= High Card peanuts');
 }
 
 // ── 20. Team Data Integrity ─────────────────────────────

@@ -39,11 +39,11 @@ function checkCondition(cond, evalResult, gameState) {
     case 'hand_in':
       return cond.values.includes(evalResult.handName);
 
-    case 'chips_lte':
-      return evalResult.chips <= cond.value;
+    case 'peanuts_lte':
+      return evalResult.peanuts <= cond.value;
 
-    case 'chips_gte':
-      return evalResult.chips >= cond.value;
+    case 'peanuts_gte':
+      return evalResult.peanuts >= cond.value;
 
     case 'losing_by':
       return gameState.opponentScore - gameState.playerScore >= cond.value;
@@ -181,17 +181,17 @@ const POST_HANDLERS = {
     return { ...result, mult: Math.round(Math.max(1, result.mult + effect.value) * 10) / 10 };
   },
 
-  /** Add to chips (can be negative) */
-  add_chips(result, effect, gameState) {
+  /** Add to peanuts (can be negative) */
+  add_peanuts(result, effect, gameState) {
     if (!checkCondition(effect.condition, result, gameState)) return result;
-    return { ...result, chips: Math.max(0, result.chips + effect.value) };
+    return { ...result, peanuts: Math.max(0, result.peanuts + effect.value) };
   },
 
-  /** Add chips per runner on base */
-  per_runner_chips(result, effect, gameState) {
+  /** Add peanuts per runner on base */
+  per_runner_peanuts(result, effect, gameState) {
     const runners = gameState.bases.filter(b => b).length;
     if (runners === 0) return result;
-    return { ...result, chips: result.chips + (runners * effect.value) };
+    return { ...result, peanuts: result.peanuts + (runners * effect.value) };
   },
 
   /** Upgrade outcome from one type to another */
@@ -202,7 +202,7 @@ const POST_HANDLERS = {
       ...result,
       outcome: effect.to,
       handName: effect.newHandName || result.handName,
-      chips: result.chips + (effect.addChips || 0),
+      peanuts: result.peanuts + (effect.addPeanuts || 0),
       mult: result.mult + (effect.addMult || 0),
     };
   },
@@ -215,7 +215,7 @@ const POST_HANDLERS = {
       ...result,
       outcome: effect.toOutcome,
       handName: effect.toHand || result.handName,
-      chips: effect.chips !== undefined ? effect.chips : result.chips,
+      peanuts: effect.peanuts !== undefined ? effect.peanuts : result.peanuts,
       mult: effect.mult !== undefined ? effect.mult : result.mult,
     };
   },
@@ -233,7 +233,7 @@ const POST_HANDLERS = {
       ...result,
       outcome: 'Groundout',
       handName: effect.newHandName || 'Groundout',
-      chips: 0,
+      peanuts: 0,
       mult: 1,
       wasGroundout: true,
     };
@@ -248,7 +248,7 @@ const POST_HANDLERS = {
       ...result,
       outcome: 'Single',
       handName: effect.newHandName || 'Bunt Single',
-      chips: effect.chips || 1,
+      peanuts: effect.peanuts || 1,
       mult: effect.mult || 1,
     };
   },

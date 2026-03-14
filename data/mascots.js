@@ -4,14 +4,14 @@
  * Sprites: assets/animals/mascots_4x.png (15 animals, 3 rows of 5)
  *
  * Effect types:
- *   team_convert_high_card — High Card becomes weak single for all  { chips, mult }
+ *   team_convert_high_card — High Card becomes weak single for all  { peanuts, mult }
  *   add_mult               — bonus mult with condition              { value, condition? }
  *   strikeout_to_walk      — chance strikeout becomes walk          { chance }
- *   flat_chips_per_ab      — bonus chips every at-bat               { value }
+ *   flat_peanuts_per_ab      — bonus peanuts every at-bat               { value }
  *   ignore_pair_penalty    — disable Pitcher Adjusts pair penalty   {}
  *   bonus_draw_on_discard  — chance to draw extra card on discard   { chance }
- *   per_runner_chips       — +chips per baserunner                  { value }
- *   double_chips           — double chip score with condition       { condition }
+ *   per_runner_peanuts       — +chips per baserunner                  { value }
+ *   double_peanuts           — double peanut score with condition       { condition }
  *   strikeout_redraw       — first K each inning redraws hand       { usesPerInning }
  *   pitcher_hit_reduction  — reduce opponent hit chance             { value }
  *   mult_per_inning_run    — +mult per run scored this inning       { value }
@@ -29,7 +29,7 @@ export default [
     category: 'mascot',
     spriteIndex: 0,
     description: 'High Card becomes a weak single for ALL batters',
-    effect: { type: 'team_convert_high_card', chips: 1, mult: 1 },
+    effect: { type: 'team_convert_high_card', peanuts: 1, mult: 1 },
   },
   {
     id: 'morning_rooster',
@@ -58,8 +58,8 @@ export default [
     rarity: 'common',
     category: 'mascot',
     spriteIndex: 3,
-    description: '+3 bonus chips after every at-bat',
-    effect: { type: 'flat_chips_per_ab', value: 3 },
+    description: '+3 bonus peanuts after every at-bat',
+    effect: { type: 'flat_peanuts_per_ab', value: 3 },
   },
   {
     id: 'black_sheep',
@@ -90,8 +90,8 @@ export default [
     rarity: 'uncommon',
     category: 'mascot',
     spriteIndex: 6,
-    description: '+2 chips per runner on base (all batters)',
-    effect: { type: 'per_runner_chips', value: 2 },
+    description: '+2 peanuts per runner on base (all batters)',
+    effect: { type: 'per_runner_peanuts', value: 2 },
   },
   {
     id: 'thunder_bear',
@@ -100,8 +100,8 @@ export default [
     rarity: 'rare',
     category: 'mascot',
     spriteIndex: 7,
-    description: 'Home Runs score double chips',
-    effect: { type: 'double_chips', condition: { type: 'outcome_is', value: 'Home Run' } },
+    description: 'Home Runs score double peanuts',
+    effect: { type: 'double_peanuts', condition: { type: 'outcome_is', value: 'Home Run' } },
   },
   {
     id: 'nine_lives',

@@ -416,7 +416,7 @@ export default class RosterManager {
   applyBatterModifiers(evalResult, gameState) {
     const batter = this.getCurrentBatter();
     const result = { ...evalResult };
-    const bonuses = { powerChips: 0, contactMult: 0, contactSave: false };
+    const bonuses = { powerPeanuts: 0, contactMult: 0, contactSave: false };
 
     // Contact save: batter can rescue a pair that became a Groundout
     if (result.wasGroundout && result.originalHand === 'Pair') {
@@ -424,7 +424,7 @@ export default class RosterManager {
       if (Math.random() < saveChance) {
         result.outcome = 'Single';
         result.handName = 'Pair';
-        result.chips = 1;
+        result.peanuts = 1;
         result.mult = 1.5;
         result.score = 2;
         result.wasGroundout = false;
@@ -440,14 +440,14 @@ export default class RosterManager {
     if (!isHit) return { result, bonuses };
 
     const powerBonus = Math.max(0, batter.power - 5);
-    bonuses.powerChips = powerBonus;
-    result.chips += powerBonus;
+    bonuses.powerPeanuts = powerBonus;
+    result.peanuts += powerBonus;
 
     const contactBonus = batter.contact / 10;
     bonuses.contactMult = contactBonus;
     result.mult = Math.round((result.mult + contactBonus) * 10) / 10;
 
-    result.score = Math.round(result.chips * result.mult);
+    result.score = Math.round(result.peanuts * result.mult);
     result.extraBaseChance = batter.speed * 0.05;
 
     return { result, bonuses };
@@ -463,13 +463,13 @@ export default class RosterManager {
 
     if (result.outcome === 'Single' || result.outcome === 'Double') {
       const velPenalty = Math.max(0, (pitcher.velocity * fatigue) - 6);
-      result.chips = Math.max(0, result.chips - Math.floor(velPenalty / 2));
+      result.peanuts = Math.max(0, result.peanuts - Math.floor(velPenalty / 2));
     }
 
     const controlPenalty = (pitcher.control * fatigue) * 0.05;
     result.mult = Math.round(Math.max(1, result.mult - controlPenalty) * 10) / 10;
 
-    result.score = Math.round(result.chips * result.mult);
+    result.score = Math.round(result.peanuts * result.mult);
     return result;
   }
 

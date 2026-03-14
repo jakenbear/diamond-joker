@@ -31,7 +31,7 @@ var player_score: int = 0
 var opponent_score: int = 0
 var state: int = State.BATTING
 var last_result: Dictionary = {}
-var total_chips: int = 0
+var total_peanuts: int = 0
 var shop_visited: Dictionary = {}  # inning -> true
 var player_runs_by_inning: Array[int] = []
 var opponent_runs_by_inning: Array[int] = []
@@ -51,7 +51,7 @@ func reset() -> void:
 	opponent_score = 0
 	state = State.BATTING
 	last_result = {}
-	total_chips = 0
+	total_peanuts = 0
 	shop_visited = {}
 	player_runs_by_inning = []
 	opponent_runs_by_inning = []
@@ -62,14 +62,14 @@ func reset() -> void:
 	staff_slots = 2
 
 
-func get_total_chips() -> int:
-	return total_chips
+func get_total_peanuts() -> int:
+	return total_peanuts
 
 
-func spend_chips(amount: int) -> bool:
-	if total_chips < amount:
+func spend_peanuts(amount: int) -> bool:
+	if total_peanuts < amount:
 		return false
-	total_chips -= amount
+	total_peanuts -= amount
 	return true
 
 
@@ -126,7 +126,7 @@ func resolve_outcome(outcome: String, hand_score: int = 0, batter = null) -> Dic
 		return {"runs_scored": 0, "description": "Unknown outcome", "state": state}
 
 	_at_bats_this_inning += 1
-	total_chips += int(hand_score)
+	total_peanuts += int(hand_score)
 
 	var runs_scored: int = 0
 	var description: String = outcome
@@ -349,7 +349,7 @@ func get_status() -> Dictionary:
 		"player_score": player_score,
 		"opponent_score": opponent_score,
 		"state": state,
-		"total_chips": total_chips,
+		"total_peanuts": total_peanuts,
 		"player_runs_by_inning": player_runs_by_inning.duplicate(),
 		"opponent_runs_by_inning": opponent_runs_by_inning.duplicate(),
 		"current_inning_player_runs": _current_inning_player_runs,
@@ -369,7 +369,7 @@ func get_result() -> Dictionary:
 		"opponent_score": opponent_score,
 		"won": player_score > opponent_score,
 		"innings": inning,
-		"total_chips": total_chips,
+		"total_peanuts": total_peanuts,
 		"player_runs_by_inning": player_runs_by_inning.duplicate(),
 		"opponent_runs_by_inning": opponent_runs_by_inning.duplicate(),
 	}

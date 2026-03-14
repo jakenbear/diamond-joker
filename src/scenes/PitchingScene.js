@@ -71,7 +71,7 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '20px', fontFamily: 'monospace', color: '#ff8a80',
     }).setOrigin(1, 0).setDepth(8);
 
-    this.chipBalanceText = this.add.text(640, 33, '', {
+    this.peanutBalanceText = this.add.text(640, 33, '', {
       fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(8);
 
@@ -91,7 +91,7 @@ export default class PitchingScene extends Phaser.Scene {
     const oppName = oppTeam ? oppTeam.id : 'OPP';
     const liveOppScore = s.opponentScore + (this._pitchState ? this._pitchState.runs : 0);
     this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${liveOppScore} ${oppName}`);
-    this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
+    this.peanutBalanceText.setText(`Peanuts: ${s.totalPeanuts}`);
 
     // Position "(you)" under player team name
     this.scoreText.updateText();

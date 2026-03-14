@@ -5,13 +5,13 @@ extends RefCounted
 ## Each discard = a pitch. Outcome depends on batter/pitcher stats.
 
 const COUNT_MODIFIERS: Dictionary = {
-	"3-0": {"chips_mod": 2, "mult_mod": 1.0},
-	"2-0": {"chips_mod": 1, "mult_mod": 0.5},
-	"3-1": {"chips_mod": 1, "mult_mod": 0.5},
-	"3-2": {"chips_mod": 0, "mult_mod": 0.5},
-	"0-1": {"chips_mod": 0, "mult_mod": -0.2},
-	"1-2": {"chips_mod": 0, "mult_mod": -0.3},
-	"0-2": {"chips_mod": -1, "mult_mod": -0.5},
+	"3-0": {"peanuts_mod": 2, "mult_mod": 1.0},
+	"2-0": {"peanuts_mod": 1, "mult_mod": 0.5},
+	"3-1": {"peanuts_mod": 1, "mult_mod": 0.5},
+	"3-2": {"peanuts_mod": 0, "mult_mod": 0.5},
+	"0-1": {"peanuts_mod": 0, "mult_mod": -0.2},
+	"1-2": {"peanuts_mod": 0, "mult_mod": -0.3},
+	"0-2": {"peanuts_mod": -1, "mult_mod": -0.5},
 }
 
 var balls: int = 0
@@ -74,7 +74,7 @@ func get_count() -> Dictionary:
 
 func get_count_modifiers() -> Dictionary:
 	var key: String = "%d-%d" % [balls, strikes]
-	return COUNT_MODIFIERS.get(key, {"chips_mod": 0, "mult_mod": 0})
+	return COUNT_MODIFIERS.get(key, {"peanuts_mod": 0, "mult_mod": 0})
 
 
 func is_walk() -> bool:

@@ -36,7 +36,7 @@ export default class BaseballState {
     this.opponentScore = 0;
     this.state = 'BATTING';  // BATTING | RESOLVE | SWITCH_SIDE | GAME_OVER
     this.lastResult = null;
-    this.totalChips = 0;
+    this.totalPeanuts = 0;
     this.shopVisited = new Set(); // Track which innings we've shown shop for
     // Per-inning run tracking for box score (index 0 = inning 1)
     this.playerRunsByInning = [];
@@ -48,15 +48,15 @@ export default class BaseballState {
     this.staffSlots = 2;   // Start with 2 slots, expandable to 4
   }
 
-  /** Get total accumulated chips (currency for shop) */
-  getTotalChips() {
-    return this.totalChips;
+  /** Get total accumulated peanuts (currency for shop) */
+  getTotalPeanuts() {
+    return this.totalPeanuts;
   }
 
-  /** Spend chips in the shop. Returns true if successful. */
-  spendChips(amount) {
-    if (this.totalChips < amount) return false;
-    this.totalChips -= amount;
+  /** Spend peanuts in the shop. Returns true if successful. */
+  spendPeanuts(amount) {
+    if (this.totalPeanuts < amount) return false;
+    this.totalPeanuts -= amount;
     return true;
   }
 
@@ -119,7 +119,7 @@ export default class BaseballState {
   /**
    * Resolve an outcome from a played hand.
    * @param {string} outcome - The baseball outcome name
-   * @param {number} handScore - Score from the hand (chips * mult) to accumulate
+   * @param {number} handScore - Score from the hand (peanuts * mult) to accumulate
    * Returns { runsScored, description, state }
    */
   resolveOutcome(outcome, handScore = 0, batter = null) {
@@ -130,8 +130,8 @@ export default class BaseballState {
 
     this._atBatsThisInning++;
 
-    // Accumulate chips from hand score
-    this.totalChips += Math.floor(handScore);
+    // Accumulate peanuts from hand score
+    this.totalPeanuts += Math.floor(handScore);
 
     let runsScored = 0;
     let description = outcome;
@@ -421,7 +421,7 @@ export default class BaseballState {
       playerScore: this.playerScore,
       opponentScore: this.opponentScore,
       state: this.state,
-      totalChips: this.totalChips,
+      totalPeanuts: this.totalPeanuts,
       playerRunsByInning: [...this.playerRunsByInning],
       opponentRunsByInning: [...this.opponentRunsByInning],
       currentInningPlayerRuns: this._currentInningPlayerRuns,
@@ -442,7 +442,7 @@ export default class BaseballState {
       opponentScore: this.opponentScore,
       won: this.playerScore > this.opponentScore,
       innings: this.inning,
-      totalChips: this.totalChips,
+      totalPeanuts: this.totalPeanuts,
       playerRunsByInning: [...this.playerRunsByInning],
       opponentRunsByInning: [...this.opponentRunsByInning],
     };

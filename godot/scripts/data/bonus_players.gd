@@ -13,8 +13,8 @@ static var DATA: Array[Dictionary] = [
 		"pos": "1B",
 		"power": 9, "contact": 4, "speed": 5, "bats": "R",
 		"innate_trait_id": "cleanup_crew",
-		"lineup_effect": {"type": "team_add_chips_on_xbh", "value": 1},
-		"lineup_description": "All batters: +1 chip on doubles+",
+		"lineup_effect": {"type": "team_add_peanuts_on_xbh", "value": 1},
+		"lineup_description": "All batters: +1 peanut on doubles+",
 		"rarity": "common",
 	},
 	{
@@ -33,8 +33,8 @@ static var DATA: Array[Dictionary] = [
 		"pos": "RF",
 		"power": 8, "contact": 5, "speed": 6, "bats": "L",
 		"innate_trait_id": "hot_corner",
-		"lineup_effect": {"type": "team_add_chips_on_xbh", "value": 2},
-		"lineup_description": "All batters: +2 chips on doubles+",
+		"lineup_effect": {"type": "team_add_peanuts_on_xbh", "value": 2},
+		"lineup_description": "All batters: +2 peanuts on doubles+",
 		"rarity": "uncommon",
 	},
 
@@ -109,8 +109,8 @@ static var DATA: Array[Dictionary] = [
 		"pos": "1B",
 		"power": 8, "contact": 6, "speed": 3, "bats": "R",
 		"innate_trait_id": "extra_innings",
-		"lineup_effect": {"type": "team_late_inning_chips", "value": 3},
-		"lineup_description": "All batters: +3 chips in innings 7-9",
+		"lineup_effect": {"type": "team_late_inning_peanuts", "value": 3},
+		"lineup_description": "All batters: +3 peanuts in innings 7-9",
 		"rarity": "uncommon",
 	},
 	{
@@ -119,8 +119,8 @@ static var DATA: Array[Dictionary] = [
 		"pos": "SS",
 		"power": 5, "contact": 7, "speed": 8, "bats": "L",
 		"innate_trait_id": "bunt_single",
-		"lineup_effect": {"type": "team_strikeout_chips", "value": 2},
-		"lineup_description": "All batters: earn 2 chips on strikeouts",
+		"lineup_effect": {"type": "team_strikeout_peanuts", "value": 2},
+		"lineup_description": "All batters: earn 2 peanuts on strikeouts",
 		"rarity": "common",
 	},
 	{

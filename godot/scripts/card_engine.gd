@@ -176,12 +176,12 @@ static func evaluate_hand(cards: Array[Dictionary], pre_modifier: Callable = Cal
 			entry = quality_result
 
 	entry["played_description"] = _describe_play(eval_cards, entry["hand_name"])
-	entry["score"] = roundi(entry["chips"] * entry["mult"])
+	entry["score"] = roundi(entry["peanuts"] * entry["mult"])
 
 	# Apply post-modifier
 	if post_modifier.is_valid() and not game_state.is_empty():
 		var modified: Dictionary = post_modifier.call(entry, game_state)
-		modified["score"] = roundi(modified["chips"] * modified["mult"])
+		modified["score"] = roundi(modified["peanuts"] * modified["mult"])
 		return modified
 
 	return entry
@@ -270,7 +270,7 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 			return {
 				"hand_name": out_type,
 				"outcome": out_type,
-				"chips": 0,
+				"peanuts": 0,
 				"mult": 1.0,
 				"score": 0,
 				"was_groundout": true,
@@ -280,7 +280,7 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 		if pair_rank >= 10:
 			var bonus: int = pair_rank - 9
 			var result: Dictionary = entry.duplicate()
-			result["chips"] = entry["chips"] + bonus
+			result["peanuts"] = entry["peanuts"] + bonus
 			return result
 		return {}
 
@@ -296,7 +296,7 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 			return {
 				"hand_name": out_type,
 				"outcome": out_type,
-				"chips": 0,
+				"peanuts": 0,
 				"mult": 1.0,
 				"score": 0,
 				"was_groundout": true,
@@ -307,7 +307,7 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 	if pair_rank >= 10:
 		var bonus: int = pair_rank - 9
 		var result: Dictionary = entry.duplicate()
-		result["chips"] = entry["chips"] + bonus
+		result["peanuts"] = entry["peanuts"] + bonus
 		return result
 
 	return {}

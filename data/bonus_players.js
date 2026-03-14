@@ -5,21 +5,21 @@
  *
  * Pack tiers:
  *   Bronze Pack — 2+ runs in a half-inning, pick 1 of 2
- *   Gold Pack   — 4+ runs (or 25+ chip single hand), pick 1 of 3
+ *   Gold Pack   — 4+ runs (or 25+ peanut single hand), pick 1 of 3
  *
  * innateTraitId: references data/batter_traits.js (equipped free, doesn't count toward 2-trait cap)
  * lineupEffect: passive bonus for the whole lineup while this player is active
  *
  * Lineup effect types:
- *   team_add_chips_on_xbh     — +chips on doubles, triples, HRs    { value }
+ *   team_add_peanuts_on_xbh     — +chips on doubles, triples, HRs    { value }
  *   team_pair_out_reduction   — reduce pair out chance              { value }
  *   team_extra_base_chance    — +extra base chance on singles       { value }
  *   team_power_mult           — x mult for high-power batters       { value, threshold }
  *   team_add_mult_on_hit      — +mult on all hits                  { value }
- *   team_strikeout_chips      — earn chips even on strikeouts       { value }
+ *   team_strikeout_peanuts      — earn peanuts even on strikeouts       { value }
  *   team_first_pitch_mult     — bonus mult on first-pitch swings    { value }
  *   team_runner_mult          — +mult per runner on base            { value }
- *   team_late_inning_chips    — +chips in innings 7-9               { value }
+ *   team_late_inning_peanuts    — +chips in innings 7-9               { value }
  *   team_contact_save_boost   — increase contact save chance        { value }
  */
 export default [
@@ -30,8 +30,8 @@ export default [
     pos: '1B',
     power: 9, contact: 4, speed: 5, bats: 'R',
     innateTraitId: 'cleanup_crew',
-    lineupEffect: { type: 'team_add_chips_on_xbh', value: 1 },
-    lineupDescription: 'All batters: +1 chip on doubles+',
+    lineupEffect: { type: 'team_add_peanuts_on_xbh', value: 1 },
+    lineupDescription: 'All batters: +1 peanut on doubles+',
     rarity: 'common',
   },
   {
@@ -50,8 +50,8 @@ export default [
     pos: 'RF',
     power: 8, contact: 5, speed: 6, bats: 'L',
     innateTraitId: 'hot_corner',
-    lineupEffect: { type: 'team_add_chips_on_xbh', value: 2 },
-    lineupDescription: 'All batters: +2 chips on doubles+',
+    lineupEffect: { type: 'team_add_peanuts_on_xbh', value: 2 },
+    lineupDescription: 'All batters: +2 peanuts on doubles+',
     rarity: 'uncommon',
   },
 
@@ -126,8 +126,8 @@ export default [
     pos: '1B',
     power: 8, contact: 6, speed: 3, bats: 'R',
     innateTraitId: 'extra_innings',
-    lineupEffect: { type: 'team_late_inning_chips', value: 3 },
-    lineupDescription: 'All batters: +3 chips in innings 7-9',
+    lineupEffect: { type: 'team_late_inning_peanuts', value: 3 },
+    lineupDescription: 'All batters: +3 peanuts in innings 7-9',
     rarity: 'uncommon',
   },
   {
@@ -136,8 +136,8 @@ export default [
     pos: 'SS',
     power: 5, contact: 7, speed: 8, bats: 'L',
     innateTraitId: 'bunt_single',
-    lineupEffect: { type: 'team_strikeout_chips', value: 2 },
-    lineupDescription: 'All batters: earn 2 chips on strikeouts',
+    lineupEffect: { type: 'team_strikeout_peanuts', value: 2 },
+    lineupDescription: 'All batters: earn 2 peanuts on strikeouts',
     rarity: 'common',
   },
   {

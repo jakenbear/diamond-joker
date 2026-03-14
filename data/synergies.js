@@ -8,12 +8,12 @@
  *
  * Bonus types:
  *   add_mult_all         — +mult on all at-bats                  { value }
- *   add_chips_all        — +chips on all at-bats                 { value }
+ *   add_peanuts_all        — +chips on all at-bats                 { value }
  *   add_mult_on_hr       — +mult on Home Runs                    { value }
  *   add_mult_lefty       — +mult on lefty batter at-bats         { value }
  *   team_pair_out_reduction — reduce pair out chance              { value }
  *   team_extra_base_chance  — +extra base chance                  { value }
- *   add_chips_on_xbh     — +chips on doubles, triples, HRs       { value }
+ *   add_peanuts_on_xbh     — +chips on doubles, triples, HRs       { value }
  *   pitcher_control_reduction — opponent pitcher -control         { value }
  *   pitcher_hit_reduction — reduce opponent hit chance            { value }
  *   bonus_player_stat_boost — bonus players +stats               { value }
@@ -39,8 +39,8 @@ export default [
       const r = roster.filter(b => b.bats === 'R').length;
       return l >= 4 && r >= 4;
     },
-    bonus: { type: 'add_chips_all', value: 2 },
-    bonusDescription: '+2 chips on all at-bats',
+    bonus: { type: 'add_peanuts_all', value: 2 },
+    bonusDescription: '+2 peanuts on all at-bats',
   },
   {
     id: 'southpaw_stack',
@@ -116,8 +116,8 @@ export default [
       const third = roster.find(b => b.pos === '3B');
       return first && first.power >= 8 && third && third.power >= 8;
     },
-    bonus: { type: 'add_chips_on_xbh', value: 3 },
-    bonusDescription: '+3 chips on triples+',
+    bonus: { type: 'add_peanuts_on_xbh', value: 3 },
+    bonusDescription: '+3 peanuts on triples+',
   },
 
   // ── Bonus Player Combos ──
@@ -147,7 +147,7 @@ export default [
     description: '5+ batters with 7+ contact and 6+ speed',
     hint: 'Many contact-speed players...',
     check: (roster) => roster.filter(b => b.contact >= 7 && b.speed >= 6).length >= 5,
-    bonus: { type: 'add_chips_all', value: 1 },
-    bonusDescription: '+1 chip on all at-bats',
+    bonus: { type: 'add_peanuts_all', value: 1 },
+    bonusDescription: '+1 peanut on all at-bats',
   },
 ];

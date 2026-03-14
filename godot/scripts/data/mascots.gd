@@ -14,7 +14,7 @@ static var DATA: Array[Dictionary] = [
 		"category": "mascot",
 		"sprite_index": 0,
 		"description": "High Card becomes a weak single for ALL batters",
-		"effect": {"type": "team_convert_high_card", "chips": 1, "mult": 1},
+		"effect": {"type": "team_convert_high_card", "peanuts": 1, "mult": 1},
 	},
 	{
 		"id": "morning_rooster",
@@ -43,8 +43,8 @@ static var DATA: Array[Dictionary] = [
 		"rarity": "common",
 		"category": "mascot",
 		"sprite_index": 3,
-		"description": "+3 bonus chips after every at-bat",
-		"effect": {"type": "flat_chips_per_ab", "value": 3},
+		"description": "+3 bonus peanuts after every at-bat",
+		"effect": {"type": "flat_peanuts_per_ab", "value": 3},
 	},
 	{
 		"id": "black_sheep",
@@ -75,8 +75,8 @@ static var DATA: Array[Dictionary] = [
 		"rarity": "uncommon",
 		"category": "mascot",
 		"sprite_index": 6,
-		"description": "+2 chips per runner on base (all batters)",
-		"effect": {"type": "per_runner_chips", "value": 2},
+		"description": "+2 peanuts per runner on base (all batters)",
+		"effect": {"type": "per_runner_peanuts", "value": 2},
 	},
 	{
 		"id": "thunder_bear",
@@ -85,8 +85,8 @@ static var DATA: Array[Dictionary] = [
 		"rarity": "rare",
 		"category": "mascot",
 		"sprite_index": 7,
-		"description": "Home Runs score double chips",
-		"effect": {"type": "double_chips", "condition": {"type": "outcome_is", "value": "Home Run"}},
+		"description": "Home Runs score double peanuts",
+		"effect": {"type": "double_peanuts", "condition": {"type": "outcome_is", "value": "Home Run"}},
 	},
 	{
 		"id": "nine_lives",

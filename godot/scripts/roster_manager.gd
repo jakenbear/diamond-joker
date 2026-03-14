@@ -229,7 +229,7 @@ func get_active_lineup_effects() -> Array[Dictionary]:
 func apply_batter_modifiers(eval_result: Dictionary, game_state: Dictionary) -> Dictionary:
 	var batter: Dictionary = get_current_batter()
 	var result: Dictionary = eval_result.duplicate()
-	var bonuses: Dictionary = {"power_chips": 0, "contact_mult": 0.0, "contact_save": false}
+	var bonuses: Dictionary = {"power_peanuts": 0, "contact_mult": 0.0, "contact_save": false}
 
 	# Contact save: rescue a pair that became a Groundout
 	if result.get("was_groundout", false) and result.get("original_hand", "") == "Pair":
@@ -237,7 +237,7 @@ func apply_batter_modifiers(eval_result: Dictionary, game_state: Dictionary) -> 
 		if randf() < save_chance:
 			result["outcome"] = "Single"
 			result["hand_name"] = "Pair"
-			result["chips"] = 1
+			result["peanuts"] = 1
 			result["mult"] = 1.5
 			result["score"] = 2
 			result["was_groundout"] = false
@@ -254,14 +254,14 @@ func apply_batter_modifiers(eval_result: Dictionary, game_state: Dictionary) -> 
 		return {"result": result, "bonuses": bonuses}
 
 	var power_bonus: int = maxi(0, batter.get("power", 5) - 5)
-	bonuses["power_chips"] = power_bonus
-	result["chips"] = result.get("chips", 0) + power_bonus
+	bonuses["power_peanuts"] = power_bonus
+	result["peanuts"] = result.get("peanuts", 0) + power_bonus
 
 	var contact_bonus: float = batter.get("contact", 5) / 10.0
 	bonuses["contact_mult"] = contact_bonus
 	result["mult"] = snappedf(result.get("mult", 1.0) + contact_bonus, 0.1)
 
-	result["score"] = roundi(result["chips"] * result["mult"])
+	result["score"] = roundi(result["peanuts"] * result["mult"])
 	result["extra_base_chance"] = batter.get("speed", 5) * 0.05
 
 	return {"result": result, "bonuses": bonuses}
@@ -275,12 +275,12 @@ func apply_pitcher_modifiers(eval_result: Dictionary, game_state: Dictionary) ->
 
 	if result["outcome"] == "Single" or result["outcome"] == "Double":
 		var vel_penalty: int = maxi(0, int(p.get("velocity", 5) * fatigue) - 6)
-		result["chips"] = maxi(0, result.get("chips", 0) - int(vel_penalty / 2))
+		result["peanuts"] = maxi(0, result.get("peanuts", 0) - int(vel_penalty / 2))
 
 	var control_penalty: float = (p.get("control", 5) * fatigue) * 0.05
 	result["mult"] = snappedf(maxf(1.0, result.get("mult", 1.0) - control_penalty), 0.1)
 
-	result["score"] = roundi(result["chips"] * result["mult"])
+	result["score"] = roundi(result["peanuts"] * result["mult"])
 	return result
 
 
