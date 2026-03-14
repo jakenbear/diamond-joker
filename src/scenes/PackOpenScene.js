@@ -350,23 +350,13 @@ export default class PackOpenScene extends Phaser.Scene {
   // ── Exit ───────────────────────────────────────────────
 
   _exitToNext() {
-    // Go to shop if available, otherwise to pitching
-    if (this.baseball.shouldShowShop()) {
-      this.scene.start('ShopScene', {
-        rosterManager: this.rosterManager,
-        traitManager: this.traitManager,
-        baseball: this.baseball,
-        cardEngine: this.cardEngine,
-        gameLogEntries: this.gameLogEntries,
-      });
-    } else {
-      this.scene.start('PitchingScene', {
-        rosterManager: this.rosterManager,
-        baseball: this.baseball,
-        traitManager: this.traitManager,
-        cardEngine: this.cardEngine,
-        gameLogEntries: this.gameLogEntries,
-      });
-    }
+    // Always go to pitching next — shop is handled by PitchingScene after opponent half
+    this.scene.start('PitchingScene', {
+      rosterManager: this.rosterManager,
+      baseball: this.baseball,
+      traitManager: this.traitManager,
+      cardEngine: this.cardEngine,
+      gameLogEntries: this.gameLogEntries,
+    });
   }
 }
