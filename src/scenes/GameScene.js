@@ -70,6 +70,14 @@ export default class GameScene extends Phaser.Scene {
       frameWidth: 72, frameHeight: 72,
     });
 
+    // Coach face spritesheet (6 cols × 5 rows, 96×96 per face)
+    this.load.spritesheet('faces', 'assets/sprites/faces.png', {
+      frameWidth: 96, frameHeight: 96,
+    });
+
+    // Blank card base for staff cards
+    this.load.image('card_blank', 'assets/cards/space5.png');
+
     // Set nearest-neighbor filtering on card textures only (keeps text smooth)
     this.load.on('complete', () => {
       for (const s of suits) {
@@ -90,9 +98,11 @@ export default class GameScene extends Phaser.Scene {
           }
         }
       }
-      // Nearest-neighbor on mascot spritesheet
-      if (this.textures.exists('mascots')) {
-        this.textures.get('mascots').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      // Nearest-neighbor on mascot spritesheet, faces, and blank card
+      for (const key of ['mascots', 'faces', 'card_blank']) {
+        if (this.textures.exists(key)) {
+          this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
       }
     });
   }
@@ -772,10 +782,13 @@ export default class GameScene extends Phaser.Scene {
       this.add.rectangle(stackX + stackW / 2, cardY + 12, stackW - 12, 32, badgeColor, 0.5)
         .setStrokeStyle(1, isCoach ? 0x26a69a : 0xffa000, 0.6).setDepth(1);
 
-      // Mascot sprite or coach badge
+      // Mascot sprite, coach face, or text badge
       if (!isCoach && item.spriteIndex !== undefined && this.textures.exists('mascots')) {
         this.add.image(stackX + 20, cardY + 12, 'mascots', item.spriteIndex)
-          .setOrigin(0.5).setScale(0.4).setDepth(2);
+          .setOrigin(0.5).setScale(0.35).setDepth(2);
+      } else if (isCoach && item.faceIndex !== undefined && this.textures.exists('faces')) {
+        this.add.image(stackX + 20, cardY + 12, 'faces', item.faceIndex)
+          .setOrigin(0.5).setScale(0.25).setDepth(2);
       } else {
         const badge = isCoach ? 'C' : 'M';
         this.add.text(stackX + 14, cardY + 5, badge, {

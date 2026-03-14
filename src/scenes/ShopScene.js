@@ -242,52 +242,60 @@ export default class ShopScene extends Phaser.Scene {
     const canAfford = this.baseball.getTotalChips() >= item.price && hasSlots;
     const isCoach = item.category === 'coach';
 
-    const border = this.add.rectangle(x, y, 240, 260, colors.border, 0.3)
+    // Outer border (rarity colored)
+    const border = this.add.rectangle(x, y, 240, 280, colors.border, 0.3)
       .setStrokeStyle(3, colors.border);
-    const bg = this.add.rectangle(x, y, 230, 250, 0x1a2a3a);
+    const bg = this.add.rectangle(x, y, 230, 270, 0x1a2a3a);
 
-    // Category badge
+    // Category badge + rarity
     const badgeColor = isCoach ? '#80cbc4' : '#ffab40';
     const badgeText = isCoach ? 'COACH' : 'MASCOT';
-    this.add.text(x, y - 105, badgeText, {
-      fontSize: '11px', fontFamily: 'monospace', color: badgeColor, fontStyle: 'bold',
-    }).setOrigin(0.5);
-
-    // Rarity
-    this.add.text(x + 80, y - 105, item.rarity.toUpperCase(), {
+    this.add.text(x - 50, y - 120, badgeText, {
+      fontSize: '10px', fontFamily: 'monospace', color: badgeColor, fontStyle: 'bold',
+    }).setOrigin(0, 0.5);
+    this.add.text(x + 50, y - 120, item.rarity.toUpperCase(), {
       fontSize: '10px', fontFamily: 'monospace', color: colors.label,
-    }).setOrigin(0.5);
+    }).setOrigin(1, 0.5);
 
-    // Mascot sprite (if available)
+    // Card art: blank card base with sprite overlay
+    const cardScale = 2.5;  // 32×42 → 80×105
+    const cardY = y - 55;
+    if (this.textures.exists('card_blank')) {
+      this.add.image(x, cardY, 'card_blank').setScale(cardScale).setDepth(1);
+    }
+
+    // Overlay: mascot animal or coach face
     if (!isCoach && item.spriteIndex !== undefined && this.textures.exists('mascots')) {
-      this.add.image(x, y - 65, 'mascots', item.spriteIndex)
-        .setOrigin(0.5).setDepth(1);
+      this.add.image(x, cardY, 'mascots', item.spriteIndex)
+        .setOrigin(0.5).setScale(0.9).setDepth(2);
+    } else if (isCoach && item.faceIndex !== undefined && this.textures.exists('faces')) {
+      this.add.image(x, cardY, 'faces', item.faceIndex)
+        .setOrigin(0.5).setScale(0.7).setDepth(2);
     }
 
     // Name
-    const nameY = (!isCoach && item.spriteIndex !== undefined) ? y - 25 : y - 75;
-    this.add.text(x, nameY, item.name, {
-      fontSize: '18px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    this.add.text(x, y + 10, item.name, {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Description
-    this.add.text(x, y + 10, item.description, {
-      fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
+    this.add.text(x, y + 40, item.description, {
+      fontSize: '11px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center', wordWrap: { width: 200 },
     }).setOrigin(0.5);
 
     // Price
     const priceColor = canAfford ? '#ffd600' : '#ff5252';
     const priceNote = !hasSlots ? '(no slots)' : `${item.price} chips`;
-    this.add.text(x, y + 55, priceNote, {
-      fontSize: '16px', fontFamily: 'monospace', color: priceColor, fontStyle: 'bold',
+    this.add.text(x, y + 75, priceNote, {
+      fontSize: '14px', fontFamily: 'monospace', color: priceColor, fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Buy button
     const btnColor = canAfford ? 0x2e7d32 : 0x555555;
-    const buyBg = this.add.rectangle(x, y + 90, 110, 36, btnColor, 0.9)
+    const buyBg = this.add.rectangle(x, y + 105, 110, 36, btnColor, 0.9)
       .setStrokeStyle(2, canAfford ? 0x4caf50 : 0x666666);
-    this.add.text(x, y + 90, 'HIRE', {
+    this.add.text(x, y + 105, 'HIRE', {
       fontSize: '16px', fontFamily: 'monospace', color: canAfford ? '#ffffff' : '#888888', fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -308,10 +316,13 @@ export default class ShopScene extends Phaser.Scene {
     this.add.rectangle(640, y, 600, 40, 0x111d2a, 0.6)
       .setStrokeStyle(1, 0x222d3a);
 
-    // Mascot sprite or coach badge
+    // Staff sprite: mascot animal or coach face
     if (!isCoach && item.spriteIndex !== undefined && this.textures.exists('mascots')) {
       this.add.image(360, y, 'mascots', item.spriteIndex)
-        .setOrigin(0.5).setScale(0.45);
+        .setOrigin(0.5).setScale(0.4);
+    } else if (isCoach && item.faceIndex !== undefined && this.textures.exists('faces')) {
+      this.add.image(360, y, 'faces', item.faceIndex)
+        .setOrigin(0.5).setScale(0.3);
     } else {
       this.add.text(360, y, isCoach ? 'C' : 'M', {
         fontSize: '14px', fontFamily: 'monospace', color: badgeColor, fontStyle: 'bold',
