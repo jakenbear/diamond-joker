@@ -1587,47 +1587,66 @@ group('Count System: Basic State');
 group('Count System: recordDiscard');
 
 {
-  // High control pitcher (7+): never throws balls
+  // Elite pitcher (high vel+ctrl) gets more strikes than average
   const cm = new CountManager();
-  let anyBall = false;
-  for (let i = 0; i < 200; i++) {
+  const N = 1000;
+  let eliteStrikes = 0, avgStrikes = 0;
+  for (let i = 0; i < N; i++) {
     cm.reset();
-    const result = cm.recordDiscard(8);
-    if (result.isBall) anyBall = true;
+    if (cm.recordDiscard(9, 9, 5).isStrike) eliteStrikes++;
+    cm.reset();
+    if (cm.recordDiscard(5, 5, 5).isStrike) avgStrikes++;
   }
-  assert(!anyBall, 'Control 8 pitcher never throws balls (200 trials)');
+  assert(eliteStrikes > avgStrikes, `Elite pitcher (${eliteStrikes}) > avg pitcher (${avgStrikes}) strikes`);
 }
 {
-  // Strike increments correctly
-  const cm = new CountManager();
-  const r1 = cm.recordDiscard(10); // control 10 = no balls
-  assert(r1.isStrike && cm.getCount().strikes === 1, 'First discard: strike 1');
-  const r2 = cm.recordDiscard(10);
-  assert(r2.isStrike && cm.getCount().strikes === 2, 'Second discard: strike 2');
-  const r3 = cm.recordDiscard(10);
-  assert(r3.isFoul && cm.getCount().strikes === 2, 'Third discard: foul (strikes stay at 2)');
+  // Strike increments correctly (use elite pitcher to maximize strike chance)
+  // Run multiple trials since strikes aren't guaranteed
+  let passedAll = false;
+  for (let trial = 0; trial < 50 && !passedAll; trial++) {
+    const cm = new CountManager();
+    const r1 = cm.recordDiscard(10, 10, 1);
+    if (!r1.isStrike) continue;
+    const r2 = cm.recordDiscard(10, 10, 1);
+    if (!r2.isStrike) continue;
+    // At 2 strikes, next pitch can be strikeout, foul, or ball
+    assert(cm.getCount().strikes === 2, 'Two strikes accumulated');
+    passedAll = true;
+  }
+  assert(passedAll, 'Can accumulate 2 strikes with elite pitcher');
 }
 {
-  // Ball accumulation with wild pitcher (control 3, ballChance = 32%)
+  // At 2 strikes: 3rd strike = strikeout
+  let gotStrikeout = false;
+  for (let i = 0; i < 200 && !gotStrikeout; i++) {
+    const cm = new CountManager();
+    cm.strikes = 2;
+    const r = cm.recordDiscard(10, 10, 1); // elite pitcher, low contact
+    if (r.isStrikeout) gotStrikeout = true;
+  }
+  assert(gotStrikeout, 'Strikeout achievable at 2 strikes');
+}
+{
+  // Ball accumulation with weak pitcher (low vel+ctrl, high contact batter)
   const N = 2000;
   let totalBalls = 0;
   for (let i = 0; i < N; i++) {
     const cm = new CountManager();
-    const result = cm.recordDiscard(3);
+    const result = cm.recordDiscard(3, 3, 7);
     if (result.isBall) totalBalls++;
   }
   const ballRate = totalBalls / N;
-  assertClose(ballRate, 0.22, 0.42, `Wild pitcher (control 3) ball rate ~32%`);
+  // strikeChance = 0.40 + (3-5)*0.02 + (3-5)*0.02 - (7-5)*0.03 = 0.40-0.04-0.04-0.06 = 0.26
+  // ballRate ~0.74
+  assertClose(ballRate, 0.60, 0.88, `Weak pitcher ball rate ~74%`);
 }
 {
   // Walk detection: force 4 balls
-  const cm = new CountManager();
-  cm.balls = 3;
-  // Use control 1 for very high ball chance: (7-1)*0.08 = 48%
   let walked = false;
   for (let i = 0; i < 200 && !walked; i++) {
-    cm.balls = 3; // reset to 3 each try
-    const result = cm.recordDiscard(1);
+    const cm = new CountManager();
+    cm.balls = 3;
+    const result = cm.recordDiscard(1, 1, 10); // worst pitcher, best batter
     if (result.isWalk) walked = true;
   }
   assert(walked, 'Walk detected when 4th ball accumulates');
@@ -1655,10 +1674,14 @@ group('Count System: Count Modifiers');
   assert(mods.chipsMod === -1 && mods.multMod === -0.5, '0-2 count: -1 chips, -0.5 mult');
 }
 {
-  // All count modifier keys exist
-  const expectedKeys = ['3-0','2-0','3-1','1-0','2-1','3-2','0-0','1-1','2-2','0-1','1-2','0-2'];
+  // All count modifier keys exist (7 non-neutral entries in new system)
+  const expectedKeys = ['3-0','2-0','3-1','3-2','0-1','1-2','0-2'];
   const allExist = expectedKeys.every(k => COUNT_MODIFIERS[k] !== undefined);
-  assert(allExist, 'All 12 count modifier entries exist');
+  assert(allExist, 'All 7 count modifier entries exist');
+  // Neutral counts (0-0, 1-1, etc.) fall through to default {chipsMod:0, multMod:0}
+  const cm = new CountManager();
+  const neutral = cm.getCountModifiers();
+  assert(neutral.chipsMod === 0 && neutral.multMod === 0, '0-0 count returns neutral defaults');
 }
 
 group('Count System: Two-Strike Groundout Penalty');
@@ -2783,6 +2806,56 @@ group('10a. CountManager — New Pitch Formula');
     if (r.isStrike) extremeLowStrikes++;
   }
   assertClose(extremeLowStrikes, 200, 500, `Min clamp strike rate (${extremeLowStrikes}/${N})`);
+}
+
+group('10b. CountManager — Strikeout & Walk Detection');
+{
+  // isStrikeout() method
+  const cm = new CountManager();
+  cm.strikes = 3;
+  assert(cm.isStrikeout(), 'isStrikeout() true at 3 strikes');
+  cm.strikes = 2;
+  assert(!cm.isStrikeout(), 'isStrikeout() false at 2 strikes');
+
+  // isWalk() method (already tested in basic state, but confirm here)
+  const cm2 = new CountManager();
+  cm2.balls = 4;
+  assert(cm2.isWalk(), 'isWalk() true at 4 balls');
+  cm2.balls = 3;
+  assert(!cm2.isWalk(), 'isWalk() false at 3 balls');
+
+  // Strikeout flag only set when going from 2→3 strikes
+  let strikeoutAt0 = false;
+  for (let i = 0; i < 200; i++) {
+    const cm3 = new CountManager(); // starts at 0 strikes
+    const r = cm3.recordDiscard(10, 10, 1);
+    if (r.isStrikeout) strikeoutAt0 = true;
+  }
+  assert(!strikeoutAt0, 'No strikeout flag on first strike (0→1)');
+
+  // Full at-bat simulation: can reach strikeout through natural play
+  let fullAbStrikeout = false;
+  for (let trial = 0; trial < 500 && !fullAbStrikeout; trial++) {
+    const cm4 = new CountManager();
+    for (let pitch = 0; pitch < 20; pitch++) {
+      const r = cm4.recordDiscard(8, 8, 3);
+      if (r.isStrikeout) { fullAbStrikeout = true; break; }
+      if (r.isWalk) break;
+    }
+  }
+  assert(fullAbStrikeout, 'Full at-bat can reach strikeout naturally');
+
+  // Full at-bat simulation: can reach walk through natural play
+  let fullAbWalk = false;
+  for (let trial = 0; trial < 500 && !fullAbWalk; trial++) {
+    const cm5 = new CountManager();
+    for (let pitch = 0; pitch < 20; pitch++) {
+      const r = cm5.recordDiscard(2, 2, 9);
+      if (r.isWalk) { fullAbWalk = true; break; }
+      if (r.isStrikeout) break;
+    }
+  }
+  assert(fullAbWalk, 'Full at-bat can reach walk naturally');
 }
 
 // ═══════════════════════════════════════════════════════
