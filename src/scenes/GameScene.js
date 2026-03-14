@@ -162,86 +162,72 @@ export default class GameScene extends Phaser.Scene {
   _createScoreboard() {
     this.add.rectangle(640, 25, 1280, 50, 0x0d3311).setDepth(0);
 
-    this.inningText = this.add.text(BATTER_X + PANEL_W / 2 + 20, 10, '', {
-      fontSize: '20px', fontFamily: 'monospace', color: '#ffffff',
-    }).setDepth(1);
-
-    this.scoreText = this.add.text(640, 8, '', {
-      fontSize: '22px', fontFamily: 'monospace', color: '#ffd600',
-    }).setOrigin(0.5, 0).setDepth(1);
-
-    // Outs + Count display — same line, same size
-    const statusX = PITCHER_X - PANEL_W / 2 - 30;
-    this.outsText = this.add.text(statusX, 10, '', {
-      fontSize: '16px', fontFamily: 'monospace', color: '#ff8a80',
-    }).setOrigin(1, 0).setDepth(1);
-
-    // Ball/Strike count — same row, right of outs
-    const countStartX = statusX + 10;
-    this.ballsLabel = this.add.text(countStartX, 8, 'B', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#66bb6a', fontStyle: 'bold',
-    }).setDepth(1);
-    this.ballsDots = this.add.text(countStartX + 16, 8, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#66bb6a',
-    }).setDepth(1);
-    this.strikesLabel = this.add.text(countStartX, 24, 'S', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#ff5252', fontStyle: 'bold',
-    }).setDepth(1);
-    this.strikesDots = this.add.text(countStartX + 16, 24, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#ff5252',
-    }).setDepth(1);
-
-    this.countManager = new CountManager();
-
-    this.chipBalanceText = this.add.text(640, 33, '', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
+    // Line 1: Score + Chips (centered)
+    this.scoreText = this.add.text(640, 6, '', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(1);
 
     // Small "(you)" indicator under player team name
-    this.youIndicator = this.add.text(0, 33, '(you)', {
+    this.youIndicator = this.add.text(0, 28, '(you)', {
       fontSize: '10px', fontFamily: 'monospace', color: '#69f0ae',
     }).setOrigin(0.5, 0).setDepth(1).setAlpha(0.7);
+
+    // Line 2 left: INN + Outs
+    this.inningOutsText = this.add.text(BATTER_X + PANEL_W / 2 + 20, 32, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff',
+    }).setDepth(1);
+
+    // Line 2 right: B + S count (right-aligned before pitcher panel)
+    this.countText = this.add.text(PITCHER_X - PANEL_W / 2 - 10, 32, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff',
+    }).setOrigin(1, 0).setDepth(1);
+
+    this.countManager = new CountManager();
+
+    this.chipBalanceText = this.add.text(640, 6, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
+    }).setOrigin(0.5, 0).setDepth(1).setVisible(false);
 
     this._updateScoreboard();
   }
 
   _updateScoreboard() {
     const s = this.baseball.getStatus();
-    this.inningText.setText(`INN ${s.inning} ${s.half === 'top' ? '\u25b2' : '\u25bc'}`);
     const playerTeam = this.rosterManager.getTeam();
     const playerName = playerTeam ? playerTeam.id : 'YOU';
     const oppTeam = this.rosterManager.getOpponentTeam();
     const oppName = oppTeam ? oppTeam.id : 'OPP';
-    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
+    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}    Chips: ${s.totalChips}`);
 
-    // Position "(you)" indicator under the player team name using actual text bounds
+    // Position "(you)" indicator under the player team name
     this.scoreText.updateText();
     const scoreLeft = this.scoreText.x - this.scoreText.width / 2;
     const measuredWidth = this.add.text(0, -100, playerName, {
-      fontSize: '22px', fontFamily: 'monospace',
+      fontSize: '20px', fontFamily: 'monospace',
     });
     const playerNameWidth = measuredWidth.width;
     measuredWidth.destroy();
     this.youIndicator.setX(scoreLeft + playerNameWidth / 2);
-    this._animateChipCounter(s.totalChips);
 
+    // Line 2 left: INN + Outs
     const outDots = [];
     for (let i = 0; i < 3; i++) {
       outDots.push(i < s.outs ? '\u25cf' : '\u25cb');
     }
-    this.outsText.setText(`Outs: ${outDots.join(' ')}`);
+    const innHalf = s.half === 'top' ? '\u25b2' : '\u25bc';
+    this.inningOutsText.setText(`INN ${s.inning} ${innHalf}   Outs: ${outDots.join(' ')}`);
 
+    // Line 2 right: B + S count
     const count = this.countManager.getCount();
     const ballDots = [];
     for (let i = 0; i < 4; i++) {
       ballDots.push(i < count.balls ? '\u25cf' : '\u25cb');
     }
-    this.ballsDots.setText(ballDots.join(' '));
     const strikeDots = [];
     for (let i = 0; i < 3; i++) {
       strikeDots.push(i < count.strikes ? '\u25cf' : '\u25cb');
     }
-    this.strikesDots.setText(strikeDots.join(' '));
+    this.countText.setText(`B: ${ballDots.join(' ')}   S: ${strikeDots.join(' ')}`);
 
     if (!this._deferBaseUpdate) this._updateBases(s.bases);
   }
@@ -739,24 +725,21 @@ export default class GameScene extends Phaser.Scene {
 
   _updateInfoText() {
     const count = this.countManager.getCount();
-    const countStr = `${count.balls}-${count.strikes}`;
     const freeTakeStr = this.freeTakesRemaining > 0 ? ` | Free takes: ${this.freeTakesRemaining}` : '';
     this.discardInfo.setText(
-      `Count: ${countStr}${freeTakeStr} | Select cards to PLAY or DISCARD`
+      `Select cards to PLAY or DISCARD${freeTakeStr}`
     );
     this.deckInfo.setText(`Deck: ${this.cardEngine.deck.length}`);
 
-    // Update discard button label with count + risk color
+    // Tint discard button by risk level (count shown in scoreboard)
     if (this.discardBtn) {
+      this.discardBtn.txt.setText('DISCARD');
       if (count.strikes === 0) {
-        this.discardBtn.txt.setText(`DISCARD (${countStr})`);
-        this.discardBtn.txt.setColor('#a5d6a7');
+        this.discardBtn.bg.setFillStyle(0x558b2f);  // green — safe
       } else if (count.strikes === 1) {
-        this.discardBtn.txt.setText(`DISCARD (${countStr})`);
-        this.discardBtn.txt.setColor('#fff176');
+        this.discardBtn.bg.setFillStyle(0xf57f17);  // orange — caution
       } else {
-        this.discardBtn.txt.setText(`DISCARD (${countStr}) DANGER`);
-        this.discardBtn.txt.setColor('#ff8a80');
+        this.discardBtn.bg.setFillStyle(0xc62828);  // red — danger
       }
     }
   }
