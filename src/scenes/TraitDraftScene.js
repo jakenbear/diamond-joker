@@ -28,17 +28,17 @@ export default class TraitDraftScene extends Phaser.Scene {
     this.add.rectangle(640, 360, 1280, 720, 0x0d1b2a);
 
     // Title
-    this.add.text(640, 28, 'DRAFT STARTING TRAITS', {
+    this.add.text(640, 40, 'DRAFT STARTING TRAITS', {
       fontSize: '32px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.add.text(640, 56, `${this.team.name} ${this.team.nickname} — pick one trait per batter`, {
+    this.add.text(640, 72, `${this.team.name} ${this.team.nickname} — pick one trait per batter`, {
       fontSize: '14px', fontFamily: 'monospace', color: '#aaaaaa',
     }).setOrigin(0.5);
 
     this._rowButtons = [];
-    const startY = 88;
-    const rowH = 60;
+    const startY = 105;
+    const rowH = 62;
 
     this.team.batters.forEach((batter, i) => {
       const y = startY + i * rowH;
@@ -130,10 +130,10 @@ export default class TraitDraftScene extends Phaser.Scene {
   }
 
   _createConfirmButton() {
-    this._confirmBg = this.add.rectangle(640, 658, 260, 48, 0x444444)
+    this._confirmBg = this.add.rectangle(640, 680, 260, 48, 0x444444)
       .setStrokeStyle(2, 0x555555)
       .setInteractive({ useHandCursor: true });
-    this._confirmTxt = this.add.text(640, 658, 'CONFIRM LINEUP', {
+    this._confirmTxt = this.add.text(640, 680, 'CONFIRM LINEUP', {
       fontSize: '22px', fontFamily: 'monospace', color: '#666666', fontStyle: 'bold',
     }).setOrigin(0.5);
 
