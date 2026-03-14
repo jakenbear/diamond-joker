@@ -280,7 +280,11 @@ export default class CardEngine {
    * pairPenalty: +0.25 per pair/two-pair played this inning (stacks fast)
    */
   static _applyRankQuality(entry, pairRank, handIdx, strikeCount = 0, gameState = null) {
-    const pairsPlayed = gameState?.baseballState?.pairsPlayedThisInning || 0;
+    const bs = gameState?.baseballState;
+    const pairsPlayed = bs?.pairsPlayedThisInning || 0;
+    const tripsPlayed = bs?.tripsPlayedThisInning || 0;
+    const straightsPlayed = bs?.straightsPlayedThisInning || 0;
+    const flushesPlayed = bs?.flushesPlayedThisInning || 0;
 
     let outChance = 0;
 
@@ -289,25 +293,24 @@ export default class CardEngine {
       const twoStrikePenalty = strikeCount >= 2 ? 0.10 : 0;
       const pairPenalty = pairsPlayed * 0.25;
       outChance = 0.95 - (pairRank - 2) * 0.03 + twoStrikePenalty + pairPenalty;
-
-      // Increment pair counter
-      if (gameState?.baseballState) {
-        gameState.baseballState.pairsPlayedThisInning++;
-      }
+      if (bs) bs.pairsPlayedThisInning++;
     } else if (handIdx === 7) {
       // Two Pair
       const pairPenalty = pairsPlayed * 0.12;
       outChance = 0.55 + pairPenalty;
-
-      if (gameState?.baseballState) {
-        gameState.baseballState.pairsPlayedThisInning++;
-      }
+      if (bs) bs.pairsPlayedThisInning++;
     } else if (handIdx === 6) {
       // Three of a Kind
-      outChance = 0.35;
-    } else if (handIdx === 5 || handIdx === 4) {
-      // Straight or Flush
-      outChance = 0.10;
+      outChance = 0.35 + tripsPlayed * 0.15;
+      if (bs) bs.tripsPlayedThisInning++;
+    } else if (handIdx === 5) {
+      // Straight
+      outChance = 0.10 + straightsPlayed * 0.20;
+      if (bs) bs.straightsPlayedThisInning++;
+    } else if (handIdx === 4) {
+      // Flush
+      outChance = 0.10 + flushesPlayed * 0.20;
+      if (bs) bs.flushesPlayedThisInning++;
     }
 
     outChance = Math.min(0.95, Math.max(0.05, outChance));

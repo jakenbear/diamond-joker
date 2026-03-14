@@ -40,7 +40,7 @@ Inning Loop (per inning):
 | Parameter | Value |
 |-----------|-------|
 | Deck size | 52 (standard poker deck) |
-| Hand size | 8 cards |
+| Hand size | 7 cards |
 | Discards | Unlimited (count-based — see Count System) |
 | Cards played | 1–5 (selected from hand) |
 
@@ -113,23 +113,23 @@ outChance = 0.95 - (pairRank - 2) × 0.03 + twoStrikePenalty + pairPenalty
 **Straight / Flush:** 10% base out chance (small upset).
 **Full House+:** 0% out chance (guaranteed hits — reward for building strong hands).
 
-### "Pitcher Adjusts" — Pair Degradation
+### "Pitcher Adjusts" — Universal Hand Degradation
 
-The more pairs/two-pairs you play in a single inning, the worse they get. The pitcher reads your strategy.
+The more you play the same hand type in a single inning, the worse it gets. The pitcher reads your strategy. Each hand type is tracked independently.
 
-| Pair # This Inning | Extra Out Chance (Pair) | Extra Out Chance (Two Pair) |
-|--------------------|------------------------|---------------------------|
-| 1st | +0% | +0% |
-| 2nd | +25% | +12% |
-| 3rd | +50% | +24% |
-| 4th+ | +75% | +36% |
+| # This Inning | Pair (+) | Two Pair (+) | Three of a Kind (+) | Straight (+) | Flush (+) |
+|----------------|----------|-------------|---------------------|-------------|-----------|
+| 1st | +0% | +0% | +0% | +0% | +0% |
+| 2nd | +25% | +12% | +15% | +20% | +20% |
+| 3rd | +50% | +24% | +30% | +40% | +40% |
+| 4th+ | +75% | +36% | +45% | +60% | +60% |
 
 Capped at 95% max out chance. Resets each half-inning.
 
 **Visual warnings** appear on the hand description:
-- 2nd pair: *"Pitcher adjusting..."* (yellow)
-- 3rd pair: *"Pitcher has your number!"* (red)
-- 4th+ pair: *"You're cooked!"* (red)
+- 2nd repeat: *"Pitcher adjusting..."* (yellow)
+- 3rd repeat: *"Pitcher has your number!"* (red)
+- 4th+ repeat: *"You're cooked!"* (red)
 
 ### Contact Rescue
 
@@ -542,10 +542,10 @@ Key parameters to tune:
 
 | Lever | Current Value | Effect |
 |-------|--------------|--------|
-| Hand size | 8 | More cards = more hand options |
+| Hand size | 7 | More cards = more hand options |
 | Discards | 2 | Discard depth for hand improvement |
-| Pair out base | 80% - rank×6% | How risky pairs feel |
-| Pitcher adjusts | +15% per pair | Diminishing returns on pairs |
+| Pair out base | 95% - rank×3% | How risky pairs feel |
+| Pitcher adjusts | +25%/pair, +20%/straight/flush, +15%/trips | Universal hand degradation |
 | Contact rescue | contact × 4% | Pair safety net |
 | Shop buy limits | 1/2/3 | Trait accumulation rate |
 | Fatigue rate | 8% per inning past threshold | Late-game pitcher decay |

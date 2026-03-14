@@ -44,6 +44,9 @@ export default class BaseballState {
     this._currentInningPlayerRuns = 0;
     this._atBatsThisInning = 0;  // Track at-bats for first_batter_of_inning
     this.pairsPlayedThisInning = 0;
+    this.tripsPlayedThisInning = 0;
+    this.straightsPlayedThisInning = 0;
+    this.flushesPlayedThisInning = 0;
     this.staff = [];       // Active coaches and mascots
     this.staffSlots = 2;   // Start with 2 slots, expandable to 4
   }
@@ -364,6 +367,9 @@ export default class BaseballState {
       this.inning++;
       this._atBatsThisInning = 0;
       this.pairsPlayedThisInning = 0;
+      this.tripsPlayedThisInning = 0;
+      this.straightsPlayedThisInning = 0;
+      this.flushesPlayedThisInning = 0;
 
       // Check game over after 9 innings
       if (this.inning > 9 && this.playerScore !== this.opponentScore) {

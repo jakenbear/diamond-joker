@@ -255,6 +255,9 @@ static func _get_pair_rank(freq: Dictionary) -> int:
 static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int, strike_count: int = 0, game_state: Dictionary = {}) -> Dictionary:
 	var bs = game_state.get("baseball_state", null)
 	var pairs_played: int = bs.pairs_played_this_inning if bs else 0
+	var trips_played: int = bs.trips_played_this_inning if bs else 0
+	var straights_played: int = bs.straights_played_this_inning if bs else 0
+	var flushes_played: int = bs.flushes_played_this_inning if bs else 0
 
 	var out_chance: float = 0.0
 
@@ -272,11 +275,20 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 		if bs:
 			bs.pairs_played_this_inning += 1
 	elif hand_idx == 6:
-		# Three of a Kind: 35%
-		out_chance = 0.35
-	elif hand_idx == 5 or hand_idx == 4:
-		# Straight or Flush: 10%
-		out_chance = 0.10
+		# Three of a Kind: 35% + stacking penalty
+		out_chance = 0.35 + trips_played * 0.15
+		if bs:
+			bs.trips_played_this_inning += 1
+	elif hand_idx == 5:
+		# Straight: 10% + stacking penalty
+		out_chance = 0.10 + straights_played * 0.20
+		if bs:
+			bs.straights_played_this_inning += 1
+	elif hand_idx == 4:
+		# Flush: 10% + stacking penalty
+		out_chance = 0.10 + flushes_played * 0.20
+		if bs:
+			bs.flushes_played_this_inning += 1
 
 	out_chance = minf(0.95, maxf(0.05, out_chance))
 

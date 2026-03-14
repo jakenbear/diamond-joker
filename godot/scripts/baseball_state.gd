@@ -38,6 +38,9 @@ var opponent_runs_by_inning: Array[int] = []
 var _current_inning_player_runs: int = 0
 var _at_bats_this_inning: int = 0
 var pairs_played_this_inning: int = 0
+var trips_played_this_inning: int = 0
+var straights_played_this_inning: int = 0
+var flushes_played_this_inning: int = 0
 var staff: Array[Dictionary] = []  # Active coaches and mascots
 var staff_slots: int = 2           # Start with 2 slots, expandable to 4
 
@@ -58,6 +61,9 @@ func reset() -> void:
 	_current_inning_player_runs = 0
 	_at_bats_this_inning = 0
 	pairs_played_this_inning = 0
+	trips_played_this_inning = 0
+	straights_played_this_inning = 0
+	flushes_played_this_inning = 0
 	staff = []
 	staff_slots = 2
 
@@ -308,6 +314,9 @@ func switch_side(sim_runs = null) -> Dictionary:
 		inning += 1
 		_at_bats_this_inning = 0
 		pairs_played_this_inning = 0
+		trips_played_this_inning = 0
+		straights_played_this_inning = 0
+		flushes_played_this_inning = 0
 
 		if inning > 9 and player_score != opponent_score:
 			state = State.GAME_OVER

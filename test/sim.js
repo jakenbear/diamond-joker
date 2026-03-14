@@ -334,8 +334,8 @@ group('1c. Deck Integrity');
   const ce = new CardEngine();
   ce.draw(5);
   ce.discard([0, 1]);
-  assert(ce.hand.length === 8, 'discard([0,1]) → hand still 8 (replacements drawn)');
-  assert(ce.deck.length === 42, 'discard([0,1]) → deck=42');
+  assert(ce.hand.length === 7, 'discard([0,1]) → hand still 7 (replacements drawn)');
+  assert(ce.deck.length === 43, 'discard([0,1]) → deck=43');
 }
 {
   const ce = new CardEngine();
@@ -348,7 +348,7 @@ group('1c. Deck Integrity');
   ce.draw(5);
   ce.playHand([0, 1, 2, 3, 4]);
   const hand = ce.newAtBat();
-  assert(hand.length === 8, 'newAtBat gives 8 cards');
+  assert(hand.length === 7, 'newAtBat gives 7 cards');
   assert(ce.discardsRemaining === undefined, 'CardEngine no longer tracks discardsRemaining');
 }
 {
@@ -846,7 +846,7 @@ group('1c-extra. Deck Exhaustion');
   }
   assert(ce.deck.length < 5, 'Deck depleted to < 5 cards');
   const hand = ce.newAtBat();
-  assert(hand.length === 8, 'newAtBat on near-empty deck still gives 8 cards');
+  assert(hand.length === 7, 'newAtBat on near-empty deck still gives 7 cards');
 }
 {
   // Play 15+ consecutive at-bats draining the deck → no crash
@@ -896,7 +896,7 @@ group('1c-extra. Deck Exhaustion');
   ce.draw(5); // draws only 3 from deck (deck now 0), hand has 3
   // Now discard 2 — needs to reshuffle discard pile to draw replacements
   const result = ce.discard([0, 1]);
-  assert(result.length === 8, `Discard with empty deck refills hand to 8 (got ${result.length})`);
+  assert(result.length === 7, `Discard with empty deck refills hand to 7 (got ${result.length})`);
 }
 
 // ── 1d-extra. Batter Cycling ─────────────────────────────
@@ -2035,7 +2035,7 @@ group('Deck Definitions');
   // Standard deck
   const ce = new CardEngine('standard');
   assert(ce.deck.length === 52, 'Standard deck has 52 cards');
-  assert(ce.handSize === 8, 'Standard hand size is 8');
+  assert(ce.handSize === 7, 'Standard hand size is 7');
 }
 
 {
@@ -2050,7 +2050,7 @@ group('Deck Definitions');
   // Double deck
   const ce = new CardEngine('double');
   assert(ce.deck.length === 104, 'Double deck has 104 cards');
-  assert(ce.handSize === 8, 'Double deck hand size is 8');
+  assert(ce.handSize === 7, 'Double deck hand size is 7');
 }
 
 {
@@ -2215,6 +2215,85 @@ console.log('\n── Pitcher Adjusts: escalating out chance ──');
   assert(bs.pairsPlayedThisInning === 1, 'incremented to 1 after first pair');
   CardEngine.evaluateHand(pairCards, null, null, { baseballState: bs });
   assert(bs.pairsPlayedThisInning === 2, 'incremented to 2 after second pair');
+}
+
+console.log('\n── Universal Pitcher Reads: Straights/Flushes/Trips degrade ──');
+
+{
+  // Straight degradation: 10% base, +20% per repeat
+  const straightCards = [
+    { rank: 5, suit: 'H' }, { rank: 6, suit: 'D' }, { rank: 7, suit: 'C' },
+    { rank: 8, suit: 'S' }, { rank: 9, suit: 'H' },
+  ];
+  const bs = new BaseballState();
+  bs.straightsPlayedThisInning = 2; // 3rd straight: 10% + 40% = 50% out
+  let outs = 0;
+  const trials = 2000;
+  for (let i = 0; i < trials; i++) {
+    bs.straightsPlayedThisInning = 2;
+    const r = CardEngine.evaluateHand(straightCards, null, null, { baseballState: bs });
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
+  }
+  const outRate = outs / trials;
+  assertClose(outRate, 0.38, 0.62, `3rd straight out rate ~50%: ${(outRate*100).toFixed(1)}%`);
+}
+
+{
+  // Flush degradation: 10% base, +20% per repeat
+  const flushCards = [
+    { rank: 2, suit: 'H' }, { rank: 5, suit: 'H' }, { rank: 7, suit: 'H' },
+    { rank: 9, suit: 'H' }, { rank: 12, suit: 'H' },
+  ];
+  const bs = new BaseballState();
+  bs.flushesPlayedThisInning = 2; // 3rd flush: 10% + 40% = 50% out
+  let outs = 0;
+  const trials = 2000;
+  for (let i = 0; i < trials; i++) {
+    bs.flushesPlayedThisInning = 2;
+    const r = CardEngine.evaluateHand(flushCards, null, null, { baseballState: bs });
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
+  }
+  const outRate = outs / trials;
+  assertClose(outRate, 0.38, 0.62, `3rd flush out rate ~50%: ${(outRate*100).toFixed(1)}%`);
+}
+
+{
+  // Three of a Kind degradation: 35% base, +15% per repeat
+  const tripCards = [{ rank: 8, suit: 'H' }, { rank: 8, suit: 'D' }, { rank: 8, suit: 'C' }];
+  const bs = new BaseballState();
+  bs.tripsPlayedThisInning = 2; // 3rd trips: 35% + 30% = 65% out
+  let outs = 0;
+  const trials = 2000;
+  for (let i = 0; i < trials; i++) {
+    bs.tripsPlayedThisInning = 2;
+    const r = CardEngine.evaluateHand(tripCards, null, null, { baseballState: bs });
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
+  }
+  const outRate = outs / trials;
+  assertClose(outRate, 0.53, 0.77, `3rd trips out rate ~65%: ${(outRate*100).toFixed(1)}%`);
+}
+
+{
+  // New tracking fields reset on switchSide
+  const bs = new BaseballState();
+  bs.tripsPlayedThisInning = 3;
+  bs.straightsPlayedThisInning = 2;
+  bs.flushesPlayedThisInning = 1;
+  bs.switchSide(0);
+  assert(bs.tripsPlayedThisInning === 0, 'tripsPlayedThisInning resets on switchSide');
+  assert(bs.straightsPlayedThisInning === 0, 'straightsPlayedThisInning resets on switchSide');
+  assert(bs.flushesPlayedThisInning === 0, 'flushesPlayedThisInning resets on switchSide');
+}
+
+{
+  // Straight/flush/trips counters increment after evaluation
+  const bs = new BaseballState();
+  const straightCards = [
+    { rank: 5, suit: 'H' }, { rank: 6, suit: 'D' }, { rank: 7, suit: 'C' },
+    { rank: 8, suit: 'S' }, { rank: 9, suit: 'H' },
+  ];
+  CardEngine.evaluateHand(straightCards, null, null, { baseballState: bs });
+  assert(bs.straightsPlayedThisInning === 1, 'straightsPlayedThisInning incremented after straight');
 }
 
 console.log('\n── Contact rescue nerf ──');
