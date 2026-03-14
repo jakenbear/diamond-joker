@@ -838,16 +838,20 @@ export default class GameScene extends Phaser.Scene {
     closeBg.on('pointerdown', () => this._toggleRosterOverlay());
     els.push(closeBg, closeTxt);
 
-    // Title
-    els.push(this.add.text(640, 25, 'LINEUP', {
-      fontSize: '24px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    // ── Left column: LINEUP ──
+    const colL = 40;       // left edge of lineup column
+    const colLW = 560;     // lineup column width
+    const colR = 640;      // left edge of right column
+    const colRW = 580;     // right column width
+
+    els.push(this.add.text(colL + colLW / 2, 25, 'LINEUP', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(51));
 
-    // Roster list (left side)
     const roster = this.rosterManager.getRoster();
     const currentIdx = this.rosterManager.getCurrentBatterIndex();
-    const rosterX = 60;
-    const startY = 60;
+    const rosterX = colL + 10;
+    const startY = 55;
     const rowH = 44;
 
     roster.forEach((player, i) => {
@@ -855,7 +859,7 @@ export default class GameScene extends Phaser.Scene {
       const isNext = i === currentIdx;
       const isBonus = player.isBonus;
 
-      const rowBg = this.add.rectangle(310, y + 16, 520, 38,
+      const rowBg = this.add.rectangle(colL + colLW / 2, y + 16, colLW - 10, 38,
         isBonus ? 0x2a2a1a : 0x111d2a, 0.7)
         .setStrokeStyle(1, isNext ? 0x69f0ae : 0x222d3a).setDepth(51);
       els.push(rowBg);
@@ -877,19 +881,19 @@ export default class GameScene extends Phaser.Scene {
         fontSize: '10px', fontFamily: 'monospace', color: '#81c784',
       }).setDepth(52));
 
-      // Traits
+      // Traits (right side of row)
       if (player.traits && player.traits.length > 0) {
         const traitNames = player.traits.map(t => t.name).join(', ');
-        els.push(this.add.text(380, y + 13, traitNames, {
+        els.push(this.add.text(colL + colLW - 20, y + 13, traitNames, {
           fontSize: '9px', fontFamily: 'monospace', color: '#ce93d8',
           wordWrap: { width: 200 },
-        }).setOrigin(0, 0.5).setDepth(52));
+        }).setOrigin(1, 0.5).setDepth(52));
       }
     });
 
-    // Synergies (right side)
-    const synX = 620;
-    els.push(this.add.text(synX + 150, 55, 'SYNERGIES', {
+    // ── Right column: SYNERGIES + GAME LOG ──
+    const synX = colR + 20;
+    els.push(this.add.text(colR + colRW / 2, 25, 'SYNERGIES', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ce93d8', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(51));
 
@@ -897,7 +901,7 @@ export default class GameScene extends Phaser.Scene {
     const activeIds = new Set((this.activeSynergies || []).map(s => s.id));
 
     allSynergies.forEach((syn, i) => {
-      const y = 75 + i * 30;
+      const y = 50 + i * 28;
       const isActive = activeIds.has(syn.id);
       const icon = isActive ? '\u2713' : '\u2717';
       const iconColor = isActive ? '#69f0ae' : '#444444';
@@ -912,26 +916,25 @@ export default class GameScene extends Phaser.Scene {
       }).setDepth(52));
 
       const desc = isActive ? syn.bonusDescription : syn.hint;
-      els.push(this.add.text(synX + 180, y, desc, {
+      els.push(this.add.text(synX + 180, y + 1, desc, {
         fontSize: '9px', fontFamily: 'monospace', color: isActive ? '#81c784' : '#555555',
       }).setDepth(52));
     });
 
-    // Game Log (bottom-right of overlay)
-    const logX = synX;
-    const logTopY = 445;
-    els.push(this.add.text(logX + 150, logTopY - 5, 'GAME LOG', {
+    // Game Log (below synergies in right column)
+    const logTopY = 400;
+    els.push(this.add.text(colR + colRW / 2, logTopY, 'GAME LOG', {
       fontSize: '14px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(51));
 
-    els.push(this.add.rectangle(logX + 150, logTopY + 105, 620, 190, 0x0a1f0d, 0.6)
+    els.push(this.add.rectangle(colR + colRW / 2, logTopY + 125, colRW - 20, 230, 0x0a1f0d, 0.6)
       .setStrokeStyle(1, 0x2e7d32, 0.4).setDepth(51));
 
     const visible = this.gameLogEntries.slice(-12);
     const logText = visible.map(e => e.text).join('\n');
-    els.push(this.add.text(logX + 10, logTopY + 15, logText || '(no entries yet)', {
+    els.push(this.add.text(synX, logTopY + 20, logText || '(no entries yet)', {
       fontSize: '9px', fontFamily: 'monospace', color: '#b0bec5',
-      wordWrap: { width: 600 }, lineSpacing: 2,
+      wordWrap: { width: colRW - 40 }, lineSpacing: 2,
     }).setDepth(52));
   }
 
