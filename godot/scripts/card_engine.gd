@@ -9,7 +9,6 @@ const RANK_NAMES: Dictionary = {11: "J", 12: "Q", 13: "K", 14: "A"}
 var deck: Array[Dictionary] = []
 var hand: Array[Dictionary] = []
 var discard_pile: Array[Dictionary] = []
-var discards_remaining: int = 2
 var hand_size: int = 5
 var _deck_id: String = "standard"
 
@@ -17,7 +16,6 @@ var _deck_id: String = "standard"
 func _init(deck_id: String = "standard") -> void:
 	_deck_id = deck_id
 	var config: Dictionary = Decks.DECK_CONFIGS.get(deck_id, Decks.DECK_CONFIGS["standard"])
-	discards_remaining = config.get("discards", 2)
 	hand_size = config.get("hand_size", 5)
 	_build_deck()
 	shuffle()
@@ -41,8 +39,6 @@ func reset_deck() -> void:
 	shuffle()
 	hand = []
 	discard_pile = []
-	var config: Dictionary = Decks.DECK_CONFIGS.get(_deck_id, Decks.DECK_CONFIGS["standard"])
-	discards_remaining = config.get("discards", 2)
 
 
 func draw(n: int = 5) -> Array[Dictionary]:
@@ -54,10 +50,6 @@ func draw(n: int = 5) -> Array[Dictionary]:
 
 
 func discard(indices: Array[int]) -> Array[Dictionary]:
-	if discards_remaining <= 0:
-		return hand
-	discards_remaining -= 1
-
 	# Sort descending so splicing doesn't shift indices
 	var sorted_indices := indices.duplicate()
 	sorted_indices.sort()
@@ -100,8 +92,6 @@ func play_hand(selected_indices: Array[int] = [], pre_modifier: Callable = Calla
 	# All cards go to discard
 	discard_pile.append_array(hand)
 	hand = []
-	var config: Dictionary = Decks.DECK_CONFIGS.get(_deck_id, Decks.DECK_CONFIGS["standard"])
-	discards_remaining = config.get("discards", 2)
 	return result
 
 
@@ -109,8 +99,6 @@ func new_at_bat() -> Array[Dictionary]:
 	if deck.size() < hand_size:
 		reset_deck()
 	hand = []
-	var config: Dictionary = Decks.DECK_CONFIGS.get(_deck_id, Decks.DECK_CONFIGS["standard"])
-	discards_remaining = config.get("discards", 2)
 	draw(hand_size)
 	return hand
 
