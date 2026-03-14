@@ -112,14 +112,14 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Base Diamond (scorebug mini-diamond) ────────────────
 
   _createBaseDiamond() {
-    // Compact scorebug-style diamond next to outs indicator
-    const cx = 1190, cy = 25;
-    const bs = 10; // base square half-size
-    const gap = 14; // distance from center to each base
+    // Scorebug-style mini diamond — top-right, next to outs
+    const cx = 1230, cy = 70;
+    const bs = 12; // base square size
+    const gap = 18; // distance from center to each base
 
     // Diamond outline
     const g = this.add.graphics().setDepth(8);
-    g.lineStyle(1, 0x4caf50, 0.5);
+    g.lineStyle(1.5, 0x4caf50, 0.4);
     g.beginPath();
     g.moveTo(cx, cy - gap);           // 2nd
     g.lineTo(cx + gap, cy);           // 1st
@@ -129,16 +129,16 @@ export default class PitchingScene extends Phaser.Scene {
     g.strokePath();
 
     // Base squares: 1st (right), 2nd (top), 3rd (left)
-    const emptyColor = 0x333333;
+    const emptyColor = 0x444444;
     this._baseBugSquares = [
-      this.add.rectangle(cx + gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45),  // 1st
-      this.add.rectangle(cx, cy - gap, bs, bs, emptyColor).setDepth(9).setAngle(45),  // 2nd
-      this.add.rectangle(cx - gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45),  // 3rd
+      this.add.rectangle(cx + gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1, 0x666666),  // 1st
+      this.add.rectangle(cx, cy - gap, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1, 0x666666),  // 2nd
+      this.add.rectangle(cx - gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1, 0x666666),  // 3rd
     ];
 
     // Runner name text below the diamond
-    this._baseBugRunnerText = this.add.text(cx, cy + gap + 10, '', {
-      fontSize: '8px', fontFamily: 'monospace', color: '#ffd600',
+    this._baseBugRunnerText = this.add.text(cx, cy + gap + 12, '', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(9);
 
     // Keep these for _advanceOppRunners / _handleIBB compatibility
@@ -151,7 +151,6 @@ export default class PitchingScene extends Phaser.Scene {
     this.runners = [null, null, null];
     this.runnerLabels = [null, null, null];
 
-    // Stash for batter panel sprite updates (no big diamond sprites anymore)
     this._pitchDiamondCx = cx;
     this._pitchDiamondCy = cy;
     this._pitchDiamondSize = gap;
@@ -180,7 +179,7 @@ export default class PitchingScene extends Phaser.Scene {
   }
 
   _showStrikeoutK() {
-    const k = this.add.text(640, 280, 'K', {
+    const k = this.add.text(640, 300, 'K', {
       fontSize: '120px', fontFamily: 'monospace', color: '#ff5252', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(15).setAlpha(0);
     this.tweens.add({
@@ -214,15 +213,15 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Result Display ──────────────────────────────────────
 
   _createResultDisplay() {
-    this.resultText = this.add.text(640, 370, '', {
-      fontSize: '22px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    this.resultText = this.add.text(640, 385, '', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: 600 },
-    }).setOrigin(0.5).setDepth(3);
+    }).setOrigin(0.5).setDepth(10);
 
-    this.handNameText = this.add.text(640, 400, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+    this.handNameText = this.add.text(640, 410, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#81c784',
       align: 'center', wordWrap: { width: 600 },
-    }).setOrigin(0.5).setDepth(3);
+    }).setOrigin(0.5).setDepth(10);
   }
 
   // ── Staff Card Stack (bottom-left, replaces game log) ──
@@ -735,24 +734,26 @@ export default class PitchingScene extends Phaser.Scene {
     this._destroyBoardElements();
     this._boardElements = [];
 
-    // Pitcher hole cards
     const state = this.showdownEngine.getState();
-    const holeY = 440;
-    this._boardElements.push(this.add.text(490, holeY - 25, 'YOUR HAND', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
-    }).setDepth(5));
+
+    // Pitcher hole cards (bottom)
+    const holeY = 480;
+    const holeStartX = 600;
+    this._boardElements.push(this.add.text(holeStartX - 55, holeY, 'YOU', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5));
     state.pitcherHole.forEach((card, i) => {
-      const x = 510 + i * 70;
+      const x = holeStartX + i * 70;
       this._renderCardOnBoard(x, holeY, card, true, false, 'pitcher');
     });
 
-    // Batter hole cards (face-down)
-    const batterY = 220;
-    this._boardElements.push(this.add.text(490, batterY - 25, 'BATTER', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
-    }).setDepth(5));
+    // Batter hole cards (top — face-down)
+    const batterY = 130;
+    this._boardElements.push(this.add.text(holeStartX - 55, batterY, 'OPP', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5));
     state.batterHole.forEach((card, i) => {
-      const x = 510 + i * 70;
+      const x = holeStartX + i * 70;
       this._renderCardOnBoard(x, batterY, card, false, false, 'batter');
     });
   }
@@ -763,12 +764,8 @@ export default class PitchingScene extends Phaser.Scene {
 
     const state = this.showdownEngine.getState();
 
-    // Community cards (center)
-    const commY = 330;
-    this._boardElements.push(this.add.text(640, commY - 35, 'COMMUNITY', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(5));
-
+    // Community cards (center row)
+    const commY = 280;
     const commCount = state.community.length;
     const commStartX = 640 - (commCount - 1) * 40;
     state.community.forEach((card, i) => {
@@ -778,32 +775,27 @@ export default class PitchingScene extends Phaser.Scene {
       this._renderCardOnBoard(x, commY, card, !faceDown, locked, 'community');
     });
 
-    // Pitcher hole cards
-    const holeY = 440;
-    this._boardElements.push(this.add.text(490, holeY - 25, 'YOUR HAND', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
-    }).setDepth(5));
+    // Pitcher hole cards (below community)
+    const holeY = 480;
+    const holeStartX = 600;
+    this._boardElements.push(this.add.text(holeStartX - 55, holeY, 'YOU', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5));
     state.pitcherHole.forEach((card, i) => {
-      const x = 510 + i * 70;
+      const x = holeStartX + i * 70;
       this._renderCardOnBoard(x, holeY, card, true, false, 'pitcher');
     });
 
-    // Batter hole cards
-    const batterY = 220;
-    this._boardElements.push(this.add.text(490, batterY - 25, 'BATTER', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
-    }).setDepth(5));
+    // Batter hole cards (above community)
+    const batterY = 130;
+    this._boardElements.push(this.add.text(holeStartX - 55, batterY, 'OPP', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5));
     state.batterHole.forEach((card, i) => {
-      const x = 510 + i * 70;
+      const x = holeStartX + i * 70;
       const revealed = state.revealedBatterCards.includes(i);
       this._renderCardOnBoard(x, batterY, card, revealed, false, 'batter');
     });
-
-    // Stage label
-    const stageLabel = state.stage.toUpperCase();
-    this._boardElements.push(this.add.text(640, commY + 40, stageLabel, {
-      fontSize: '12px', fontFamily: 'monospace', color: '#81c784', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(5));
   }
 
   _renderCardOnBoard(x, y, card, faceUp, locked, owner) {
@@ -867,9 +859,9 @@ export default class PitchingScene extends Phaser.Scene {
     this.handNameText.setText(`Stage ${stageNum}/3`);
     this.handNameText.setColor('#81c784');
 
-    const btnY = 580;
+    const btnY = 600;
     const btnW = 140;
-    const btnH = 70;
+    const btnH = 65;
     const spacing = btnW + 12;
     const startX = 640 - (repertoire.length - 1) * spacing / 2;
 
