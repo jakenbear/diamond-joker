@@ -119,6 +119,7 @@ export default class GameScene extends Phaser.Scene {
     this.selectedIndices = new Set();
     this.cardSprites = [];
     this.inputLocked = false;
+    this._maxChipsThisInning = 0;
     this.baseGraphics = [];
     this.batterTraitSprites = [];
     this.pitcherTraitSprites = [];
@@ -1830,6 +1831,11 @@ export default class GameScene extends Phaser.Scene {
     // ── Staff effects (mascots & coaches) ──
     const staffBonuses = this._applyStaffEffects(handResult, gameState);
 
+    // ── Bonus player lineup effects ──
+    const lineupBonuses = this._applyLineupEffects(handResult, gameState);
+    // Merge lineup extra base into staff bonuses for unified handling
+    staffBonuses.extraBaseBonus += lineupBonuses.extraBaseBonus;
+
     // Sacrifice fly (trait-based, e.g. on strikeouts)
     let sacrificeFlyRun = 0;
     if (handResult.sacrificeFly) {
@@ -1987,6 +1993,10 @@ export default class GameScene extends Phaser.Scene {
     this._deferBaseUpdate = true;
 
     this.time.delayedCall(resolveStart, () => {
+      // Track max chip hand this inning for pack triggers
+      if (handResult.score > this._maxChipsThisInning) {
+        this._maxChipsThisInning = handResult.score;
+      }
       const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score, batter);
 
       let extraBase = { scored: 0, advanced: false };
@@ -2082,7 +2092,7 @@ export default class GameScene extends Phaser.Scene {
 
       // ── Phase 3: Scoring Cascade for hits (after runners) ──
       this.handNameText.setText('');
-      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage, staffBonuses);
+      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage, staffBonuses, lineupBonuses);
       const totalCascadeDelay = RUNNER_DELAY + cascadeDelay;
 
       // Score popup for runs (after cascade)
@@ -2112,8 +2122,8 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Show scoring cascade: base hand → power → contact → trait → pitcher → staff → final */
-  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg, staffBonuses = null) {
+  /** Show scoring cascade: base hand → power → contact → trait → pitcher → staff → lineup → final */
+  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg, staffBonuses = null, lineupBonuses = null) {
     const steps = [];
     const stepDelay = 350;
     let runningChips = handResult.chips - bonuses.powerChips + pitcherPenalty.chips;
@@ -2177,6 +2187,13 @@ export default class GameScene extends Phaser.Scene {
     // Step 6: Staff bonuses (mascots & coaches)
     if (staffBonuses && staffBonuses.messages.length > 0) {
       for (const msg of staffBonuses.messages) {
+        steps.push({ text: msg.text, color: msg.color });
+      }
+    }
+
+    // Step 6b: Lineup bonuses (bonus players)
+    if (lineupBonuses && lineupBonuses.messages.length > 0) {
+      for (const msg of lineupBonuses.messages) {
         steps.push({ text: msg.text, color: msg.color });
       }
     }
@@ -2464,6 +2481,100 @@ export default class GameScene extends Phaser.Scene {
     return bonuses;
   }
 
+  // ── Bonus Player Lineup Effect Processor ──────────────
+  // Applies passive effects from bonus players in the lineup.
+  // Returns { chipBonus, multBonus, messages[], extraBaseBonus, pairOutReduction, contactSaveBoost }
+
+  _applyLineupEffects(handResult, gameState) {
+    const effects = this.rosterManager.getActiveLineupEffects();
+    const bonuses = { chipBonus: 0, multBonus: 0, messages: [], extraBaseBonus: 0, pairOutReduction: 0, contactSaveBoost: 0 };
+    if (effects.length === 0) return bonuses;
+
+    const isHit = !['Strikeout', 'Groundout', 'Flyout', 'Double Play', "Fielder's Choice"].includes(handResult.outcome);
+    const isXBH = ['Double', 'Triple', 'Home Run'].includes(handResult.outcome);
+
+    for (const eff of effects) {
+      switch (eff.type) {
+        case 'team_add_chips_on_xbh': {
+          if (isXBH) {
+            bonuses.chipBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} chip (XBH bonus)`, color: '#ffd600' });
+          }
+          break;
+        }
+        case 'team_pair_out_reduction': {
+          bonuses.pairOutReduction += eff.value;
+          break;
+        }
+        case 'team_extra_base_chance': {
+          bonuses.extraBaseBonus += eff.value;
+          break;
+        }
+        case 'team_power_mult': {
+          const batter = this.rosterManager.getCurrentBatter();
+          if (batter.power >= (eff.threshold || 8)) {
+            const bonus = Math.round((handResult.mult * eff.value - handResult.mult) * 10) / 10;
+            bonuses.multBonus += bonus;
+            bonuses.messages.push({ text: `x${eff.value} mult (PWR ${batter.power})`, color: '#ff8a65' });
+          }
+          break;
+        }
+        case 'team_add_mult_on_hit': {
+          if (isHit) {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (lineup bonus)`, color: '#ffab40' });
+          }
+          break;
+        }
+        case 'team_strikeout_chips': {
+          if (handResult.outcome === 'Strikeout') {
+            bonuses.chipBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} chips (K bonus)`, color: '#ffd600' });
+          }
+          break;
+        }
+        case 'team_first_pitch_mult': {
+          if (this.discardCount === 0) {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (1st pitch)`, color: '#ffab40' });
+          }
+          break;
+        }
+        case 'team_runner_mult': {
+          const runners = gameState.bases.filter(b => b).length;
+          if (runners > 0) {
+            const bonus = eff.value * runners;
+            bonuses.multBonus += bonus;
+            bonuses.messages.push({ text: `+${bonus}x (${runners} on base)`, color: '#ffab40' });
+          }
+          break;
+        }
+        case 'team_late_inning_chips': {
+          if (gameState.inning >= 7) {
+            bonuses.chipBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} chips (late inning)`, color: '#ffd600' });
+          }
+          break;
+        }
+        case 'team_contact_save_boost': {
+          bonuses.contactSaveBoost += eff.value;
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    // Apply chip/mult bonuses
+    if (bonuses.chipBonus > 0 || bonuses.multBonus > 0) {
+      handResult.chips += bonuses.chipBonus;
+      handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
+      handResult.score = Math.round(handResult.chips * handResult.mult);
+    }
+
+    return bonuses;
+  }
+
   // Pitching methods moved to PitchingScene.js
 
   _goToShop() {
@@ -2477,6 +2588,20 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _goToPitching() {
+    // Check for card pack reward before pitching
+    const packTier = this._checkPackReward();
+    if (packTier) {
+      this.scene.start('PackOpenScene', {
+        tier: packTier,
+        rosterManager: this.rosterManager,
+        traitManager: this.traitManager,
+        baseball: this.baseball,
+        cardEngine: this.cardEngine,
+        gameLogEntries: this.gameLogEntries,
+      });
+      return;
+    }
+
     this.scene.start('PitchingScene', {
       rosterManager: this.rosterManager,
       baseball: this.baseball,
@@ -2484,6 +2609,19 @@ export default class GameScene extends Phaser.Scene {
       cardEngine: this.cardEngine,
       gameLogEntries: this.gameLogEntries,
     });
+  }
+
+  /** Check if batting performance earned a card pack. */
+  _checkPackReward() {
+    const canGetPack = this.rosterManager.bonusPlayerCount < 3;
+    if (!canGetPack) return null;
+
+    const runsThisInning = this.baseball.getStatus().currentInningPlayerRuns;
+    const hadBigHand = this._maxChipsThisInning >= 25;
+
+    if (runsThisInning >= 4 || hadBigHand) return 'gold';
+    if (runsThisInning >= 2) return 'bronze';
+    return null;
   }
 
   _showMidInningTransition() {

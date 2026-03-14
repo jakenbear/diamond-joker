@@ -3,8 +3,10 @@
  * Manages your team (batting) and opponent team (their batters face your pitcher).
  */
 import TEAMS from '../data/teams.js';
+import BATTER_TRAITS from '../data/batter_traits.js';
 
 const MAX_TRAITS_PER_PLAYER = 2;
+const MAX_BONUS_PLAYERS = 3;
 const MAX_PITCHER_TRAITS = 2;
 
 const PITCH_TYPES = {
@@ -171,6 +173,10 @@ export default class RosterManager {
       lineupIndex: i,
     }));
     this.currentBatterIndex = 0;
+
+    // Bonus player tracking
+    this.bonusPlayerCount = 0;
+    this.benchedPlayers = [];
 
     // Your pitcher (pitches against opponent batters)
     this.myPitcher = { ...team.pitchers[pitcherIndex] };
@@ -363,9 +369,48 @@ export default class RosterManager {
   equipTrait(playerIndex, traitCard) {
     const player = this.roster[playerIndex];
     if (!player) return false;
-    if (player.traits.length >= MAX_TRAITS_PER_PLAYER) return false;
+    // Bonus players can hold innate + 2 shop traits (3 total)
+    const cap = player.isBonus ? 3 : MAX_TRAITS_PER_PLAYER;
+    if (player.traits.length >= cap) return false;
     player.traits.push(traitCard);
     return true;
+  }
+
+  // ── Bonus Players ──────────────────────────────────────
+
+  /**
+   * Add a bonus player to the roster, benching the player at replaceIndex.
+   * Innate trait is auto-equipped and doesn't count toward the shop trait cap.
+   * Returns false if at max bonus players or invalid index.
+   */
+  addBonusPlayer(bonusPlayer, replaceIndex) {
+    if (this.bonusPlayerCount >= MAX_BONUS_PLAYERS) return false;
+    if (replaceIndex < 0 || replaceIndex >= this.roster.length) return false;
+
+    const benched = this.roster[replaceIndex];
+    this.benchedPlayers.push(benched);
+
+    const bp = {
+      ...bonusPlayer,
+      traits: [],
+      isBonus: true,
+      lineupIndex: replaceIndex,
+    };
+
+    // Equip innate trait (marked so it doesn't count toward shop cap)
+    const trait = BATTER_TRAITS.find(t => t.id === bonusPlayer.innateTraitId);
+    if (trait) bp.traits.push({ ...trait, isInnate: true });
+
+    this.roster[replaceIndex] = bp;
+    this.bonusPlayerCount++;
+    return true;
+  }
+
+  /** Get all active lineup effects from bonus players in the roster. */
+  getActiveLineupEffects() {
+    return this.roster
+      .filter(p => p.isBonus && p.lineupEffect)
+      .map(p => p.lineupEffect);
   }
 
   applyBatterModifiers(evalResult, gameState) {

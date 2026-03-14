@@ -8,6 +8,7 @@ import GameScene from './scenes/GameScene.js';
 import PitchingScene from './scenes/PitchingScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
 import ShopScene from './scenes/ShopScene.js';
+import PackOpenScene from './scenes/PackOpenScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -15,7 +16,7 @@ const config = {
   height: 720,
   backgroundColor: 0x1b5e20,
   parent: 'game-container',
-  scene: [TitleScene, TeamSelectScene, TraitDraftScene, GameScene, PitchingScene, GameOverScene, ShopScene],
+  scene: [TitleScene, TeamSelectScene, TraitDraftScene, GameScene, PitchingScene, GameOverScene, ShopScene, PackOpenScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

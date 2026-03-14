@@ -14,6 +14,7 @@ import BATTER_TRAITS from '../data/batter_traits.js';
 import PITCHER_TRAITS from '../data/pitcher_traits.js';
 import COACHES from '../data/coaches.js';
 import MASCOTS from '../data/mascots.js';
+import BONUS_PLAYERS from '../data/bonus_players.js';
 
 // ── Test Harness ────────────────────────────────────────
 
@@ -2417,6 +2418,99 @@ console.log('\n\x1b[1m── Part 7: Staff Effect Integration ──\x1b[0m');
   for (const c of COACHES) {
     assert(knownCoachTypes.has(c.effect.type), `Coach "${c.name}" has known effect type: ${c.effect.type}`);
   }
+}
+
+// ═══════════════════════════════════════════════════════
+//  PART 8: BONUS PLAYERS & CARD PACKS
+// ═══════════════════════════════════════════════════════
+
+console.log('\n\x1b[1m── Part 8: Bonus Players & Card Packs ──\x1b[0m');
+
+{
+  // 8a: Bonus player data validation
+  assert(BONUS_PLAYERS.length >= 12, `At least 12 bonus players defined (got ${BONUS_PLAYERS.length})`);
+  const bpIds = new Set();
+  for (const bp of BONUS_PLAYERS) {
+    assert(bp.id && bp.name, `Bonus player has id and name: ${bp.id}`);
+    assert(bp.power && bp.contact && bp.speed, `${bp.name} has stats`);
+    assert(bp.pos, `${bp.name} has position`);
+    assert(bp.bats === 'L' || bp.bats === 'R', `${bp.name} has valid bats`);
+    assert(bp.innateTraitId, `${bp.name} has innateTraitId`);
+    assert(BATTER_TRAITS.some(t => t.id === bp.innateTraitId), `${bp.name} innate trait '${bp.innateTraitId}' exists in batter_traits`);
+    assert(bp.lineupEffect && bp.lineupEffect.type, `${bp.name} has lineup effect`);
+    assert(bp.lineupDescription, `${bp.name} has lineup description`);
+    assert(['common', 'uncommon', 'rare'].includes(bp.rarity), `${bp.name} has valid rarity`);
+    assert(!bpIds.has(bp.id), `${bp.name} has unique ID`);
+    bpIds.add(bp.id);
+  }
+
+  // Rarity distribution
+  const bpRarity = { common: 0, uncommon: 0, rare: 0 };
+  for (const bp of BONUS_PLAYERS) bpRarity[bp.rarity]++;
+  assert(bpRarity.common >= 3, `At least 3 common bonus players (got ${bpRarity.common})`);
+  assert(bpRarity.uncommon >= 3, `At least 3 uncommon bonus players (got ${bpRarity.uncommon})`);
+  assert(bpRarity.rare >= 2, `At least 2 rare bonus players (got ${bpRarity.rare})`);
+
+  // 8b: Lineup effect types are valid
+  const knownLineupTypes = new Set([
+    'team_add_chips_on_xbh', 'team_pair_out_reduction', 'team_extra_base_chance',
+    'team_power_mult', 'team_add_mult_on_hit', 'team_strikeout_chips',
+    'team_first_pitch_mult', 'team_runner_mult', 'team_late_inning_chips',
+    'team_contact_save_boost',
+  ]);
+  for (const bp of BONUS_PLAYERS) {
+    assert(knownLineupTypes.has(bp.lineupEffect.type),
+      `${bp.name} lineup effect type '${bp.lineupEffect.type}' is known`);
+  }
+
+  // 8c: RosterManager bonus player methods
+  const rm2 = new RosterManager(TEAMS[0], 0, TEAMS[1]);
+  assert(rm2.bonusPlayerCount === 0, 'Starts with 0 bonus players');
+  assert(rm2.getActiveLineupEffects().length === 0, 'No lineup effects initially');
+
+  // Add a bonus player
+  const testBP = BONUS_PLAYERS[0]; // Knuckles McBride
+  const originalPlayer = rm2.getRoster()[4]; // 5th batter
+  assert(rm2.addBonusPlayer(testBP, 4), 'Can add bonus player');
+  assert(rm2.bonusPlayerCount === 1, 'Bonus count is 1');
+  assert(rm2.benchedPlayers.length === 1, 'One player benched');
+  assert(rm2.benchedPlayers[0].name === originalPlayer.name, 'Correct player benched');
+
+  const newPlayer = rm2.getRoster()[4];
+  assert(newPlayer.isBonus === true, 'New player marked as bonus');
+  assert(newPlayer.name === testBP.name, 'Bonus player has correct name');
+  assert(newPlayer.traits.length === 1, 'Innate trait auto-equipped');
+  assert(newPlayer.traits[0].isInnate === true, 'Innate trait marked');
+
+  // Lineup effects
+  const effects = rm2.getActiveLineupEffects();
+  assert(effects.length === 1, 'One lineup effect active');
+  assert(effects[0].type === testBP.lineupEffect.type, 'Correct lineup effect type');
+
+  // Max 3 bonus players
+  const rm3 = new RosterManager(TEAMS[0], 0, TEAMS[1]);
+  assert(rm3.addBonusPlayer(BONUS_PLAYERS[0], 0), 'Add 1st bonus player');
+  assert(rm3.addBonusPlayer(BONUS_PLAYERS[1], 1), 'Add 2nd bonus player');
+  assert(rm3.addBonusPlayer(BONUS_PLAYERS[2], 2), 'Add 3rd bonus player');
+  assert(!rm3.addBonusPlayer(BONUS_PLAYERS[3], 3), 'Cannot add 4th bonus player');
+  assert(rm3.bonusPlayerCount === 3, 'Max 3 bonus players enforced');
+
+  // 8d: Bonus players get 3 trait slots (innate + 2 shop)
+  const rm4 = new RosterManager(TEAMS[0], 0, TEAMS[1]);
+  rm4.addBonusPlayer(BONUS_PLAYERS[0], 0);
+  const bp = rm4.getRoster()[0];
+  assert(bp.traits.length === 1, 'Starts with innate trait');
+  assert(rm4.equipTrait(0, BATTER_TRAITS[0]), 'Can equip 1st shop trait');
+  assert(bp.traits.length === 2, 'Has 2 traits now');
+  assert(rm4.equipTrait(0, BATTER_TRAITS[1]), 'Can equip 2nd shop trait');
+  assert(bp.traits.length === 3, 'Has 3 traits (innate + 2 shop)');
+  assert(!rm4.equipTrait(0, BATTER_TRAITS[2]), 'Cannot equip 4th trait');
+
+  // 8e: Regular players still capped at 2 traits
+  const rm5 = new RosterManager(TEAMS[0], 0, TEAMS[1]);
+  assert(rm5.equipTrait(0, BATTER_TRAITS[0]), 'Regular player: equip 1st');
+  assert(rm5.equipTrait(0, BATTER_TRAITS[1]), 'Regular player: equip 2nd');
+  assert(!rm5.equipTrait(0, BATTER_TRAITS[2]), 'Regular player: cannot equip 3rd');
 }
 
 // ═══════════════════════════════════════════════════════
