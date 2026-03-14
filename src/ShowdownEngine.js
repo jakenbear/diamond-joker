@@ -12,6 +12,13 @@ import CardEngine from './CardEngine.js';
 
 const SUITS = ['H', 'D', 'C', 'S'];
 
+// Stamina cost per pitch (from PITCH_TYPES, simplified for showdown)
+const PITCH_STAMINA = {
+  fastball: 0.06, breaking: 0.04, changeup: 0.02, slider: 0.03,
+  cutter: 0.04, curveball: 0.04, sinker: 0.03, splitter: 0.05,
+  twoseam: 0.03, knuckle: 0.01, screwball: 0.05, palmball: 0.02,
+};
+
 export default class ShowdownEngine {
   /**
    * Generate a 20-card pitcher deck based on velocity.
@@ -47,9 +54,13 @@ export default class ShowdownEngine {
     this.faceDownIndices = [];
     this.hiddenNextCard = false;
     this._revealedBatterCards = [];
+    this.staminaDrained = 0;
+    this.pitcherTraits = pitcher.traits || [];
   }
 
-  start(batterStats = null) {
+  start(batterStats = null, outs = 0, inning = 1) {
+    this.outs = outs;
+    this.inning = inning;
     this.pitcherDeck = ShowdownEngine.generateDeck(this.pitcher.velocity, this.pitcher.control);
     const batterVel = batterStats ? (batterStats.contact * 0.6 + batterStats.power * 0.4) : 5;
     this.batterDeck = ShowdownEngine.generateDeck(batterVel, 5);
@@ -132,7 +143,10 @@ export default class ShowdownEngine {
     const pHand = ShowdownEngine.bestHand(this.pitcherHole, this.community);
     const bHand = ShowdownEngine.bestHand(this.batterHole, this.community);
 
-    const pScore = pHand.score;
+    // Apply pitcher trait bonuses
+    const traitBonus = this._calcTraitBonus();
+
+    const pScore = pHand.score + traitBonus;
     const bScore = bHand.score;
 
     let winner, margin;
@@ -160,6 +174,7 @@ export default class ShowdownEngine {
       outcome,
       isOut: winner === 'pitcher',
       margin,
+      traitBonus,
     };
   }
 
@@ -174,6 +189,48 @@ export default class ShowdownEngine {
     if (margin >= 8) return Math.random() < 0.5 ? 'Triple' : 'Double';
     if (margin >= 3) return 'Double';
     return 'Single';
+  }
+
+  // ── Trait Bonuses ───────────────────────────────────────
+
+  /**
+   * Calculate pitcher score bonus from traits.
+   * Translates batting-scene pitcher traits into showdown score bonuses.
+   */
+  _calcTraitBonus() {
+    let bonus = 0;
+    for (const trait of this.pitcherTraits) {
+      const id = typeof trait === 'string' ? trait : trait.id;
+      switch (id) {
+        case 'heater':       bonus += 3; break;
+        case 'painted_corner': bonus += 2; break;
+        case 'changeup':     bonus += 1; break;
+        case 'slider':
+          bonus += this.outs === 2 ? 2 : 1;
+          break;
+        case 'intimidation':
+          bonus += this.outs === 0 ? 3 : (this.outs === 2 ? -2 : 0);
+          break;
+        case 'closers_instinct':
+          if (this.inning >= 7 && this.inning <= 9) bonus += 5;
+          break;
+        case 'curveball':
+          // 30% chance to downgrade batter's best hole card
+          if (Math.random() < 0.3) {
+            const idx = this.batterHole[0].rank >= this.batterHole[1].rank ? 0 : 1;
+            this.batterHole[idx].rank = Math.max(2, this.batterHole[idx].rank - 3);
+          }
+          break;
+        case 'knuckleball':
+          // Randomize one community card's suit
+          if (this.community.length > 0) {
+            const ci = Math.floor(Math.random() * this.community.length);
+            this.community[ci].suit = SUITS[Math.floor(Math.random() * 4)];
+          }
+          break;
+      }
+    }
+    return bonus;
   }
 
   // ── Pitch Effects ───────────────────────────────────────
@@ -207,9 +264,34 @@ export default class ShowdownEngine {
     const handler = effects[pitchKey];
     if (!handler) return { success: false, reason: 'Unknown pitch' };
 
+    // Control-based misfire for targeted effects:
+    // Low control = chance to hit wrong target
+    const targeted = ['slider', 'cutter', 'splitter', 'twoseam', 'knuckle', 'breaking'];
+    if (targeted.includes(pitchKey) && options.targetIndex !== undefined) {
+      const misfireChance = Math.max(0, (6 - this.pitcher.control) * 0.08);
+      if (Math.random() < misfireChance && this.community.length > 1) {
+        // Pick a random different target
+        let newTarget;
+        do { newTarget = Math.floor(Math.random() * this.community.length); }
+        while (newTarget === options.targetIndex && this.community.length > 1);
+        options.targetIndex = newTarget;
+        options.misfired = true;
+      }
+    }
+
     const result = handler(options);
-    if (result.success) this.pitchesUsed.push(pitchKey);
+    if (result.success) {
+      this.pitchesUsed.push(pitchKey);
+      // Drain stamina
+      this.staminaDrained += PITCH_STAMINA[pitchKey] || 0.03;
+      if (options.misfired) result.misfired = true;
+    }
     return result;
+  }
+
+  /** Total stamina drained during this at-bat's showdown */
+  getStaminaDrained() {
+    return this.staminaDrained;
   }
 
   _effectFastball({ swapIndex = 0 }) {

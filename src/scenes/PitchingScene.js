@@ -686,7 +686,7 @@ export default class PitchingScene extends Phaser.Scene {
     const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
 
     this.showdownEngine = new ShowdownEngine(pitcher);
-    this.showdownEngine.start(batter);
+    this.showdownEngine.start(batter, this._pitchState.outs, this._pitchState.inning);
     if (this._pitchState.atBatNumber > 1) {
       this.showdownEngine.degradeDeck(this._pitchState.atBatNumber);
     }
@@ -1110,6 +1110,12 @@ export default class PitchingScene extends Phaser.Scene {
     const bHandName = result.batterHand.handName || 'High Card';
     this.handNameText.setText(`You: ${pHandName} (${result.pitcherHand.score}) vs Batter: ${bHandName} (${result.batterHand.score})`);
     this.handNameText.setColor('#b0bec5');
+
+    // Apply pitch-effect stamina drain
+    const pitchStaminaDrain = this.showdownEngine.getStaminaDrained();
+    if (pitchStaminaDrain > 0) {
+      this.rosterManager.myPitcherStamina = Math.max(0, this.rosterManager.myPitcherStamina - pitchStaminaDrain);
+    }
 
     // Apply result to pitch state
     this.time.delayedCall(1500, () => this._applyShowdownResult(result));

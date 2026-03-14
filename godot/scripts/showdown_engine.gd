@@ -6,6 +6,12 @@ extends RefCounted
 
 const SUITS := ["H", "D", "C", "S"]
 
+const PITCH_STAMINA := {
+	"fastball": 0.06, "breaking": 0.04, "changeup": 0.02, "slider": 0.03,
+	"cutter": 0.04, "curveball": 0.04, "sinker": 0.03, "splitter": 0.05,
+	"twoseam": 0.03, "knuckle": 0.01, "screwball": 0.05, "palmball": 0.02,
+}
+
 var pitcher: Dictionary
 var pitcher_deck: Array[Dictionary] = []
 var batter_deck: Array[Dictionary] = []
@@ -18,6 +24,10 @@ var locked_indices: Array[int] = []
 var face_down_indices: Array[int] = []
 var hidden_next_card: bool = false
 var _revealed_batter_cards: Array[int] = []
+var stamina_drained: float = 0.0
+var pitcher_traits: Array = []
+var outs: int = 0
+var inning: int = 1
 
 
 static func generate_deck(velocity: int, control: int) -> Array[Dictionary]:
@@ -31,7 +41,9 @@ static func generate_deck(velocity: int, control: int) -> Array[Dictionary]:
 	return deck
 
 
-func start(batter_stats: Dictionary = {}) -> void:
+func start(batter_stats: Dictionary = {}, p_outs: int = 0, p_inning: int = 1) -> void:
+	outs = p_outs
+	inning = p_inning
 	pitcher_deck = ShowdownEngine.generate_deck(pitcher.get("velocity", 5), pitcher.get("control", 5))
 	var batter_vel := 5.0
 	if batter_stats.size() > 0:
@@ -49,6 +61,8 @@ func start(batter_stats: Dictionary = {}) -> void:
 	face_down_indices = []
 	hidden_next_card = false
 	_revealed_batter_cards = []
+	stamina_drained = 0.0
+	pitcher_traits = pitcher.get("traits", [])
 
 
 func deal_flop() -> void:
@@ -72,13 +86,11 @@ func deal_river() -> void:
 static func best_hand(hole: Array[Dictionary], comm: Array[Dictionary]) -> Dictionary:
 	var all_cards := hole + comm
 	if all_cards.size() < 5:
-		# Not enough for combos — just return basic eval
 		return {"score": 0, "hand_name": "High Card"}
 	var best: Dictionary = {}
 	var best_score := -1
 	var combos := _combinations(all_cards, 5)
 	for combo in combos:
-		# Use simplified scoring since we don't have CardEngine in GDScript yet
 		var result := _evaluate_simple(combo)
 		if result["score"] > best_score:
 			best = result
@@ -145,7 +157,6 @@ static func _evaluate_simple(cards: Array[Dictionary]) -> Dictionary:
 	elif counts[0] == 2:
 		score = 5; hand_name = "Pair"
 
-	# Add high card bonus
 	score += ranks[ranks.size() - 1]
 
 	return {"score": score, "hand_name": hand_name}
@@ -156,18 +167,47 @@ static func _is_straight(sorted: Array[int]) -> bool:
 		return false
 	for i in range(1, sorted.size()):
 		if sorted[i] != sorted[i - 1] + 1:
-			# Check ace-low
 			if sorted[4] == 14 and sorted[0] == 2 and sorted[1] == 3 and sorted[2] == 4 and sorted[3] == 5:
 				return true
 			return false
 	return true
 
 
+# Trait Bonuses
+
+func _calc_trait_bonus() -> int:
+	var bonus := 0
+	for trait in pitcher_traits:
+		var id: String = trait if trait is String else trait.get("id", "")
+		match id:
+			"heater": bonus += 3
+			"painted_corner": bonus += 2
+			"changeup": bonus += 1
+			"slider":
+				bonus += 2 if outs == 2 else 1
+			"intimidation":
+				if outs == 0: bonus += 3
+				elif outs == 2: bonus -= 2
+			"closers_instinct":
+				if inning >= 7 and inning <= 9: bonus += 5
+			"curveball":
+				if randf() < 0.3:
+					var idx := 0 if batter_hole[0]["rank"] >= batter_hole[1]["rank"] else 1
+					batter_hole[idx]["rank"] = maxi(2, batter_hole[idx]["rank"] - 3)
+			"knuckleball":
+				if community.size() > 0:
+					var ci := randi() % community.size()
+					community[ci]["suit"] = SUITS[randi() % 4]
+	return bonus
+
+
 func resolve() -> Dictionary:
 	var p_hand := ShowdownEngine.best_hand(pitcher_hole, community)
 	var b_hand := ShowdownEngine.best_hand(batter_hole, community)
 
-	var p_score: int = p_hand["score"]
+	var trait_bonus := _calc_trait_bonus()
+
+	var p_score: int = p_hand["score"] + trait_bonus
 	var b_score: int = b_hand["score"]
 
 	var winner: String
@@ -198,6 +238,7 @@ func resolve() -> Dictionary:
 		"outcome": outcome,
 		"is_out": winner == "pitcher",
 		"margin": margin,
+		"trait_bonus": trait_bonus,
 	}
 
 
@@ -220,6 +261,17 @@ func apply_pitch(pitch_key: String, options: Dictionary = {}) -> Dictionary:
 	if pitches_used.has(pitch_key):
 		return {"success": false, "reason": "Already used this pitch"}
 
+	# Control-based misfire for targeted effects
+	var targeted := ["slider", "cutter", "splitter", "twoseam", "knuckle", "breaking"]
+	if targeted.has(pitch_key) and options.has("target_index"):
+		var misfire_chance := maxf(0, (6 - pitcher.get("control", 5)) * 0.08)
+		if randf() < misfire_chance and community.size() > 1:
+			var new_target: int = options["target_index"]
+			while new_target == options["target_index"] and community.size() > 1:
+				new_target = randi() % community.size()
+			options["target_index"] = new_target
+			options["misfired"] = true
+
 	var result: Dictionary
 	match pitch_key:
 		"fastball": result = _effect_fastball(options)
@@ -238,7 +290,14 @@ func apply_pitch(pitch_key: String, options: Dictionary = {}) -> Dictionary:
 
 	if result.get("success", false):
 		pitches_used.append(pitch_key)
+		stamina_drained += PITCH_STAMINA.get(pitch_key, 0.03)
+		if options.get("misfired", false):
+			result["misfired"] = true
 	return result
+
+
+func get_stamina_drained() -> float:
+	return stamina_drained
 
 
 func _effect_fastball(opts: Dictionary) -> Dictionary:

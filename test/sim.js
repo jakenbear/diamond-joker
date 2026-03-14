@@ -3812,6 +3812,144 @@ group('25h. ShowdownEngine — Stamina degradation');
   assert(typeof sd.degradeDeck === 'function', 'degradeDeck method exists');
 }
 
+group('25i. ShowdownEngine — Stamina drain from pitch effects');
+{
+  const sd = new ShowdownEngine({ velocity: 7, control: 6, stamina: 5 });
+  sd.start();
+  sd.dealFlop();
+  assert(sd.getStaminaDrained() === 0, 'No stamina drained initially');
+  sd.applyPitch('fastball', { swapIndex: 0 });
+  assert(sd.getStaminaDrained() === 0.06, 'Fastball drains 0.06 stamina');
+  sd.applyPitch('changeup');
+  assert(Math.abs(sd.getStaminaDrained() - 0.08) < 0.001, 'Changeup adds 0.02 more');
+  sd.applyPitch('slider', { targetIndex: 0 });
+  assert(Math.abs(sd.getStaminaDrained() - 0.11) < 0.001, 'Slider adds 0.03 more');
+}
+
+group('25j. ShowdownEngine — Control misfire on targeted effects');
+{
+  // Low control pitcher — force misfire by seeding many attempts
+  const sd = new ShowdownEngine({ velocity: 5, control: 1, stamina: 5 }); // control=1 → 40% misfire
+  sd.start();
+  sd.dealFlop();
+  // Run slider many times on fresh engines, track if target ever changes
+  let misfireCount = 0;
+  for (let i = 0; i < 100; i++) {
+    const eng = new ShowdownEngine({ velocity: 5, control: 1, stamina: 5 });
+    eng.start();
+    eng.dealFlop();
+    // community has 3 cards, target index 0
+    const origTarget = 0;
+    const opts = { targetIndex: origTarget };
+    eng.applyPitch('slider', opts);
+    if (opts.misfired) misfireCount++;
+  }
+  assert(misfireCount > 5, `Low control pitcher should misfire sometimes (got ${misfireCount}/100)`);
+
+  // High control pitcher — rarely misfires
+  let highCtrlMisfires = 0;
+  for (let i = 0; i < 100; i++) {
+    const eng = new ShowdownEngine({ velocity: 5, control: 10, stamina: 5 });
+    eng.start();
+    eng.dealFlop();
+    const opts = { targetIndex: 0 };
+    eng.applyPitch('slider', opts);
+    if (opts.misfired) highCtrlMisfires++;
+  }
+  assert(highCtrlMisfires === 0, `High control pitcher should never misfire (got ${highCtrlMisfires}/100)`);
+}
+
+group('25k. ShowdownEngine — Pitcher trait bonuses');
+{
+  // Heater trait adds +3 to pitcher score
+  const eng1 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['heater'] });
+  eng1.start();
+  eng1.dealFlop();
+  eng1.dealTurn();
+  eng1.dealRiver();
+  const result1 = eng1.resolve();
+  assert(result1.traitBonus === 3, `Heater trait gives +3 bonus (got ${result1.traitBonus})`);
+
+  // Painted corner + changeup = +3 total
+  const eng2 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['painted_corner', 'changeup'] });
+  eng2.start();
+  eng2.dealFlop();
+  eng2.dealTurn();
+  eng2.dealRiver();
+  const result2 = eng2.resolve();
+  assert(result2.traitBonus === 3, `Painted corner(+2) + changeup(+1) = +3 (got ${result2.traitBonus})`);
+
+  // Intimidation at 0 outs = +3
+  const eng3 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['intimidation'] });
+  eng3.start(null, 0, 1); // 0 outs
+  eng3.dealFlop();
+  eng3.dealTurn();
+  eng3.dealRiver();
+  const result3 = eng3.resolve();
+  assert(result3.traitBonus === 3, `Intimidation at 0 outs = +3 (got ${result3.traitBonus})`);
+
+  // Intimidation at 2 outs = -2
+  const eng4 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['intimidation'] });
+  eng4.start(null, 2, 1); // 2 outs
+  eng4.dealFlop();
+  eng4.dealTurn();
+  eng4.dealRiver();
+  const result4 = eng4.resolve();
+  assert(result4.traitBonus === -2, `Intimidation at 2 outs = -2 (got ${result4.traitBonus})`);
+
+  // Closer's instinct in inning 8 = +5
+  const eng5 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['closers_instinct'] });
+  eng5.start(null, 0, 8); // inning 8
+  eng5.dealFlop();
+  eng5.dealTurn();
+  eng5.dealRiver();
+  const result5 = eng5.resolve();
+  assert(result5.traitBonus === 5, `Closer's instinct inning 8 = +5 (got ${result5.traitBonus})`);
+
+  // Closer's instinct in inning 3 = 0
+  const eng6 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['closers_instinct'] });
+  eng6.start(null, 0, 3); // inning 3
+  eng6.dealFlop();
+  eng6.dealTurn();
+  eng6.dealRiver();
+  const result6 = eng6.resolve();
+  assert(result6.traitBonus === 0, `Closer's instinct inning 3 = 0 (got ${result6.traitBonus})`);
+
+  // No traits = 0 bonus
+  const eng7 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5 });
+  eng7.start();
+  eng7.dealFlop();
+  eng7.dealTurn();
+  eng7.dealRiver();
+  const result7 = eng7.resolve();
+  assert(result7.traitBonus === 0, `No traits = 0 bonus (got ${result7.traitBonus})`);
+
+  // Slider trait at 2 outs = +2, at 1 out = +1
+  const eng8 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['slider'] });
+  eng8.start(null, 2, 1);
+  eng8.dealFlop();
+  eng8.dealTurn();
+  eng8.dealRiver();
+  const result8 = eng8.resolve();
+  assert(result8.traitBonus === 2, `Slider trait at 2 outs = +2 (got ${result8.traitBonus})`);
+
+  const eng9 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['slider'] });
+  eng9.start(null, 1, 1);
+  eng9.dealFlop();
+  eng9.dealTurn();
+  eng9.dealRiver();
+  const result9 = eng9.resolve();
+  assert(result9.traitBonus === 1, `Slider trait at 1 out = +1 (got ${result9.traitBonus})`);
+}
+
+group('25l. ShowdownEngine — start() accepts outs and inning');
+{
+  const sd = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5 });
+  sd.start(null, 2, 7);
+  assert(sd.outs === 2, 'outs stored correctly');
+  assert(sd.inning === 7, 'inning stored correctly');
+}
+
 // ═══════════════════════════════════════════════════════
 
 console.log('\n' + '═'.repeat(50));
