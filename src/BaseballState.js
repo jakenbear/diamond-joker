@@ -13,12 +13,12 @@ const OUTCOME_EFFECTS = {
   'Double':             { basesToMove: 2, isOut: false },
   'Triple':             { basesToMove: 3, isOut: false },
   'Home Run':           { basesToMove: 4, isOut: false },
-  'Walk':               { basesToMove: 1, isOut: false },
+  'Walk':               { basesToMove: 1, isOut: false, isWalk: true },
   'Double Play':        { basesToMove: 0, isOut: true, outsRecorded: 2 },
   'Fielder\'s Choice':  { basesToMove: 0, isOut: true, fieldsersChoice: true },
   'Error':              { basesToMove: 1, isOut: false },
   'Dropped Third Strike': { basesToMove: 1, isOut: false },
-  'HBP':                { basesToMove: 1, isOut: false },
+  'HBP':                { basesToMove: 1, isOut: false, isWalk: true },
   'Sac Bunt':           { basesToMove: 0, isOut: true, sacBunt: true },
 };
 
@@ -174,7 +174,7 @@ export default class BaseballState {
         this.state = 'BATTING';
       }
     } else {
-      runsScored = this._advanceRunners(effect.basesToMove, batter);
+      runsScored = this._advanceRunners(effect.basesToMove, batter, effect.isWalk);
 
       if (this.half === 'top') {
         this.playerScore += runsScored;
@@ -254,7 +254,7 @@ export default class BaseballState {
    * Advance runners by a number of bases. Batter also occupies a base (unless HR/4).
    * Returns runs scored.
    */
-  _advanceRunners(basesToMove, batter = null) {
+  _advanceRunners(basesToMove, batter = null, isWalk = false) {
     let runs = 0;
 
     if (basesToMove >= 4) {
@@ -264,7 +264,35 @@ export default class BaseballState {
       return runs;
     }
 
-    // Advance existing runners from 3rd base backward
+    if (isWalk) {
+      // Walk/HBP: only advance runners in a continuous forced chain from 1st
+      // Find how far the force extends (1st occupied, 1st+2nd, 1st+2nd+3rd)
+      let forceUpTo = -1; // highest base index that is forced
+      for (let i = 0; i < 3; i++) {
+        if (this.bases[i]) {
+          forceUpTo = i;
+        } else {
+          break; // chain broken
+        }
+      }
+
+      // Advance forced runners from highest to lowest
+      for (let i = forceUpTo; i >= 0; i--) {
+        const runner = this.bases[i];
+        this.bases[i] = null;
+        if (i + 1 >= 3) {
+          runs++; // scores from 3rd
+        } else {
+          this.bases[i + 1] = runner;
+        }
+      }
+
+      // Place batter on 1st
+      this.bases[0] = batter || true;
+      return runs;
+    }
+
+    // Hits: advance all existing runners by basesToMove
     for (let i = 2; i >= 0; i--) {
       if (!this.bases[i]) continue;
       const runner = this.bases[i];

@@ -269,7 +269,7 @@ export default class RosterManager {
 
     // IBB — automatic walk
     if (pitchType === 'ibb') {
-      const scored = this._advanceRunners(bases, 1, 0, batter);
+      const scored = this._advanceRunners(bases, 1, 0, batter, true);
       this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
       return { outcome: 'Walk (IBB)', isOut: false, basesGained: 1, batter, walked: true, scored };
     }
@@ -284,7 +284,7 @@ export default class RosterManager {
     if (pitchType === 'breaking') {
       const walkChance = Math.max(0, (6 - pitcher.control) * 0.04);
       if (walkChance > 0 && Math.random() < walkChance) {
-        const scored = this._advanceRunners(bases, 1, 0, batter);
+        const scored = this._advanceRunners(bases, 1, 0, batter, true);
         this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
         return { outcome: 'Walk', isOut: false, basesGained: 1, batter, walked: true, scored };
       }
@@ -585,7 +585,7 @@ export default class RosterManager {
   /**
    * Advance runners on bases. Returns number of runs scored.
    */
-  _advanceRunners(bases, basesGained, batterSpeed, batter = null) {
+  _advanceRunners(bases, basesGained, batterSpeed, batter = null, isWalk = false) {
     let scored = 0;
 
     if (basesGained >= 4) {
@@ -595,7 +595,30 @@ export default class RosterManager {
       return scored;
     }
 
-    // Move runners forward by basesGained
+    if (isWalk) {
+      // Walk/HBP: only advance runners in a continuous forced chain from 1st
+      let forceUpTo = -1;
+      for (let i = 0; i < 3; i++) {
+        if (bases[i]) {
+          forceUpTo = i;
+        } else {
+          break;
+        }
+      }
+      for (let i = forceUpTo; i >= 0; i--) {
+        const runner = bases[i];
+        bases[i] = null;
+        if (i + 1 >= 3) {
+          scored++;
+        } else {
+          bases[i + 1] = runner;
+        }
+      }
+      bases[0] = batter || true;
+      return scored;
+    }
+
+    // Hits: move runners forward by basesGained
     for (let i = 2; i >= 0; i--) {
       if (bases[i]) {
         const runner = bases[i];

@@ -14,12 +14,12 @@ const OUTCOME_EFFECTS: Dictionary = {
 	"Double":             {"bases_to_move": 2, "is_out": false},
 	"Triple":             {"bases_to_move": 3, "is_out": false},
 	"Home Run":           {"bases_to_move": 4, "is_out": false},
-	"Walk":               {"bases_to_move": 1, "is_out": false},
+	"Walk":               {"bases_to_move": 1, "is_out": false, "is_walk": true},
 	"Double Play":        {"bases_to_move": 0, "is_out": true, "outs_recorded": 2},
 	"Fielder's Choice":   {"bases_to_move": 0, "is_out": true, "fielders_choice": true},
 	"Error":              {"bases_to_move": 1, "is_out": false},
 	"Dropped Third Strike": {"bases_to_move": 1, "is_out": false},
-	"HBP":                {"bases_to_move": 1, "is_out": false},
+	"HBP":                {"bases_to_move": 1, "is_out": false, "is_walk": true},
 	"Sac Bunt":           {"bases_to_move": 0, "is_out": true, "sac_bunt": true},
 }
 
@@ -167,7 +167,7 @@ func resolve_outcome(outcome: String, hand_score: int = 0, batter = null) -> Dic
 		else:
 			state = State.BATTING
 	else:
-		runs_scored = _advance_runners(effect.get("bases_to_move", 0), batter)
+		runs_scored = _advance_runners(effect.get("bases_to_move", 0), batter, effect.get("is_walk", false))
 
 		if half == "top":
 			player_score += runs_scored
@@ -225,7 +225,7 @@ func advance_all_runners() -> int:
 	return runs
 
 
-func _advance_runners(bases_to_move: int, batter = null) -> int:
+func _advance_runners(bases_to_move: int, batter = null, is_walk: bool = false) -> int:
 	var runs: int = 0
 
 	if bases_to_move >= 4:
@@ -237,7 +237,25 @@ func _advance_runners(bases_to_move: int, batter = null) -> int:
 		bases = [null, null, null]
 		return runs
 
-	# Advance existing runners from 3rd base backward
+	if is_walk:
+		# Walk/HBP: only advance runners in a continuous forced chain from 1st
+		var force_up_to: int = -1
+		for i in range(3):
+			if bases[i]:
+				force_up_to = i
+			else:
+				break
+		for i in range(force_up_to, -1, -1):
+			var runner = bases[i]
+			bases[i] = null
+			if i + 1 >= 3:
+				runs += 1
+			else:
+				bases[i + 1] = runner
+		bases[0] = batter if batter else true
+		return runs
+
+	# Hits: advance existing runners from 3rd base backward
 	for i in range(2, -1, -1):
 		if not bases[i]:
 			continue

@@ -2857,6 +2857,73 @@ group('10b. CountManager — Strikeout & Walk Detection');
 
 // ═══════════════════════════════════════════════════════
 //  SUMMARY
+// ── 10c. Walk/HBP Force Advance (only forced runners move) ──
+
+group('10c. Walk/HBP — Only Forced Runners Advance');
+
+{
+  // Bug: runner on 3rd only, walk should NOT score a run
+  const bs1 = new BaseballState();
+  bs1.bases = [null, null, { name: 'Runner Third' }]; // only 3rd occupied
+  bs1.resolveOutcome('Walk', 0);
+  assert(bs1.bases[0] !== null, 'Walk: batter reaches 1st');
+  assert(bs1.bases[2] !== null, 'Walk: runner on 3rd stays (not forced)');
+  assert(bs1.playerScore === 0, 'Walk with runner on 3rd only: no run scores');
+}
+
+{
+  // Runner on 1st and 3rd: walk forces 1st→2nd, 3rd stays
+  const bs2 = new BaseballState();
+  bs2.bases = [{ name: 'Runner First' }, null, { name: 'Runner Third' }];
+  bs2.resolveOutcome('Walk', 0);
+  assert(bs2.bases[0] !== null, 'Walk: batter on 1st');
+  assert(bs2.bases[1] !== null, 'Walk: runner forced 1st→2nd');
+  assert(bs2.bases[2] !== null, 'Walk: runner on 3rd stays (not forced)');
+  assert(bs2.playerScore === 0, 'Walk with 1st+3rd: no run scores');
+}
+
+{
+  // Bases loaded: walk forces all, run scores
+  const bs3 = new BaseballState();
+  bs3.bases = [{ name: 'R1' }, { name: 'R2' }, { name: 'R3' }];
+  bs3.resolveOutcome('Walk', 0);
+  assert(bs3.playerScore === 1, 'Bases loaded walk: 1 run scores');
+  assert(bs3.bases[0] !== null, 'Bases loaded walk: batter on 1st');
+  assert(bs3.bases[1] !== null, 'Bases loaded walk: runner on 2nd');
+  assert(bs3.bases[2] !== null, 'Bases loaded walk: runner on 3rd');
+}
+
+{
+  // 1st and 2nd occupied: walk forces 1st→2nd, 2nd→3rd, no run
+  const bs4 = new BaseballState();
+  bs4.bases = [{ name: 'R1' }, { name: 'R2' }, null];
+  bs4.resolveOutcome('Walk', 0);
+  assert(bs4.bases[0] !== null, 'Walk: batter on 1st');
+  assert(bs4.bases[1] !== null, 'Walk: forced to 2nd');
+  assert(bs4.bases[2] !== null, 'Walk: forced to 3rd');
+  assert(bs4.playerScore === 0, 'Walk with 1st+2nd: no run scores');
+}
+
+{
+  // HBP same behavior — runner on 3rd only, no run
+  const bs5 = new BaseballState();
+  bs5.bases = [null, null, { name: 'Runner Third' }];
+  bs5.resolveOutcome('HBP', 0);
+  assert(bs5.bases[2] !== null, 'HBP: runner on 3rd stays');
+  assert(bs5.playerScore === 0, 'HBP with runner on 3rd only: no run scores');
+}
+
+{
+  // 2nd and 3rd occupied: walk puts batter on 1st, no one forced
+  const bs6 = new BaseballState();
+  bs6.bases = [null, { name: 'R2' }, { name: 'R3' }];
+  bs6.resolveOutcome('Walk', 0);
+  assert(bs6.bases[0] !== null, 'Walk: batter on 1st');
+  assert(bs6.bases[1] !== null, 'Walk: runner on 2nd stays');
+  assert(bs6.bases[2] !== null, 'Walk: runner on 3rd stays');
+  assert(bs6.playerScore === 0, 'Walk with 2nd+3rd: no run scores');
+}
+
 // ═══════════════════════════════════════════════════════
 
 console.log('\n' + '═'.repeat(50));
