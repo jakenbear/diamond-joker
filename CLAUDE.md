@@ -21,6 +21,7 @@ When making ANY gameplay change (mechanics, balance, outcomes, traits, etc.):
 | `src/EffectEngine.js` | `godot/scripts/effect_engine.gd` |
 | `src/SituationalEngine.js` | `godot/scripts/situational_engine.gd` |
 | `src/TraitManager.js` | `godot/scripts/trait_manager.gd` |
+| `src/CountManager.js` | `godot/scripts/count_manager.gd` |
 | `data/hand_table.js` | `godot/scripts/data/hand_table.gd` |
 | `data/teams.js` | `godot/scripts/data/teams.gd` |
 | `data/decks.js` | `godot/scripts/data/decks.gd` |
