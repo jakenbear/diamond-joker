@@ -18,9 +18,9 @@ const CARD_ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
 
 const CARD_W = 96;
 const CARD_H = 126;
-const CARD_SPACING = 85;
+const CARD_SPACING = 105;
 const HAND_Y = 570;
-const HAND_START_X = 640 - (7 * CARD_SPACING) / 2;
+const HAND_START_X = 640 - 3 * CARD_SPACING;
 
 // Panel constants
 const PANEL_W = 210;

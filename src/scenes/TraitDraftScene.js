@@ -130,10 +130,28 @@ export default class TraitDraftScene extends Phaser.Scene {
   }
 
   _createConfirmButton() {
-    this._confirmBg = this.add.rectangle(640, 680, 260, 48, 0x444444)
+    // Randomize button (dice)
+    const diceBg = this.add.rectangle(440, 680, 160, 48, 0x1a2a3a)
+      .setStrokeStyle(2, 0x5c6bc0)
+      .setInteractive({ useHandCursor: true });
+    const diceTxt = this.add.text(440, 680, '\u{1F3B2} RANDOM', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#7986cb', fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    diceBg.on('pointerover', () => diceBg.setStrokeStyle(2, 0x9fa8da));
+    diceBg.on('pointerout', () => diceBg.setStrokeStyle(2, 0x5c6bc0));
+    diceBg.on('pointerdown', () => {
+      for (let i = 0; i < 9; i++) {
+        this.picks[i] = Math.random() < 0.5 ? 0 : 1;
+      }
+      this._refreshHighlights();
+    });
+
+    // Confirm button
+    this._confirmBg = this.add.rectangle(740, 680, 260, 48, 0x444444)
       .setStrokeStyle(2, 0x555555)
       .setInteractive({ useHandCursor: true });
-    this._confirmTxt = this.add.text(640, 680, 'CONFIRM LINEUP', {
+    this._confirmTxt = this.add.text(740, 680, 'CONFIRM LINEUP', {
       fontSize: '22px', fontFamily: 'monospace', color: '#666666', fontStyle: 'bold',
     }).setOrigin(0.5);
 
