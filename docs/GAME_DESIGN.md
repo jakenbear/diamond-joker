@@ -41,7 +41,7 @@ Inning Loop (per inning):
 |-----------|-------|
 | Deck size | 52 (standard poker deck) |
 | Hand size | 8 cards |
-| Discards per at-bat | 2 |
+| Discards | Unlimited (count-based — see Count System) |
 | Cards played | 1–5 (selected from hand) |
 
 When the deck runs low, the discard pile is reshuffled back in.
@@ -73,14 +73,19 @@ When the deck runs low, the discard pile is reshuffled back in.
 ## Batting Mechanics
 
 ### At-Bat Flow
-1. Draw 8 cards
-2. Optionally discard (up to 2 times) to improve your hand
-3. Select 1–5 cards and hit "Play Hand"
-4. Hand is evaluated → baseball outcome determined
-5. Batter/pitcher traits applied
-6. Situational plays checked (double play, error, etc.)
-7. Runners advance, runs score, chips earned
-8. Next batter (9-player lineup cycles)
+1. Draw 8 cards (count starts at 0-0, or 1-0 with Walk Machine)
+2. Optionally discard to improve your hand — each discard is a pitch (see Count System)
+   - STRIKE: count advances toward strikeout
+   - BALL: count advances toward walk
+   - FOUL: (at 2 strikes only) count stays, you survive
+3. If count reaches 4 balls → Walk (free base, skip to step 7)
+4. If count reaches 3 strikes → Strikeout (at-bat over, skip to step 7)
+5. Select 1–5 cards and hit "Play Hand" at any point during the count
+6. Hand is evaluated → baseball outcome determined
+7. Batter/pitcher traits applied
+8. Situational plays checked (double play, error, etc.)
+9. Runners advance, runs score, chips earned
+10. Next batter (9-player lineup cycles)
 
 ### Rank Quality — The Pair Gamble
 
@@ -139,39 +144,93 @@ A contact-10 batter rescues 40% of failed pairs back to singles.
 
 ---
 
-## Ball-Strike Count
+## Count-Based Discard System
 
-Each discard = 1 pitch thrown at you.
+The ball-strike count IS the discard system. There is no hard discard limit — the count is your limiter. Each discard simulates a pitch, creating real risk/reward tension.
+
+### Core Rules
+- Each DISCARD = a pitch is thrown → results in STRIKE, BALL, or FOUL
+- **3 strikes** → Strikeout (at-bat over, no hand played)
+- **4 balls** → Walk (batter takes first base, no hand played)
+- You can PLAY your hand at any point during the count
+- Count starts at 0-0 (unless modified by traits)
+
+### Pitch Outcome Probability
+
+**Before 2 strikes** — two outcomes (STRIKE or BALL):
 
 ```
-ballChance = max(0, (7 - pitcherControl) × 0.08)
+strikeChance = 0.40
+  + (pitcherVelocity - 5) × 0.02     // high-velo pitchers throw more strikes
+  + (pitcherControl - 5) × 0.02      // high-control pitchers hit the zone
+  - (batterContact - 5) × 0.03       // high-contact batters lay off bad pitches
+strikeChance = clamp(strikeChance, 0.15, 0.65)
+ballChance = 1.0 - strikeChance
 ```
 
-| Pitcher Control | Ball % per Pitch |
-|-----------------|-----------------|
-| 1 | 48% |
-| 3 | 32% |
-| 5 | 16% |
-| 7+ | 0% |
+**At 2 strikes** — three outcomes (FOUL, STRIKE, or BALL):
 
-- 4 balls = walk (free base, no hand evaluation)
-- Strikes cap at 2 (fouls protect you after that)
+```
+foulChance = batterContact × 0.04     // high-contact batters foul off to survive
+remaining = 1.0 - foulChance
+strikeChance = remaining × (base strikeChance from above)
+ballChance = remaining × (1.0 - base strikeChance)
+```
 
-### Count Modifiers
+### Probability Examples
 
-Your ball-strike count affects chip/mult bonuses:
+| Batter CNT | Pitcher VEL/CTL | Strike % | Foul % (at 2K) | Feel |
+|------------|-----------------|----------|-----------------|------|
+| 5 vs 5/5 | 40% | 20% | Average matchup |
+| 9 vs 5/5 | 28% | 36% | Safe to discard |
+| 3 vs 8/7 | 52% | 12% | Very risky |
+| 7 vs 6/5 | 36% | 28% | Manageable |
+| 5 vs 9/8 | 48% | 20% | Tough pitcher |
 
-| Count | Chips | Mult |
-|-------|-------|------|
-| 3-0 | +2 | +1.0 |
-| 2-0 | +1 | +0.5 |
-| 3-1 | +1 | +0.5 |
-| 3-2 | 0 | +0.5 |
-| 0-1 | 0 | -0.2 |
-| 1-2 | 0 | -0.3 |
-| 0-2 | -1 | -0.5 |
+### Strategic Scenarios
 
-Being ahead in the count rewards patience. Behind = penalized.
+| Count | Situation | Decision |
+|-------|-----------|----------|
+| 0-0 | Bad hand | Discard freely, low risk |
+| 1-1 | Mediocre hand | Depends on batter contact |
+| 0-2 | Need better hand | Very risky — only if batter has high contact (fouls) |
+| 3-0 | Decent hand | Consider discarding for the walk |
+| 3-2 | Full count | All or nothing — play your hand or gamble on one more |
+| 2-0 | Good hand | Play it — you're ahead in the count |
+
+### Count Modifiers (Chip/Mult Bonuses)
+
+Your count when you PLAY the hand affects scoring:
+
+| Count | Chips | Mult | Notes |
+|-------|-------|------|-------|
+| 3-0 | +2 | +1.0 | Patient eye rewarded |
+| 2-0 | +1 | +0.5 | Ahead in count |
+| 3-1 | +1 | +0.5 | Hitter's count |
+| 3-2 | 0 | +0.5 | Full count drama |
+| 0-1 | 0 | -0.2 | Slightly behind |
+| 1-2 | 0 | -0.3 | Pitcher's count |
+| 0-2 | -1 | -0.5 | In the hole |
+
+### Interaction with Existing Systems
+
+| System | How It Interacts |
+|--------|-----------------|
+| **Walk Machine trait** | Starts count at 1-0 (one free ball) |
+| **"Free take" traits** (Batting Gloves, Fresh Cleats, Bench Coach) | Grant free discards that don't add to count |
+| **Nine Lives mascot** | First strikeout-by-count each inning triggers redraw |
+| **Contact stat** | Higher contact = more fouls at 2 strikes = safer discarding |
+| **Opponent pitcher stats** | Their velocity/control affect YOUR discard risk |
+| **Bunt Single / Foul Fighter traits** | Still convert High Cards, but now you might not need to discard at all |
+
+### UI Display
+- Count shown near batter panel as dots/circles (balls = green, strikes = red)
+- DISCARD button shows current count and risk level:
+  - **Green** (0 strikes): "DISCARD (0-0)"
+  - **Yellow** (1 strike): "DISCARD (1-1)"
+  - **Red** (2 strikes): "DISCARD (0-2) DANGER"
+- Strike/ball/foul result flashes on screen after each discard
+- New cards dealt after discard animation
 
 ---
 
