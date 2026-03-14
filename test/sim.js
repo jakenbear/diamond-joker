@@ -3576,6 +3576,243 @@ group('24. CardEngine — At-Bat Cycle');
 }
 
 // ═══════════════════════════════════════════════════════
+// 25. ShowdownEngine
+// ═══════════════════════════════════════════════════════
+
+import ShowdownEngine from '../src/ShowdownEngine.js';
+
+group('25a. ShowdownEngine — Deck generation');
+{
+  const deck = ShowdownEngine.generateDeck(9, 5);
+  assert(deck.length === 20, 'Pitcher deck has 20 cards');
+  assert(deck.every(c => c.rank >= 2 && c.rank <= 14), 'All ranks in valid range');
+  assert(deck.every(c => ['H','D','C','S'].includes(c.suit)), 'All suits valid');
+
+  const avgRank = (d) => d.reduce((s, c) => s + c.rank, 0) / d.length;
+  let highSum = 0, lowSum = 0;
+  for (let i = 0; i < 50; i++) {
+    highSum += avgRank(ShowdownEngine.generateDeck(10, 5));
+    lowSum += avgRank(ShowdownEngine.generateDeck(4, 5));
+  }
+  assert(highSum / 50 > lowSum / 50, 'High velocity decks have higher avg rank than low velocity');
+}
+
+group('25b. ShowdownEngine — Board state & stages');
+{
+  const sd = new ShowdownEngine({ velocity: 8, control: 7, stamina: 6 });
+  sd.start();
+  assert(sd.pitcherHole.length === 2, 'Pitcher gets 2 hole cards');
+  assert(sd.batterHole.length === 2, 'Batter gets 2 hole cards');
+  assert(sd.community.length === 0, 'No community cards yet');
+  assert(sd.stage === 'pre-flop', 'Stage is pre-flop');
+
+  sd.dealFlop();
+  assert(sd.community.length === 3, 'Flop deals 3 community cards');
+  assert(sd.stage === 'flop', 'Stage is flop');
+
+  sd.dealTurn();
+  assert(sd.community.length === 4, 'Turn deals 4th community card');
+  assert(sd.stage === 'turn', 'Stage is turn');
+
+  sd.dealRiver();
+  assert(sd.community.length === 5, 'River deals 5th community card');
+  assert(sd.stage === 'river', 'Stage is river');
+}
+
+group('25c. ShowdownEngine — Resolution');
+{
+  const sd = new ShowdownEngine({ velocity: 8, control: 7, stamina: 6 });
+  sd.start();
+  // Pitcher: pair of Aces vs Batter: pair of 3s
+  sd.pitcherHole = [{ rank: 14, suit: 'H' }, { rank: 14, suit: 'S' }];
+  sd.batterHole = [{ rank: 3, suit: 'H' }, { rank: 3, suit: 'S' }];
+  sd.community = [
+    { rank: 7, suit: 'C' }, { rank: 9, suit: 'D' }, { rank: 10, suit: 'H' },
+    { rank: 5, suit: 'S' }, { rank: 2, suit: 'C' },
+  ];
+  sd.stage = 'river';
+  const r1 = sd.resolve();
+  assert(r1.winner === 'pitcher', 'Pitcher wins with better pair');
+  assert(r1.pitcherHand.handName !== undefined, 'Pitcher hand has handName');
+  assert(r1.batterHand.handName !== undefined, 'Batter hand has handName');
+  assert(typeof r1.outcome === 'string', 'Result has outcome string');
+  assert(r1.isOut === true, 'Pitcher win = out');
+
+  // Batter wins scenario
+  const sd2 = new ShowdownEngine({ velocity: 8, control: 7, stamina: 6 });
+  sd2.start();
+  sd2.pitcherHole = [{ rank: 3, suit: 'H' }, { rank: 2, suit: 'S' }];
+  sd2.batterHole = [{ rank: 14, suit: 'H' }, { rank: 14, suit: 'S' }];
+  sd2.community = [
+    { rank: 7, suit: 'C' }, { rank: 9, suit: 'D' }, { rank: 10, suit: 'H' },
+    { rank: 5, suit: 'S' }, { rank: 6, suit: 'C' },
+  ];
+  sd2.stage = 'river';
+  const r2 = sd2.resolve();
+  assert(r2.winner === 'batter', 'Batter wins with better hand');
+  assert(r2.isOut === false, 'Batter win = hit');
+  assert(['Single', 'Double', 'Triple', 'Home Run'].includes(r2.outcome), 'Batter outcome is valid hit type');
+}
+
+group('25d. ShowdownEngine — Core pitch effects');
+{
+  // Fastball: swap hole card from top 30%
+  const sd3 = new ShowdownEngine({ velocity: 9, control: 7, stamina: 6 });
+  sd3.start();
+  sd3.dealFlop();
+  const fbResult = sd3.applyPitch('fastball', { swapIndex: 0 });
+  assert(fbResult.success === true, 'Fastball succeeds');
+  assert(sd3.pitcherHole[0].rank !== undefined, 'Fastball swap produces valid card');
+  assert(sd3.pitchesUsed.includes('fastball'), 'Fastball marked as used');
+  const fbResult2 = sd3.applyPitch('fastball', { swapIndex: 0 });
+  assert(fbResult2.success === false, 'Cannot reuse same pitch');
+
+  // Changeup: peek at batter hole card
+  const sd4 = new ShowdownEngine({ velocity: 7, control: 8, stamina: 6 });
+  sd4.start();
+  sd4.dealFlop();
+  const peekResult = sd4.applyPitch('changeup', {});
+  assert(peekResult.success === true, 'Changeup succeeds');
+  assert(peekResult.revealed !== undefined, 'Changeup reveals a batter card');
+  assert(peekResult.revealed.rank >= 2 && peekResult.revealed.rank <= 14, 'Revealed card has valid rank');
+
+  // Slider: replace one community card
+  const sd5 = new ShowdownEngine({ velocity: 7, control: 7, stamina: 6 });
+  sd5.start();
+  sd5.dealFlop();
+  const sliderResult = sd5.applyPitch('slider', { targetIndex: 1 });
+  assert(sliderResult.success === true, 'Slider succeeds');
+  assert(sd5.community.length === 3, 'Community still has 3 cards after slider');
+  assert(sliderResult.replaced !== undefined, 'Slider returns replaced card info');
+}
+
+group('25e. ShowdownEngine — All pitch effects');
+{
+  function testPitch(pitchKey, setupFn, assertFn) {
+    const sd = new ShowdownEngine({ velocity: 7, control: 7, stamina: 6 });
+    sd.start();
+    sd.dealFlop();
+    if (setupFn) setupFn(sd);
+    const result = sd.applyPitch(pitchKey, { targetIndex: 0, swapIndex: 0 });
+    assertFn(result, sd);
+  }
+
+  testPitch('cutter', null, (r, sd) => {
+    assert(r.success === true, 'Cutter succeeds');
+    assert(sd.lockedIndices.includes(0), 'Cutter locks target community card');
+  });
+
+  testPitch('curveball', null, (r, sd) => {
+    assert(r.success === true, 'Curveball succeeds');
+    assert(r.downgraded === true || r.misfired === true, 'Curveball either downgrades or misfires');
+  });
+
+  testPitch('sinker', (sd) => {
+    sd._preSinkerRanks = sd.community.map(c => c.rank);
+  }, (r, sd) => {
+    assert(r.success === true, 'Sinker succeeds');
+    sd.community.forEach((c, i) => {
+      assert(c.rank === Math.max(2, sd._preSinkerRanks[i] - 1), `Sinker: community[${i}] rank decreased`);
+    });
+  });
+
+  testPitch('splitter', null, (r, sd) => {
+    assert(r.success === true, 'Splitter succeeds');
+    assert(sd.community.length === 2, 'Splitter removes one community card');
+  });
+
+  testPitch('twoseam', null, (r, sd) => {
+    assert(r.success === true, 'Two-seam succeeds');
+    assert(typeof r.newSuit === 'string', 'Two-seam reports new suit');
+  });
+
+  testPitch('knuckle', null, (r, sd) => {
+    assert(r.success === true, 'Knuckleball succeeds');
+    assert(sd.community.length === 3, 'Board still has 3 cards after knuckleball');
+  });
+
+  testPitch('screwball', null, (r, sd) => {
+    assert(r.success === true, 'Screwball succeeds');
+    assert(r.replacedBatterCard !== undefined, 'Screwball reports replaced batter card');
+  });
+
+  testPitch('palmball', null, (r, sd) => {
+    assert(r.success === true, 'Palmball succeeds');
+    assert(sd.hiddenNextCard === true, 'Palmball hides next card');
+  });
+
+  testPitch('breaking', null, (r, sd) => {
+    assert(r.success === true, 'Breaking ball succeeds');
+    assert(sd.faceDownIndices.length > 0, 'Breaking ball has a face-down card');
+  });
+}
+
+group('25f. ShowdownEngine — Full at-bat flow');
+{
+  const sd = new ShowdownEngine({ velocity: 8, control: 7, stamina: 6 });
+  const batter = { power: 7, contact: 6, speed: 5 };
+  sd.start(batter);
+  assert(sd.stage === 'pre-flop', 'Starts at pre-flop');
+
+  sd.dealFlop();
+  assert(sd.stage === 'flop', 'After flop');
+  assert(sd.applyPitch('changeup', {}).success, 'Pitch 1 at flop');
+
+  sd.dealTurn();
+  assert(sd.stage === 'turn', 'After turn');
+  assert(sd.applyPitch('slider', { targetIndex: 0 }).success, 'Pitch 2 at turn');
+
+  sd.dealRiver();
+  assert(sd.stage === 'river', 'After river');
+  assert(sd.applyPitch('fastball', { swapIndex: 0 }).success, 'Pitch 3 at river');
+
+  const result = sd.resolve();
+  assert(['pitcher', 'batter'].includes(result.winner), 'Has a winner');
+  assert(typeof result.outcome === 'string', 'Has outcome');
+  assert(typeof result.isOut === 'boolean', 'Has isOut');
+
+  const state = sd.getState();
+  assert(state.pitcherHole.length === 2, 'State has pitcher hole');
+  assert(state.community.length === 5, 'State has full community');
+  assert(state.stage === 'river', 'State has stage');
+  assert(Array.isArray(state.pitchesUsed), 'State has pitchesUsed');
+}
+
+group('25g. ShowdownEngine — Outcome validity (100 runs)');
+{
+  const validOuts = ['Strikeout', 'Flyout', 'Groundout'];
+  const validHits = ['Single', 'Double', 'Triple', 'Home Run'];
+  const allValid = [...validOuts, ...validHits];
+  let outCount = 0, hitCount = 0;
+  for (let i = 0; i < 100; i++) {
+    const sd = new ShowdownEngine({ velocity: 7, control: 7, stamina: 6 });
+    sd.start({ power: 6, contact: 6, speed: 5 });
+    sd.dealFlop();
+    sd.dealTurn();
+    sd.dealRiver();
+    const r = sd.resolve();
+    if (!allValid.includes(r.outcome)) {
+      assert(false, `Showdown ${i}: invalid outcome "${r.outcome}"`);
+    }
+    if (r.isOut) outCount++; else hitCount++;
+  }
+  assert(outCount > 0, 'Some showdowns produce outs');
+  assert(hitCount > 0, 'Some showdowns produce hits');
+  assert(outCount + hitCount === 100, 'All 100 showdowns resolved');
+}
+
+group('25h. ShowdownEngine — Stamina degradation');
+{
+  const sd = new ShowdownEngine({ velocity: 9, control: 7, stamina: 4 });
+  sd.start();
+  const deckBefore = sd.pitcherDeck.length;
+  sd.degradeDeck(3); // 3rd at-bat
+  assert(sd.pitcherDeck.length <= deckBefore, 'Deck shrinks after degradation');
+  assert(sd.pitcherDeck.length >= 5, 'Deck never goes below 5 cards');
+  assert(typeof sd.degradeDeck === 'function', 'degradeDeck method exists');
+}
+
+// ═══════════════════════════════════════════════════════
 
 console.log('\n' + '═'.repeat(50));
 console.log(`\x1b[1m  RESULTS: \x1b[32m${passed} passed\x1b[0m, \x1b[${failed > 0 ? '31' : '32'}m${failed} failed\x1b[0m`);
