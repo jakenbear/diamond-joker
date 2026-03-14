@@ -45,7 +45,8 @@ export default class PitchingScene extends Phaser.Scene {
     this._createScoreboard();
     this._createBaseDiamond();
     this._createResultDisplay();
-    this._createGameLog();
+    this._createStaffStack();
+    this._createRosterButton();
     this._createPitcherPanel();
     this._createBatterPanel();
 
@@ -267,41 +268,202 @@ export default class PitchingScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(3);
   }
 
-  // ── Game Log ────────────────────────────────────────────
+  // ── Staff Card Stack (bottom-left, replaces game log) ──
 
-  _createGameLog() {
-    const logX = 10, logY = 495, logW = 220, logH = 210;
+  _createStaffStack() {
+    const stackX = 10;
+    const stackY = 495;
+    const stackW = 220;
+    const stackH = 170;
 
-    this.add.rectangle(logX + logW / 2, logY + logH / 2, logW, logH, 0x0a1f0d, 0.8)
+    this.add.rectangle(stackX + stackW / 2, stackY + stackH / 2, stackW, stackH, 0x0a1f0d, 0.8)
       .setStrokeStyle(1, 0x2e7d32, 0.5).setDepth(0);
-    this.add.text(logX + 8, logY + 4, 'GAME LOG', {
+
+    this.add.text(stackX + 8, stackY + 4, 'STAFF', {
       fontSize: '9px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setDepth(1);
 
-    this.gameLogText = this.add.text(logX + 8, logY + 18, '', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#b0bec5',
-      wordWrap: { width: logW - 16 }, lineSpacing: 2,
-    }).setDepth(1);
+    const staff = this.baseball.getStaff();
+    if (staff.length === 0) {
+      this.add.text(stackX + stackW / 2, stackY + stackH / 2, 'No staff hired', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#555555',
+      }).setOrigin(0.5).setDepth(1);
+      return;
+    }
 
-    const mask = this.add.rectangle(logX + logW / 2, logY + logH / 2 + 8, logW, logH - 16, 0xffffff)
-      .setVisible(false);
-    this.gameLogText.setMask(mask.createGeometryMask());
+    staff.forEach((item, i) => {
+      const cardY = stackY + 20 + i * 38;
+      const isCoach = item.category === 'coach';
+      const badgeColor = isCoach ? 0x00695c : 0x6d4c00;
+      const textColor = isCoach ? '#80cbc4' : '#ffab40';
 
-    // Render existing entries
-    this._refreshGameLog();
+      this.add.rectangle(stackX + stackW / 2, cardY + 12, stackW - 12, 32, badgeColor, 0.5)
+        .setStrokeStyle(1, isCoach ? 0x26a69a : 0xffa000, 0.6).setDepth(1);
+
+      const badge = isCoach ? 'C' : 'M';
+      this.add.text(stackX + 14, cardY + 5, badge, {
+        fontSize: '11px', fontFamily: 'monospace', color: textColor, fontStyle: 'bold',
+      }).setDepth(2);
+
+      this.add.text(stackX + 28, cardY + 4, item.name, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setDepth(2);
+
+      this.add.text(stackX + 28, cardY + 16, item.description, {
+        fontSize: '8px', fontFamily: 'monospace', color: '#aaaaaa',
+        wordWrap: { width: stackW - 40 },
+      }).setDepth(2);
+    });
   }
+
+  // ── Game Log (data only, rendered in roster overlay) ──
 
   _addGameLog(entry, color = '#b0bec5') {
     const s = this.baseball.getStatus();
     const prefix = `${s.inning}${s.half === 'top' ? '\u25b2' : '\u25bc'}`;
     this.gameLogEntries.push({ text: `${prefix} ${entry}`, color });
     if (this.gameLogEntries.length > 40) this.gameLogEntries.shift();
-    this._refreshGameLog();
   }
 
-  _refreshGameLog() {
-    const visible = this.gameLogEntries.slice(-15);
-    this.gameLogText.setText(visible.map(e => e.text).join('\n'));
+  // ── Roster Overlay ────────────────────────────────────
+
+  _createRosterButton() {
+    const btnX = 10 + 220 / 2;
+    const btnY = 495 + 175;
+    const btnW = 220;
+    const btnH = 28;
+
+    const bg = this.add.rectangle(btnX, btnY, btnW, btnH, 0x1a3a2a, 0.9)
+      .setStrokeStyle(1, 0x4caf50).setDepth(3)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(btnX, btnY, 'ROSTER', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(4);
+
+    bg.on('pointerover', () => bg.setStrokeStyle(1, 0xffd600));
+    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x4caf50));
+    bg.on('pointerdown', () => this._toggleRosterOverlay());
+
+    this.rosterOverlayVisible = false;
+    this.rosterOverlayElements = [];
+  }
+
+  _toggleRosterOverlay() {
+    if (this.rosterOverlayVisible) {
+      this.rosterOverlayElements.forEach(el => el.destroy());
+      this.rosterOverlayElements = [];
+      this.rosterOverlayVisible = false;
+      return;
+    }
+    this.rosterOverlayVisible = true;
+    const els = this.rosterOverlayElements;
+
+    const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.92)
+      .setDepth(50).setInteractive();
+    els.push(overlay);
+
+    const closeBg = this.add.rectangle(1220, 40, 80, 32, 0x8b0000)
+      .setStrokeStyle(1, 0xaa2222).setDepth(51)
+      .setInteractive({ useHandCursor: true });
+    const closeTxt = this.add.text(1220, 40, 'CLOSE', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(52);
+    closeBg.on('pointerdown', () => this._toggleRosterOverlay());
+    els.push(closeBg, closeTxt);
+
+    els.push(this.add.text(640, 25, 'LINEUP', {
+      fontSize: '24px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    const roster = this.rosterManager.getRoster();
+    const currentIdx = this.rosterManager.getCurrentBatterIndex();
+    const rosterX = 60;
+    const startY = 60;
+    const rowH = 44;
+
+    roster.forEach((player, i) => {
+      const y = startY + i * rowH;
+      const isNext = i === currentIdx;
+      const isBonus = player.isBonus;
+
+      const rowBg = this.add.rectangle(310, y + 16, 520, 38,
+        isBonus ? 0x2a2a1a : 0x111d2a, 0.7)
+        .setStrokeStyle(1, isNext ? 0x69f0ae : 0x222d3a).setDepth(51);
+      els.push(rowBg);
+
+      if (isNext) {
+        els.push(this.add.text(rosterX - 5, y + 8, '\u25b6', {
+          fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae',
+        }).setDepth(52));
+      }
+
+      const posLabel = player.pos ? `${player.pos} ` : '';
+      const nameColor = isBonus ? '#ffd600' : (isNext ? '#69f0ae' : '#ffffff');
+      els.push(this.add.text(rosterX + 12, y + 6, `${i + 1}. ${posLabel}${player.name}`, {
+        fontSize: '12px', fontFamily: 'monospace', color: nameColor, fontStyle: 'bold',
+      }).setDepth(52));
+
+      const batsLabel = player.bats === 'L' ? 'L' : 'R';
+      els.push(this.add.text(rosterX + 12, y + 20, `${batsLabel}  PWR:${player.power} CNT:${player.contact} SPD:${player.speed}`, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#81c784',
+      }).setDepth(52));
+
+      if (player.traits && player.traits.length > 0) {
+        const traitNames = player.traits.map(t => t.name).join(', ');
+        els.push(this.add.text(380, y + 13, traitNames, {
+          fontSize: '9px', fontFamily: 'monospace', color: '#ce93d8',
+          wordWrap: { width: 200 },
+        }).setOrigin(0, 0.5).setDepth(52));
+      }
+    });
+
+    // Synergies (right side)
+    const synX = 620;
+    els.push(this.add.text(synX + 150, 55, 'SYNERGIES', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ce93d8', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    const allSynergies = SynergyEngine.getAll();
+    const activeSynergies = SynergyEngine.calculate(roster);
+    const activeIds = new Set(activeSynergies.map(s => s.id));
+
+    allSynergies.forEach((syn, i) => {
+      const y = 75 + i * 30;
+      const isActive = activeIds.has(syn.id);
+      const icon = isActive ? '\u2713' : '\u2717';
+      const iconColor = isActive ? '#69f0ae' : '#444444';
+
+      els.push(this.add.text(synX, y, icon, {
+        fontSize: '13px', fontFamily: 'monospace', color: iconColor, fontStyle: 'bold',
+      }).setDepth(52));
+
+      els.push(this.add.text(synX + 20, y, syn.name, {
+        fontSize: '11px', fontFamily: 'monospace',
+        color: isActive ? '#ffffff' : '#666666', fontStyle: isActive ? 'bold' : '',
+      }).setDepth(52));
+
+      const desc = isActive ? syn.bonusDescription : syn.hint;
+      els.push(this.add.text(synX + 180, y, desc, {
+        fontSize: '9px', fontFamily: 'monospace', color: isActive ? '#81c784' : '#555555',
+      }).setDepth(52));
+    });
+
+    // Game Log (bottom-right)
+    const logX = synX;
+    const logTopY = 445;
+    els.push(this.add.text(logX + 150, logTopY - 5, 'GAME LOG', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    els.push(this.add.rectangle(logX + 150, logTopY + 105, 620, 190, 0x0a1f0d, 0.6)
+      .setStrokeStyle(1, 0x2e7d32, 0.4).setDepth(51));
+
+    const visible = this.gameLogEntries.slice(-12);
+    const logText = visible.map(e => e.text).join('\n');
+    els.push(this.add.text(logX + 10, logTopY + 15, logText || '(no entries yet)', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#b0bec5',
+      wordWrap: { width: 600 }, lineSpacing: 2,
+    }).setDepth(52));
   }
 
   // ── Player Panels ──────────────────────────────────────
