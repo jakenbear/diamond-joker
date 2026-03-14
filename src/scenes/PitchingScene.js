@@ -865,40 +865,31 @@ export default class PitchingScene extends Phaser.Scene {
   _renderCardOnBoard(x, y, card, faceUp, locked, owner) {
     const CARD_BW = 58;
     const CARD_BH = 80;
-    const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
-    const SUIT_SYMBOLS = { H: '\u2665', D: '\u2666', C: '\u2663', S: '\u2660' };
-    const SUIT_COLORS = { H: '#ff5252', D: '#ff5252', C: '#ffffff', S: '#ffffff' };
-
-    let bgColor = 0x1a2a3a;
-    if (owner === 'pitcher') bgColor = 0x1a3a2a;
-    else if (owner === 'batter') bgColor = 0x3a1a1a;
+    const ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
+    const ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
 
     if (faceUp) {
-      const bg = this.add.rectangle(x, y, CARD_BW, CARD_BH, 0x111111)
-        .setStrokeStyle(locked ? 3 : 2, locked ? 0xffd600 : 0x555555).setDepth(5);
-      const rankStr = RANK_NAMES[card.rank] || card.rank.toString();
-      const suitStr = SUIT_SYMBOLS[card.suit] || '?';
-      const color = SUIT_COLORS[card.suit] || '#ffffff';
-      const txt = this.add.text(x, y - 8, rankStr, {
-        fontSize: '20px', fontFamily: 'monospace', color, fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(6);
-      const suitTxt = this.add.text(x, y + 16, suitStr, {
-        fontSize: '16px', fontFamily: 'monospace', color,
-      }).setOrigin(0.5).setDepth(6);
+      const key = `card_${ASSET_SUITS[card.suit]}${ASSET_RANKS[card.rank]}`;
+      const scaleX = CARD_BW / 32;
+      const scaleY = CARD_BH / 42;
+      const bg = this.add.image(x, y, key)
+        .setScale(scaleX, scaleY).setDepth(5);
       if (locked) {
+        const border = this.add.rectangle(x, y, CARD_BW + 4, CARD_BH + 4, 0x000000, 0)
+          .setStrokeStyle(3, 0xffd600).setDepth(6);
         const lockIcon = this.add.text(x + 22, y - 32, '\uD83D\uDD12', {
           fontSize: '10px',
         }).setOrigin(0.5).setDepth(7);
-        this._boardElements.push(lockIcon);
+        this._boardElements.push(border, lockIcon);
       }
-      this._boardElements.push(bg, txt, suitTxt);
+      this._boardElements.push(bg);
     } else {
-      const bg = this.add.rectangle(x, y, CARD_BW, CARD_BH, bgColor)
-        .setStrokeStyle(2, 0x555555).setDepth(5);
-      const qmark = this.add.text(x, y, '?', {
-        fontSize: '24px', fontFamily: 'monospace', color: '#555555', fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(6);
-      this._boardElements.push(bg, qmark);
+      const backKey = owner === 'batter' ? 'card_back_red' : 'card_back';
+      const scaleX = CARD_BW / 32;
+      const scaleY = CARD_BH / 42;
+      const bg = this.add.image(x, y, backKey)
+        .setScale(scaleX, scaleY).setDepth(5);
+      this._boardElements.push(bg);
     }
   }
 
