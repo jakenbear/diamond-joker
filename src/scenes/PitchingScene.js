@@ -109,118 +109,74 @@ export default class PitchingScene extends Phaser.Scene {
     this.outsText.setText(`Outs: ${outDots.join(' ')}`);
   }
 
-  // ── Base Diamond ────────────────────────────────────────
+  // ── Base Diamond (scorebug mini-diamond) ────────────────
 
   _createBaseDiamond() {
-    const cx = 640, cy = 280;
-    const size = 55;
-    const g = this.add.graphics().setDepth(2);
-    g.lineStyle(2, 0x4caf50, 0.6);
+    // Compact scorebug-style diamond next to outs indicator
+    const cx = 1190, cy = 25;
+    const bs = 10; // base square half-size
+    const gap = 14; // distance from center to each base
+
+    // Diamond outline
+    const g = this.add.graphics().setDepth(8);
+    g.lineStyle(1, 0x4caf50, 0.5);
     g.beginPath();
-    g.moveTo(cx, cy - size);
-    g.lineTo(cx + size, cy);
-    g.lineTo(cx, cy + size);
-    g.lineTo(cx - size, cy);
+    g.moveTo(cx, cy - gap);           // 2nd
+    g.lineTo(cx + gap, cy);           // 1st
+    g.lineTo(cx, cy + gap);           // home
+    g.lineTo(cx - gap, cy);           // 3rd
     g.closePath();
     g.strokePath();
 
-    // Base positions: 1st (right), 2nd (top), 3rd (left)
-    this.basePositions = [
-      { x: cx + size, y: cy },
-      { x: cx, y: cy - size },
-      { x: cx - size, y: cy },
+    // Base squares: 1st (right), 2nd (top), 3rd (left)
+    const emptyColor = 0x333333;
+    this._baseBugSquares = [
+      this.add.rectangle(cx + gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45),  // 1st
+      this.add.rectangle(cx, cy - gap, bs, bs, emptyColor).setDepth(9).setAngle(45),  // 2nd
+      this.add.rectangle(cx - gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45),  // 3rd
     ];
+
+    // Runner name text below the diamond
+    this._baseBugRunnerText = this.add.text(cx, cy + gap + 10, '', {
+      fontSize: '8px', fontFamily: 'monospace', color: '#ffd600',
+    }).setOrigin(0.5, 0).setDepth(9);
+
+    // Keep these for _advanceOppRunners / _handleIBB compatibility
+    this.basePositions = [
+      { x: cx + gap, y: cy },
+      { x: cx, y: cy - gap },
+      { x: cx - gap, y: cy },
+    ];
+    this.homePosition = { x: cx, y: cy + gap };
     this.runners = [null, null, null];
     this.runnerLabels = [null, null, null];
-    this.homePosition = { x: cx, y: cy + size };
 
-    // Pitcher sprite at mound (your team)
-    const team = this.rosterManager.getTeam();
-    const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
-    const pitcherKey = `sprite_${teamKey}_pitcher`;
-    if (this.textures.exists(pitcherKey)) {
-      const myPitcher = this.rosterManager.getMyPitcher();
-      const pitcherLefty = myPitcher && myPitcher.throws === 'L';
-      this.pitcherMoundSprite = this.add.image(cx, cy, pitcherKey)
-        .setScale(2).setDepth(3).setFlipX(pitcherLefty);
-    }
-
-    // Opponent batter sprite at home plate (updated each at-bat for handedness)
-    const oppTeam = this.rosterManager.getOpponentTeam();
-    const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
-    const batterKey = `sprite_${oppKey}_batter`;
+    // Stash for batter panel sprite updates (no big diamond sprites anymore)
     this._pitchDiamondCx = cx;
     this._pitchDiamondCy = cy;
-    this._pitchDiamondSize = size;
-    if (this.textures.exists(batterKey)) {
-      const oppBatter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
-      const isLefty = oppBatter && oppBatter.bats === 'L';
-      const xOff = isLefty ? 18 : -18;
-      this.oppBatterSprite = this.add.image(cx + xOff, cy + size - 5, batterKey)
-        .setScale(2).setDepth(3).setFlipX(isLefty);
-    }
+    this._pitchDiamondSize = gap;
   }
 
   _updateBases(bases) {
-    const homePos = this.homePosition;
-    // Process 3rd → 2nd → 1st (lead runners advance first)
-    const order = [2, 1, 0];
-    for (const i of order) {
-      const bp = this.basePositions[i];
-      const stagger = (2 - i) * 200;
-      if (bases[i] && !this.runners[i]) {
-        const fromPos = i === 0 ? homePos : this.basePositions[i - 1];
-        const oppTeam = this.rosterManager.getOpponentTeam();
-        const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
-        const runnerKey = `sprite_${oppKey}_runner`;
-        const runner = this.textures.exists(runnerKey)
-          ? this.add.image(fromPos.x, fromPos.y, runnerKey).setScale(2).setDepth(3).setFlipX(true)
-          : this.add.circle(fromPos.x, fromPos.y, 7, 0xffd600).setDepth(3);
-        this._spawnRunnerTrail(fromPos, bp);
-        this.tweens.add({ targets: runner, x: bp.x, y: bp.y, duration: 500, delay: stagger, ease: 'Quad.easeInOut' });
-        this.runners[i] = runner;
-      } else if (!bases[i] && this.runners[i]) {
-        const toPos = i === 2 ? homePos : this.basePositions[i + 1];
-        this._spawnRunnerTrail(bp, toPos);
-        const runnerRef = this.runners[i];
-        this.tweens.add({
-          targets: runnerRef, x: toPos.x, y: toPos.y, alpha: 0, duration: 500,
-          delay: stagger, ease: 'Quad.easeIn',
-          onComplete: () => runnerRef.destroy(),
-        });
-        this.runners[i] = null;
-      }
+    const litColor = 0xffd600;
+    const emptyColor = 0x333333;
 
-      // Runner name label
-      if (this.runnerLabels[i]) {
-        this.runnerLabels[i].destroy();
-        this.runnerLabels[i] = null;
-      }
+    for (let i = 0; i < 3; i++) {
+      const occupied = !!bases[i];
+      this._baseBugSquares[i].setFillStyle(occupied ? litColor : emptyColor);
+      this.runners[i] = occupied ? bases[i] : null;
+    }
+
+    // Show runner names below diamond
+    const names = [];
+    const labels = ['1B', '2B', '3B'];
+    for (let i = 0; i < 3; i++) {
       if (bases[i] && typeof bases[i] === 'object' && bases[i].name) {
-        const lastName = bases[i].name.split(' ').pop();
-        const labelY = i === 1 ? bp.y - 18 : bp.y - 16;
-        const label = this.add.text(bp.x, labelY, lastName, {
-          fontSize: '8px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
-        }).setOrigin(0.5, 1).setDepth(4).setAlpha(0);
-        this.tweens.add({ targets: label, alpha: 0.9, duration: 300, delay: 200 });
-        this.runnerLabels[i] = label;
+        const last = bases[i].name.split(' ').pop();
+        names.push(`${labels[i]}: ${last}`);
       }
     }
-  }
-
-  _spawnRunnerTrail(from, to) {
-    const steps = 5;
-    for (let s = 1; s <= steps; s++) {
-      const t = s / (steps + 1);
-      const x = from.x + (to.x - from.x) * t;
-      const y = from.y + (to.y - from.y) * t;
-      const dot = this.add.circle(x, y, 3, 0xffd600, 0.6).setDepth(2);
-      this.tweens.add({
-        targets: dot, alpha: 0, scale: 0.3,
-        duration: 400, delay: s * 40,
-        onComplete: () => dot.destroy(),
-      });
-    }
+    this._baseBugRunnerText.setText(names.join('  '));
   }
 
   _showStrikeoutK() {
@@ -534,11 +490,6 @@ export default class PitchingScene extends Phaser.Scene {
     const stamina = this.rosterManager.getMyPitcherStamina();
     const staminaPct = Math.round(stamina * 100);
 
-    // Update pitcher mound sprite flip for handedness
-    if (this.pitcherMoundSprite) {
-      this.pitcherMoundSprite.setFlipX(pitcher.throws === 'L');
-    }
-
     this.myPitcherNameText.setText(pitcher.name);
     const team = this.rosterManager.getTeam();
     const teamLabel = team ? `${team.logo} ${team.nickname}` : 'Starter';
@@ -609,13 +560,6 @@ export default class PitchingScene extends Phaser.Scene {
   _updateBatterPanel() {
     const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
     const idx = this.rosterManager.opponentBatterIndex;
-
-    // Update opponent batter sprite position based on handedness
-    if (this.oppBatterSprite) {
-      const isLefty = batter.bats === 'L';
-      this.oppBatterSprite.setX(this._pitchDiamondCx + (isLefty ? 18 : -18));
-      this.oppBatterSprite.setFlipX(isLefty);
-    }
 
     this.oppBatterNameText.setText(batter.name);
     const pos = batter.pos ? ` | ${batter.pos}` : '';
