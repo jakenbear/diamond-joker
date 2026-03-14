@@ -17,7 +17,6 @@ export default class CardEngine {
     this.deck = [];
     this.hand = [];
     this.discardPile = [];
-    this.discardsRemaining = this.deckConfig.discards;
     this.handSize = this.deckConfig.handSize;
     this._buildDeck();
     this.shuffle();
@@ -42,7 +41,6 @@ export default class CardEngine {
     this.shuffle();
     this.hand = [];
     this.discardPile = [];
-    this.discardsRemaining = this.deckConfig.discards;
   }
 
   /** Draw n cards from deck into hand */
@@ -55,9 +53,6 @@ export default class CardEngine {
 
   /** Discard selected cards (by index), draw replacements */
   discard(indices) {
-    if (this.discardsRemaining <= 0) return this.hand;
-    this.discardsRemaining--;
-
     // Sort descending so splicing doesn't shift indices
     const sorted = [...indices].sort((a, b) => b - a);
     for (const idx of sorted) {
@@ -100,7 +95,6 @@ export default class CardEngine {
     // All cards (played and unplayed) go to discard - at-bat is over
     this.discardPile.push(...this.hand);
     this.hand = [];
-    this.discardsRemaining = this.deckConfig.discards;
     return result;
   }
 
@@ -110,7 +104,6 @@ export default class CardEngine {
       this.resetDeck();
     }
     this.hand = [];
-    this.discardsRemaining = this.deckConfig.discards;
     this.draw(this.handSize);
     return this.hand;
   }

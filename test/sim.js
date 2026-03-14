@@ -343,7 +343,7 @@ group('1c. Deck Integrity');
   ce.playHand([0, 1, 2, 3, 4]);
   const hand = ce.newAtBat();
   assert(hand.length === 8, 'newAtBat gives 8 cards');
-  assert(ce.discardsRemaining === 2, 'newAtBat resets discards to 2');
+  assert(ce.discardsRemaining === undefined, 'CardEngine no longer tracks discardsRemaining');
 }
 {
   // No duplicate IDs after multiple shuffles
@@ -871,7 +871,7 @@ group('1c-extra. Deck Exhaustion');
     try {
       ce.newAtBat();
       if (ce.hand.length >= 2) ce.discard([0, 1]);
-      if (ce.hand.length >= 2 && ce.discardsRemaining > 0) ce.discard([0, 1]);
+      if (ce.hand.length >= 2) ce.discard([0, 1]);
       ce.playHand(ce.hand.map((_, j) => j));
     } catch (e) { ok = false; break; }
   }
@@ -1274,7 +1274,7 @@ function averagePickDiscards(hand) {
 
 function averageAtBat(ce) {
   // Only use 1 discard max
-  if (ce.discardsRemaining > 0) {
+  {
     const toDiscard = averagePickDiscards(ce.hand);
     if (toDiscard.length > 0) ce.discard(toDiscard);
   }
@@ -1288,7 +1288,6 @@ function averageAtBat(ce) {
 function smartAtBat(ce) {
   // Discard phase (use up to 2 discards)
   for (let d = 0; d < 2; d++) {
-    if (ce.discardsRemaining <= 0) break;
     const toDiscard = pickDiscards(ce.hand);
     if (toDiscard.length === 0) break;
     ce.discard(toDiscard);
@@ -1355,7 +1354,6 @@ group('2a. Single Game Walkthrough (smart brain)');
 
     // Smart play: discard then pick best hand
     for (let d = 0; d < 2; d++) {
-      if (ce.discardsRemaining <= 0) break;
       const toDiscard = pickDiscards(ce.hand);
       if (toDiscard.length === 0) break;
       ce.discard(toDiscard);
@@ -2031,7 +2029,6 @@ group('Deck Definitions');
   // Standard deck
   const ce = new CardEngine('standard');
   assert(ce.deck.length === 52, 'Standard deck has 52 cards');
-  assert(ce.discardsRemaining === 2, 'Standard deck has 2 discards');
   assert(ce.handSize === 8, 'Standard hand size is 8');
 }
 
@@ -2047,7 +2044,7 @@ group('Deck Definitions');
   // Double deck
   const ce = new CardEngine('double');
   assert(ce.deck.length === 104, 'Double deck has 104 cards');
-  assert(ce.discardsRemaining === 3, 'Double deck has 3 discards');
+  assert(ce.handSize === 8, 'Double deck hand size is 8');
 }
 
 {
@@ -2057,11 +2054,11 @@ group('Deck Definitions');
 }
 
 {
-  // resetDeck restores deck config discards
+  // resetDeck rebuilds and shuffles deck
   const ce = new CardEngine('double');
-  ce.discardsRemaining = 0;
+  ce.deck = [];
   ce.resetDeck();
-  assert(ce.discardsRemaining === 3, 'resetDeck restores deck config discards');
+  assert(ce.deck.length === 104, 'resetDeck rebuilds double deck to 104 cards');
 }
 
 // ═══════════════════════════════════════════════════════
