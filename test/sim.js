@@ -2924,6 +2924,657 @@ group('10c. Walk/HBP — Only Forced Runners Advance');
   assert(bs6.playerScore === 0, 'Walk with 2nd+3rd: no run scores');
 }
 
+// ── 11. Base Running — Hits with Runners ─────────────
+
+group('11a. Singles with Runners');
+
+{
+  // Single, empty bases: batter on 1st
+  const bs = new BaseballState();
+  bs.resolveOutcome('Single', 0);
+  assert(bs.bases[0] !== null, 'Single empty: batter on 1st');
+  assert(bs.bases[1] === null, 'Single empty: 2nd empty');
+  assert(bs.bases[2] === null, 'Single empty: 3rd empty');
+  assert(bs.playerScore === 0, 'Single empty: no runs');
+}
+
+{
+  // Single, runner on 1st: runner to 2nd, batter to 1st
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, null, null];
+  bs.resolveOutcome('Single', 0);
+  assert(bs.bases[0] !== null, 'Single+R1: batter on 1st');
+  assert(bs.bases[1] !== null, 'Single+R1: runner advances to 2nd');
+  assert(bs.playerScore === 0, 'Single+R1: no runs');
+}
+
+{
+  // Single, runner on 2nd: runner to 3rd, batter to 1st
+  const bs = new BaseballState();
+  bs.bases = [null, { name: 'R2' }, null];
+  bs.resolveOutcome('Single', 0);
+  assert(bs.bases[0] !== null, 'Single+R2: batter on 1st');
+  assert(bs.bases[2] !== null, 'Single+R2: runner advances to 3rd');
+  assert(bs.playerScore === 0, 'Single+R2: no run (2nd→3rd)');
+}
+
+{
+  // Single, runner on 3rd: runner scores
+  const bs = new BaseballState();
+  bs.bases = [null, null, { name: 'R3' }];
+  bs.resolveOutcome('Single', 0);
+  assert(bs.playerScore === 1, 'Single+R3: runner on 3rd scores');
+}
+
+{
+  // Single, bases loaded: R3 scores, R2→3rd, R1→2nd, batter→1st
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, { name: 'R2' }, { name: 'R3' }];
+  bs.resolveOutcome('Single', 0);
+  assert(bs.playerScore === 1, 'Single bases loaded: 1 run scores (R3)');
+  assert(bs.bases[0] !== null, 'Single bases loaded: batter on 1st');
+  assert(bs.bases[1] !== null, 'Single bases loaded: R1 on 2nd');
+  assert(bs.bases[2] !== null, 'Single bases loaded: R2 on 3rd');
+}
+
+group('11b. Doubles with Runners');
+
+{
+  // Double, empty: batter on 2nd
+  const bs = new BaseballState();
+  bs.resolveOutcome('Double', 0);
+  assert(bs.bases[1] !== null, 'Double empty: batter on 2nd');
+  assert(bs.bases[0] === null, 'Double empty: 1st empty');
+  assert(bs.playerScore === 0, 'Double empty: no runs');
+}
+
+{
+  // Double, runner on 1st: runner to 3rd (1+2=3), batter on 2nd
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, null, null];
+  bs.resolveOutcome('Double', 0);
+  assert(bs.playerScore === 0, 'Double+R1: no run (1st→3rd)');
+  assert(bs.bases[2] !== null, 'Double+R1: runner advances to 3rd');
+  assert(bs.bases[1] !== null, 'Double+R1: batter on 2nd');
+}
+
+{
+  // Double, runner on 2nd: runner scores
+  const bs = new BaseballState();
+  bs.bases = [null, { name: 'R2' }, null];
+  bs.resolveOutcome('Double', 0);
+  assert(bs.playerScore === 1, 'Double+R2: runner scores');
+}
+
+{
+  // Double, bases loaded: R3+R2 score, R1→3rd, batter→2nd
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, { name: 'R2' }, { name: 'R3' }];
+  bs.resolveOutcome('Double', 0);
+  assert(bs.playerScore === 2, 'Double bases loaded: 2 runs score (R3+R2)');
+  assert(bs.bases[2] !== null, 'Double bases loaded: R1 on 3rd');
+  assert(bs.bases[1] !== null, 'Double bases loaded: batter on 2nd');
+}
+
+group('11c. Triples with Runners');
+
+{
+  // Triple, empty: batter on 3rd
+  const bs = new BaseballState();
+  bs.resolveOutcome('Triple', 0);
+  assert(bs.bases[2] !== null, 'Triple empty: batter on 3rd');
+  assert(bs.playerScore === 0, 'Triple empty: no runs');
+}
+
+{
+  // Triple, bases loaded: all 3 score, batter on 3rd
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, { name: 'R2' }, { name: 'R3' }];
+  bs.resolveOutcome('Triple', 0);
+  assert(bs.playerScore === 3, 'Triple bases loaded: 3 runs score');
+  assert(bs.bases[2] !== null, 'Triple bases loaded: batter on 3rd');
+}
+
+group('11d. Home Runs');
+
+{
+  // HR, empty: 1 run (solo shot)
+  const bs = new BaseballState();
+  bs.resolveOutcome('Home Run', 0);
+  assert(bs.playerScore === 1, 'Solo HR: 1 run');
+  assert(bs.bases.every(b => b === null), 'Solo HR: bases clear');
+}
+
+{
+  // HR, bases loaded: grand slam (4 runs)
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, { name: 'R2' }, { name: 'R3' }];
+  bs.resolveOutcome('Home Run', 0);
+  assert(bs.playerScore === 4, 'Grand slam: 4 runs');
+  assert(bs.bases.every(b => b === null), 'Grand slam: bases clear');
+}
+
+{
+  // HR, runner on 2nd only: 2 runs
+  const bs = new BaseballState();
+  bs.bases = [null, { name: 'R2' }, null];
+  bs.resolveOutcome('Home Run', 0);
+  assert(bs.playerScore === 2, '2-run HR: 2 runs');
+}
+
+{
+  // HR, runners on 1st and 3rd: 3 runs
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, null, { name: 'R3' }];
+  bs.resolveOutcome('Home Run', 0);
+  assert(bs.playerScore === 3, '3-run HR (1st+3rd): 3 runs');
+}
+
+// ── 12. Outs and Inning Flow ──────────────────────────
+
+group('12a. Out Counting and Side Retirement');
+
+{
+  const bs = new BaseballState();
+  bs.resolveOutcome('Strikeout', 0);
+  assert(bs.outs === 1, '1st strikeout: 1 out');
+  assert(bs.state === 'BATTING', '1 out: still BATTING');
+
+  bs.resolveOutcome('Flyout', 0);
+  assert(bs.outs === 2, '2nd out (flyout): 2 outs');
+  assert(bs.state === 'BATTING', '2 outs: still BATTING');
+
+  bs.resolveOutcome('Groundout', 0);
+  assert(bs.outs === 0, '3rd out: outs reset to 0');
+  assert(bs.state === 'SWITCH_SIDE', '3 outs: SWITCH_SIDE');
+}
+
+{
+  // Double play with 1 out should end the inning (1+2=3)
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, null, null];
+  bs.resolveOutcome('Groundout', 0);
+  assert(bs.outs === 1, 'Groundout: 1 out');
+
+  bs.bases = [{ name: 'R1' }, null, null];
+  bs.resolveOutcome('Double Play', 0);
+  assert(bs.outs === 0, 'DP with 1 out: outs reset (3 total → side retired)');
+  assert(bs.state === 'SWITCH_SIDE', 'DP with 1 out: SWITCH_SIDE');
+}
+
+group('12b. Inning Progression');
+
+{
+  const bs = new BaseballState();
+  assert(bs.inning === 1, 'Start at inning 1');
+  assert(bs.half === 'top', 'Start at top half');
+
+  // 3 outs
+  bs.resolveOutcome('Strikeout', 0);
+  bs.resolveOutcome('Strikeout', 0);
+  bs.resolveOutcome('Strikeout', 0);
+  assert(bs.state === 'SWITCH_SIDE', 'After 3 K: SWITCH_SIDE');
+
+  // Switch side advances to next inning
+  bs.switchSide(0);
+  assert(bs.inning === 2, 'After switchSide: inning 2');
+  assert(bs.half === 'top', 'After switchSide: back to top');
+  assert(bs.state === 'BATTING', 'After switchSide: BATTING state');
+  assert(bs.outs === 0, 'New inning: 0 outs');
+}
+
+{
+  // Full 9-inning game simulation
+  const bs = new BaseballState();
+  for (let inn = 1; inn <= 9; inn++) {
+    assert(bs.inning === inn, `Inning ${inn} is correct`);
+    bs.resolveOutcome('Strikeout', 0);
+    bs.resolveOutcome('Strikeout', 0);
+    bs.resolveOutcome('Strikeout', 0);
+    if (inn < 9) {
+      bs.switchSide(0);
+    }
+  }
+  // After 9th inning 3 outs, switch side — if tied, extras
+  bs.switchSide(0);
+  assert(bs.inning === 10, 'Tied 0-0 after 9: goes to inning 10 (extras)');
+}
+
+group('12c. Game Over Conditions');
+
+{
+  // Player wins after 9 innings
+  const bs = new BaseballState();
+  for (let inn = 1; inn <= 9; inn++) {
+    if (inn === 1) {
+      bs.resolveOutcome('Home Run', 0); // score 1 run, then 3 K's
+    }
+    bs.resolveOutcome('Strikeout', 0);
+    bs.resolveOutcome('Strikeout', 0);
+    bs.resolveOutcome('Strikeout', 0);
+    bs.switchSide(0); // opponent scores 0
+  }
+  assert(bs.state === 'GAME_OVER', 'Player leads after 9: GAME_OVER');
+  assert(bs.playerScore > bs.opponentScore, 'Player wins');
+}
+
+{
+  // Tied after 9 → extras (not game over)
+  const bs = new BaseballState();
+  for (let inn = 1; inn <= 9; inn++) {
+    bs.resolveOutcome('Strikeout', 0);
+    bs.resolveOutcome('Strikeout', 0);
+    bs.resolveOutcome('Strikeout', 0);
+    bs.switchSide(0);
+  }
+  assert(bs.state !== 'GAME_OVER', 'Tied after 9: NOT game over');
+  assert(bs.inning === 10, 'Tied after 9: goes to extras (inning 10)');
+}
+
+// ── 13. Score Integrity ─────────────────────────────────
+
+group('13. Score Integrity — Runs Match playerScore');
+
+{
+  const bs = new BaseballState();
+  // Load bases then hit a grand slam
+  bs.bases = [{ name: 'R1' }, { name: 'R2' }, { name: 'R3' }];
+  const r = bs.resolveOutcome('Home Run', 0);
+  assert(r.runsScored === 4, 'Grand slam resolveOutcome returns 4 runs');
+  assert(bs.playerScore === 4, 'Grand slam playerScore is 4');
+}
+
+{
+  // Multiple at-bats accumulate correctly
+  const bs = new BaseballState();
+  bs.resolveOutcome('Home Run', 0); // 1 run
+  assert(bs.playerScore === 1, 'Solo HR: 1 run so far');
+  bs.bases = [null, { name: 'R2' }, null];
+  bs.resolveOutcome('Double', 0); // R2 scores (1+2=3 → home)
+  assert(bs.playerScore === 2, 'HR + Double with R2: 2 total runs');
+}
+
+{
+  // Chip accumulation from hand scores
+  const bs = new BaseballState();
+  bs.resolveOutcome('Single', 50);
+  bs.resolveOutcome('Double', 75);
+  assert(bs.totalChips === 125, 'Chips accumulate from hand scores: 50+75=125');
+}
+
+{
+  // Outs don't score runs
+  const bs = new BaseballState();
+  bs.bases = [null, null, { name: 'R3' }];
+  bs.resolveOutcome('Strikeout', 0);
+  assert(bs.playerScore === 0, 'Strikeout with runner on 3rd: no run');
+}
+
+{
+  // Flyout with runner on 3rd: no run (no sac fly in normal flyout)
+  const bs = new BaseballState();
+  bs.bases = [null, null, { name: 'R3' }];
+  bs.resolveOutcome('Flyout', 0);
+  assert(bs.playerScore === 0, 'Flyout with R3: no run (not sac fly)');
+}
+
+// ── 14. Error and Special Outcomes ────────────────────
+
+group('14a. Error Outcome');
+
+{
+  // Error acts like a single (basesToMove: 1)
+  const bs = new BaseballState();
+  bs.bases = [null, null, { name: 'R3' }];
+  bs.resolveOutcome('Error', 0);
+  assert(bs.playerScore === 1, 'Error with R3: runner scores');
+  assert(bs.bases[0] !== null, 'Error: batter on 1st');
+}
+
+{
+  const bs = new BaseballState();
+  bs.resolveOutcome('Error', 0);
+  assert(bs.outs === 0, 'Error: no out recorded');
+  assert(bs.bases[0] !== null, 'Error: batter reaches 1st');
+}
+
+group('14b. Dropped Third Strike');
+
+{
+  const bs = new BaseballState();
+  bs.resolveOutcome('Dropped Third Strike', 0);
+  assert(bs.outs === 0, 'D3K: no out');
+  assert(bs.bases[0] !== null, 'D3K: batter reaches 1st');
+}
+
+{
+  // D3K with runner on 3rd: runner scores
+  const bs = new BaseballState();
+  bs.bases = [null, null, { name: 'R3' }];
+  bs.resolveOutcome('Dropped Third Strike', 0);
+  assert(bs.playerScore === 1, 'D3K with R3: runner scores');
+}
+
+group('14c. Fielder\'s Choice');
+
+{
+  // FC: lead runner out, batter safe on 1st
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, null, null];
+  const r = bs.resolveOutcome("Fielder's Choice", 0);
+  assert(bs.outs === 1, 'FC: 1 out');
+  assert(bs.bases[0] !== null, 'FC: batter on 1st');
+  // Lead runner (R1) was removed
+}
+
+{
+  // FC with runners on 1st and 3rd: lead runner (3rd) out
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, null, { name: 'R3' }];
+  bs.resolveOutcome("Fielder's Choice", 0);
+  assert(bs.outs === 1, 'FC with R1+R3: 1 out');
+  assert(bs.bases[0] !== null, 'FC: batter on 1st');
+  assert(bs.bases[2] === null, 'FC: lead runner (3rd) removed');
+}
+
+group('14d. Sac Bunt Runner Advancement');
+
+{
+  // Sac bunt with runner on 1st: runner to 2nd, 1 out
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, null, null];
+  bs.resolveOutcome('Sac Bunt', 0);
+  assert(bs.outs === 1, 'Sac Bunt: 1 out');
+  assert(bs.bases[1] !== null, 'Sac Bunt: runner advanced to 2nd');
+  assert(bs.bases[0] === null, 'Sac Bunt: 1st cleared');
+}
+
+{
+  // Sac bunt with runner on 3rd: runner scores
+  const bs = new BaseballState();
+  bs.bases = [null, null, { name: 'R3' }];
+  bs.resolveOutcome('Sac Bunt', 0);
+  assert(bs.playerScore === 1, 'Sac Bunt with R3: run scores');
+  assert(bs.outs === 1, 'Sac Bunt: 1 out');
+}
+
+{
+  // Sac bunt bases loaded: runner on 3rd scores, all advance
+  const bs = new BaseballState();
+  bs.bases = [{ name: 'R1' }, { name: 'R2' }, { name: 'R3' }];
+  bs.resolveOutcome('Sac Bunt', 0);
+  assert(bs.playerScore === 1, 'Sac Bunt bases loaded: 1 run');
+  assert(bs.outs === 1, 'Sac Bunt: 1 out');
+}
+
+// ── 15. Synergy Engine ──────────────────────────────────
+
+group('15. Synergy Engine — Roster Compositions');
+
+{
+  // SynergyEngine.getAll() returns all synergies
+  const all = SynergyEngine.getAll();
+  assert(all.length > 0, `SynergyEngine has ${all.length} synergies defined`);
+  assert(all.length === SYNERGIES.length, 'getAll matches SYNERGIES data count');
+}
+
+{
+  // Empty roster: no synergies active
+  const active = SynergyEngine.calculate([]);
+  assert(active.length === 0, 'Empty roster: 0 active synergies');
+}
+
+{
+  // Each synergy has required fields
+  const all = SynergyEngine.getAll();
+  for (const syn of all) {
+    assert(syn.id && syn.name, `Synergy "${syn.id || '?'}" has id and name`);
+    assert(typeof syn.check === 'function', `Synergy "${syn.id}" has check function`);
+  }
+}
+
+// ── 16. Coach Effects Data Integrity ────────────────────
+
+group('16a. Coach Data Integrity');
+
+{
+  assert(COACHES.length === 8, `8 coaches defined (got ${COACHES.length})`);
+
+  const ids = new Set();
+  for (const c of COACHES) {
+    assert(!ids.has(c.id), `Coach ID "${c.id}" is unique`);
+    ids.add(c.id);
+    assert(c.name && c.name.length > 0, `Coach "${c.id}" has name`);
+    assert(c.price > 0, `Coach "${c.id}" has positive price`);
+    assert(c.category === 'coach', `Coach "${c.id}" has category=coach`);
+    assert(c.effect && c.effect.type, `Coach "${c.id}" has effect type`);
+    assert(c.faceIndex !== undefined, `Coach "${c.id}" has faceIndex`);
+  }
+}
+
+group('16b. Mascot Data Integrity');
+
+{
+  assert(MASCOTS.length === 15, `15 mascots defined (got ${MASCOTS.length})`);
+
+  const ids = new Set();
+  for (const m of MASCOTS) {
+    assert(!ids.has(m.id), `Mascot ID "${m.id}" is unique`);
+    ids.add(m.id);
+    assert(m.name && m.name.length > 0, `Mascot "${m.id}" has name`);
+    assert(m.price > 0, `Mascot "${m.id}" has positive price`);
+    assert(m.category === 'mascot', `Mascot "${m.id}" has category=mascot`);
+    assert(m.effect && m.effect.type, `Mascot "${m.id}" has effect type`);
+    assert(m.spriteIndex !== undefined, `Mascot "${m.id}" has spriteIndex`);
+    assert(m.spriteIndex >= 0 && m.spriteIndex <= 14, `Mascot "${m.id}" spriteIndex in range`);
+  }
+}
+
+// ── 17. Staff Slots ──────────────────────────────────────
+
+group('17. Staff Slot Management');
+
+{
+  const bs = new BaseballState();
+  assert(bs.staffSlots === 2, 'Default staff slots: 2');
+  assert(bs.getStaff().length === 0, 'Start with no staff');
+
+  const coach = { ...COACHES[0] };
+  assert(bs.addStaff(coach), 'Add first staff: succeeds');
+  assert(bs.getStaff().length === 1, '1 staff after adding');
+
+  const mascot = { ...MASCOTS[0] };
+  assert(bs.addStaff(mascot), 'Add second staff: succeeds');
+  assert(bs.getStaff().length === 2, '2 staff after adding');
+
+  // No room for a third
+  const coach2 = { ...COACHES[1] };
+  assert(!bs.addStaff(coach2), 'Add 3rd staff to 2 slots: fails');
+  assert(bs.getStaff().length === 2, 'Still 2 staff');
+}
+
+{
+  // Remove staff
+  const bs = new BaseballState();
+  const coach = { ...COACHES[0] };
+  bs.addStaff(coach);
+  assert(bs.getStaff().length === 1, 'Has 1 staff');
+  bs.removeStaff(coach.id);
+  assert(bs.getStaff().length === 0, 'Removed staff: 0 left');
+}
+
+// ── 18. Pair Degradation ─────────────────────────────────
+
+group('18. Pair Degradation — Pitcher Adjusts');
+
+{
+  // pairsPlayedThisInning increments and resets
+  const bs = new BaseballState();
+  assert(bs.pairsPlayedThisInning === 0, 'Start: 0 pairs played');
+
+  bs.pairsPlayedThisInning = 3;
+  assert(bs.pairsPlayedThisInning === 3, 'Can set pairs counter');
+
+  // After switchSide, counter resets
+  bs.resolveOutcome('Strikeout', 0);
+  bs.resolveOutcome('Strikeout', 0);
+  bs.resolveOutcome('Strikeout', 0);
+  bs.switchSide(0);
+  assert(bs.pairsPlayedThisInning === 0, 'Pairs counter resets after switchSide');
+}
+
+// ── 19. Hand Table Integrity ──────────────────────────────
+
+group('19. Hand Table Integrity');
+
+{
+  assert(HAND_TABLE.length === 10, `Hand table has 10 entries (got ${HAND_TABLE.length})`);
+
+  const names = HAND_TABLE.map(h => h.handName);
+  const expected = ['Royal Flush', 'Straight Flush', 'Four of a Kind', 'Full House',
+    'Flush', 'Straight', 'Three of a Kind', 'Two Pair', 'Pair', 'High Card'];
+  for (let i = 0; i < expected.length; i++) {
+    assert(names[i] === expected[i], `Hand ${i}: "${names[i]}" = "${expected[i]}"`);
+  }
+
+  // Each entry has required fields
+  for (const h of HAND_TABLE) {
+    assert(h.chips !== undefined, `"${h.handName}" has chips`);
+    assert(h.mult !== undefined, `"${h.handName}" has mult`);
+    assert(h.outcome !== undefined, `"${h.handName}" has outcome`);
+  }
+
+  // Better hands have better outcomes (higher chips or better outcome)
+  assert(HAND_TABLE[0].chips >= HAND_TABLE[9].chips, 'Royal Flush chips >= High Card chips');
+}
+
+// ── 20. Team Data Integrity ─────────────────────────────
+
+group('20. Team Data Integrity');
+
+{
+  assert(TEAMS.length >= 4, `At least 4 teams (got ${TEAMS.length})`);
+
+  for (const team of TEAMS) {
+    assert(team.name && team.name.length > 0, `Team "${team.name}" has name`);
+    assert(team.batters && team.batters.length === 9, `Team "${team.name}" has 9 batters`);
+    assert(team.pitchers && team.pitchers.length > 0, `Team "${team.name}" has pitchers`);
+
+    for (const b of team.batters) {
+      assert(b.name, `Batter has name in ${team.name}`);
+      assert(b.power >= 1 && b.power <= 10, `${b.name} power in range 1-10 (got ${b.power})`);
+      assert(b.contact >= 1 && b.contact <= 10, `${b.name} contact in range 1-10 (got ${b.contact})`);
+      assert(b.speed >= 1 && b.speed <= 10, `${b.name} speed in range 1-10 (got ${b.speed})`);
+      assert(b.pos, `${b.name} has position`);
+      assert(b.innateTraits && b.innateTraits.length === 2, `${b.name} has 2 innate trait options`);
+    }
+
+    for (const p of team.pitchers) {
+      assert(p.name, `Pitcher has name in ${team.name}`);
+      assert(p.velocity >= 1 && p.velocity <= 10, `${p.name} velocity in range (got ${p.velocity})`);
+      assert(p.control >= 1 && p.control <= 10, `${p.name} control in range (got ${p.control})`);
+      assert(p.stamina >= 1 && p.stamina <= 10, `${p.name} stamina in range (got ${p.stamina})`);
+    }
+  }
+}
+
+// ── 21. Batter Trait Data Integrity ──────────────────────
+
+group('21. Batter Trait Data');
+
+{
+  assert(BATTER_TRAITS.length >= 30, `At least 30 batter traits (got ${BATTER_TRAITS.length})`);
+
+  const ids = new Set();
+  for (const t of BATTER_TRAITS) {
+    assert(!ids.has(t.id), `Trait ID "${t.id}" is unique`);
+    ids.add(t.id);
+    assert(t.name && t.name.length > 0, `Trait "${t.id}" has name`);
+    assert(t.description, `Trait "${t.id}" has description`);
+    assert(['common', 'uncommon', 'rare'].includes(t.rarity), `Trait "${t.id}" has valid rarity`);
+    assert(t.effect && t.effect.type, `Trait "${t.id}" has effect type`);
+  }
+
+  // All innate traits referenced by teams actually exist
+  const traitIds = new Set(BATTER_TRAITS.map(t => t.id));
+  for (const team of TEAMS) {
+    for (const b of team.batters) {
+      for (const tid of b.innateTraits) {
+        assert(traitIds.has(tid), `Innate trait "${tid}" for ${b.name} exists in BATTER_TRAITS`);
+      }
+    }
+  }
+}
+
+// ── 22. Pitcher Trait Data Integrity ──────────────────────
+
+group('22. Pitcher Trait Data');
+
+{
+  assert(PITCHER_TRAITS.length > 0, `Has pitcher traits (got ${PITCHER_TRAITS.length})`);
+
+  const ids = new Set();
+  for (const t of PITCHER_TRAITS) {
+    assert(!ids.has(t.id), `Pitcher trait ID "${t.id}" is unique`);
+    ids.add(t.id);
+    assert(t.name, `Pitcher trait "${t.id}" has name`);
+    assert(t.effect && t.effect.type, `Pitcher trait "${t.id}" has effect type`);
+  }
+}
+
+// ── 23. Bonus Players Data ───────────────────────────────
+
+group('23. Bonus Players Data');
+
+{
+  assert(BONUS_PLAYERS.length >= 10, `At least 10 bonus players (got ${BONUS_PLAYERS.length})`);
+
+  for (const bp of BONUS_PLAYERS) {
+    assert(bp.name, `Bonus player has name`);
+    assert(bp.power >= 1 && bp.power <= 10, `${bp.name} power in range`);
+    assert(bp.contact >= 1 && bp.contact <= 10, `${bp.name} contact in range`);
+    assert(bp.speed >= 1 && bp.speed <= 10, `${bp.name} speed in range`);
+    assert(bp.pos, `${bp.name} has position`);
+    assert(['common', 'uncommon', 'rare'].includes(bp.rarity), `${bp.name} has valid rarity`);
+  }
+}
+
+// ── 24. CardEngine — Full At-Bat Cycle ───────────────────
+
+group('24. CardEngine — At-Bat Cycle');
+
+{
+  const ce = new CardEngine();
+  assert(ce.deck.length === 52, 'Standard deck: 52 cards');
+
+  ce.newAtBat();
+  assert(ce.hand.length > 0, 'newAtBat deals cards');
+  const handSize = ce.hand.length;
+
+  // Play hand
+  const indices = [0, 1];
+  const result = ce.playHand(indices);
+  assert(result.handName !== undefined, 'playHand returns handName');
+  assert(result.outcome !== undefined, 'playHand returns outcome');
+  assert(ce.hand.length === 0, 'After playHand: hand is empty');
+
+  // New at-bat redeals
+  ce.newAtBat();
+  assert(ce.hand.length === handSize, 'New at-bat redeals full hand');
+}
+
+{
+  // Discard replaces cards
+  const ce = new CardEngine();
+  ce.newAtBat();
+  const before = ce.hand.map(c => c.id);
+  ce.discard([0]);
+  const after = ce.hand.map(c => c.id);
+  assert(ce.hand.length === before.length, 'Discard: hand size stays same');
+  // At least the first card should be different (new draw)
+  assert(after[0] !== before[0] || ce.deck.length < 52, 'Discard: card replaced');
+}
+
 // ═══════════════════════════════════════════════════════
 
 console.log('\n' + '═'.repeat(50));
