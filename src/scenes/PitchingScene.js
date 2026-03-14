@@ -7,6 +7,7 @@
  */
 import { PITCH_TYPES, assignPitchRepertoire } from '../RosterManager.js';
 import SoundManager from '../SoundManager.js';
+import SynergyEngine from '../SynergyEngine.js';
 
 const TEAM_SPRITE_KEY = { 'Canada': 'canada', 'USA': 'usa', 'Japan': 'japan', 'Mexico': 'mexico' };
 
@@ -755,6 +756,13 @@ export default class PitchingScene extends Phaser.Scene {
       if (!s.effect) continue;
       if (s.effect.type === 'pitcher_hit_reduction') staffMods.hitReduction += s.effect.value;
       if (s.effect.type === 'pitcher_fatigue_delay') staffMods.fatigueDelay += s.effect.value;
+    }
+
+    // Add synergy-based pitcher mods (southpaw_stack, strong_middle)
+    const synergies = SynergyEngine.calculate(this.rosterManager.getRoster());
+    for (const syn of synergies) {
+      if (syn.bonus.type === 'pitcher_hit_reduction') staffMods.hitReduction += syn.bonus.value;
+      if (syn.bonus.type === 'pitcher_control_reduction') staffMods.hitReduction += syn.bonus.value * 0.03;
     }
 
     const result = this.rosterManager.simSingleAtBat(inning, pitchType, ps.bases, staffMods);

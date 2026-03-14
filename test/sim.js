@@ -15,6 +15,8 @@ import PITCHER_TRAITS from '../data/pitcher_traits.js';
 import COACHES from '../data/coaches.js';
 import MASCOTS from '../data/mascots.js';
 import BONUS_PLAYERS from '../data/bonus_players.js';
+import SYNERGIES from '../data/synergies.js';
+import SynergyEngine from '../src/SynergyEngine.js';
 
 // ── Test Harness ────────────────────────────────────────
 
@@ -2511,6 +2513,203 @@ console.log('\n\x1b[1m── Part 8: Bonus Players & Card Packs ──\x1b[0m');
   assert(rm5.equipTrait(0, BATTER_TRAITS[0]), 'Regular player: equip 1st');
   assert(rm5.equipTrait(0, BATTER_TRAITS[1]), 'Regular player: equip 2nd');
   assert(!rm5.equipTrait(0, BATTER_TRAITS[2]), 'Regular player: cannot equip 3rd');
+}
+
+// ═══════════════════════════════════════════════════════
+//  PART 9 — PLAYER SYNERGIES
+// ═══════════════════════════════════════════════════════
+
+console.log('\n\x1b[1m--- Part 9: Player Synergies ---\x1b[0m');
+
+// 9a: Synergy data validation
+{
+  assert(SYNERGIES.length === 12, `12 synergies defined (got ${SYNERGIES.length})`);
+  for (const s of SYNERGIES) {
+    assert(typeof s.id === 'string' && s.id.length > 0, `Synergy ${s.id} has id`);
+    assert(typeof s.name === 'string', `Synergy ${s.id} has name`);
+    assert(typeof s.description === 'string', `Synergy ${s.id} has description`);
+    assert(typeof s.hint === 'string', `Synergy ${s.id} has hint`);
+    assert(typeof s.check === 'function', `Synergy ${s.id} has check function`);
+    assert(s.bonus && typeof s.bonus.type === 'string', `Synergy ${s.id} has bonus type`);
+    assert(typeof s.bonus.value === 'number', `Synergy ${s.id} has bonus value`);
+    assert(typeof s.bonusDescription === 'string', `Synergy ${s.id} has bonusDescription`);
+  }
+}
+
+// 9b: Synergy IDs are unique
+{
+  const ids = SYNERGIES.map(s => s.id);
+  const uniqueIds = new Set(ids);
+  assert(ids.length === uniqueIds.size, 'All synergy IDs are unique');
+}
+
+// 9c: SynergyEngine.calculate with empty roster
+{
+  const result = SynergyEngine.calculate([]);
+  assert(Array.isArray(result), 'calculate returns array for empty roster');
+  assert(result.length === 0, 'No synergies active for empty roster');
+}
+
+// 9d: SynergyEngine.getAll returns all synergies
+{
+  const all = SynergyEngine.getAll();
+  assert(all.length === 12, 'getAll returns all 12 synergies');
+  assert(all === SYNERGIES, 'getAll returns same reference as SYNERGIES');
+}
+
+// 9e: Switch Squad triggers with 3+ lefty batters
+{
+  const roster = [
+    { bats: 'L', power: 5, contact: 5, speed: 5 },
+    { bats: 'L', power: 5, contact: 5, speed: 5 },
+    { bats: 'L', power: 5, contact: 5, speed: 5 },
+    { bats: 'R', power: 5, contact: 5, speed: 5 },
+  ];
+  const active = SynergyEngine.calculate(roster);
+  const hasSwitchSquad = active.some(s => s.id === 'switch_squad');
+  assert(hasSwitchSquad, 'Switch Squad active with 3 lefties');
+
+  const roster2L = [
+    { bats: 'L', power: 5, contact: 5, speed: 5 },
+    { bats: 'L', power: 5, contact: 5, speed: 5 },
+    { bats: 'R', power: 5, contact: 5, speed: 5 },
+  ];
+  const active2 = SynergyEngine.calculate(roster2L);
+  assert(!active2.some(s => s.id === 'switch_squad'), 'Switch Squad not active with only 2 lefties');
+}
+
+// 9f: Balanced Lineup triggers with 4L + 4R
+{
+  const roster = [];
+  for (let i = 0; i < 4; i++) roster.push({ bats: 'L', power: 5, contact: 5, speed: 5 });
+  for (let i = 0; i < 4; i++) roster.push({ bats: 'R', power: 5, contact: 5, speed: 5 });
+  roster.push({ bats: 'L', power: 5, contact: 5, speed: 5 });
+  const active = SynergyEngine.calculate(roster);
+  assert(active.some(s => s.id === 'balanced_lineup'), 'Balanced Lineup active with 4L+4R');
+}
+
+// 9g: Murderer's Row triggers with 3 power 8+ batters
+{
+  const roster = [
+    { bats: 'R', power: 8, contact: 5, speed: 5 },
+    { bats: 'R', power: 9, contact: 5, speed: 5 },
+    { bats: 'R', power: 10, contact: 5, speed: 5 },
+  ];
+  const active = SynergyEngine.calculate(roster);
+  assert(active.some(s => s.id === 'murderers_row'), "Murderer's Row active with 3 power hitters");
+
+  const weak = [
+    { bats: 'R', power: 7, contact: 5, speed: 5 },
+    { bats: 'R', power: 8, contact: 5, speed: 5 },
+    { bats: 'R', power: 9, contact: 5, speed: 5 },
+  ];
+  const active2 = SynergyEngine.calculate(weak);
+  assert(!active2.some(s => s.id === 'murderers_row'), "Murderer's Row not active with only 2 power 8+");
+}
+
+// 9h: Contact Factory and Speed Demons
+{
+  const contactRoster = [
+    { bats: 'R', power: 5, contact: 8, speed: 5 },
+    { bats: 'R', power: 5, contact: 9, speed: 5 },
+    { bats: 'R', power: 5, contact: 10, speed: 5 },
+  ];
+  assert(SynergyEngine.calculate(contactRoster).some(s => s.id === 'contact_factory'), 'Contact Factory triggers');
+
+  const speedRoster = [
+    { bats: 'R', power: 5, contact: 5, speed: 8 },
+    { bats: 'R', power: 5, contact: 5, speed: 9 },
+    { bats: 'R', power: 5, contact: 5, speed: 10 },
+  ];
+  assert(SynergyEngine.calculate(speedRoster).some(s => s.id === 'speed_demons'), 'Speed Demons triggers');
+}
+
+// 9i: Well-Rounded requires all 9 batters with no stat below 5
+{
+  const roster = [];
+  for (let i = 0; i < 9; i++) roster.push({ bats: 'R', power: 5, contact: 5, speed: 5 });
+  assert(SynergyEngine.calculate(roster).some(s => s.id === 'well_rounded'), 'Well-Rounded active with 9 balanced');
+
+  const shortRoster = [];
+  for (let i = 0; i < 8; i++) shortRoster.push({ bats: 'R', power: 5, contact: 5, speed: 5 });
+  assert(!SynergyEngine.calculate(shortRoster).some(s => s.id === 'well_rounded'), 'Well-Rounded needs 9 players');
+
+  const weakLink = [];
+  for (let i = 0; i < 8; i++) weakLink.push({ bats: 'R', power: 5, contact: 5, speed: 5 });
+  weakLink.push({ bats: 'R', power: 4, contact: 5, speed: 5 });
+  assert(!SynergyEngine.calculate(weakLink).some(s => s.id === 'well_rounded'), 'Well-Rounded fails with one stat below 5');
+}
+
+// 9j: Positional synergies — Strong Up the Middle
+{
+  const roster = [
+    { pos: 'C', bats: 'R', power: 5, contact: 7, speed: 5 },
+    { pos: 'SS', bats: 'R', power: 5, contact: 7, speed: 5 },
+    { pos: '2B', bats: 'R', power: 5, contact: 7, speed: 5 },
+    { pos: 'CF', bats: 'R', power: 5, contact: 7, speed: 5 },
+  ];
+  assert(SynergyEngine.calculate(roster).some(s => s.id === 'strong_middle'), 'Strong Up the Middle active');
+
+  roster[0].contact = 6;
+  assert(!SynergyEngine.calculate(roster).some(s => s.id === 'strong_middle'), 'Strong Middle fails with one below 7 contact');
+}
+
+// 9k: Corner Power
+{
+  const roster = [
+    { pos: '1B', bats: 'R', power: 8, contact: 5, speed: 5 },
+    { pos: '3B', bats: 'R', power: 8, contact: 5, speed: 5 },
+  ];
+  assert(SynergyEngine.calculate(roster).some(s => s.id === 'corner_power'), 'Corner Power active');
+}
+
+// 9l: Hired Guns and Mercenary Squad (bonus players)
+{
+  const roster = [
+    { bats: 'R', power: 5, contact: 5, speed: 5, isBonus: true },
+    { bats: 'R', power: 5, contact: 5, speed: 5, isBonus: true },
+  ];
+  const active = SynergyEngine.calculate(roster);
+  assert(active.some(s => s.id === 'hired_guns'), 'Hired Guns active with 2 bonus');
+  assert(!active.some(s => s.id === 'mercenary_squad'), 'Mercenary Squad not active with only 2');
+
+  roster.push({ bats: 'R', power: 5, contact: 5, speed: 5, isBonus: true });
+  const active2 = SynergyEngine.calculate(roster);
+  assert(active2.some(s => s.id === 'mercenary_squad'), 'Mercenary Squad active with 3 bonus');
+}
+
+// 9m: calculate returns correct shape (no check function leaking)
+{
+  const roster = [
+    { bats: 'L', power: 5, contact: 5, speed: 5 },
+    { bats: 'L', power: 5, contact: 5, speed: 5 },
+    { bats: 'L', power: 5, contact: 5, speed: 5 },
+  ];
+  const active = SynergyEngine.calculate(roster);
+  assert(active.length > 0, 'At least one synergy active');
+  const syn = active[0];
+  assert(syn.id && syn.name && syn.description && syn.bonus && syn.bonusDescription,
+    'Active synergy has id, name, description, bonus, bonusDescription');
+  assert(typeof syn.check === 'undefined', 'check function not leaked to result');
+}
+
+// 9n: Bonus type coverage — all synergy bonus types are recognized
+{
+  const knownTypes = new Set([
+    'add_mult_all', 'add_chips_all', 'add_mult_on_hr', 'add_mult_lefty',
+    'team_pair_out_reduction', 'team_extra_base_chance', 'add_chips_on_xbh',
+    'pitcher_control_reduction', 'pitcher_hit_reduction', 'bonus_player_stat_boost',
+  ]);
+  for (const s of SYNERGIES) {
+    assert(knownTypes.has(s.bonus.type), `Synergy ${s.id} has recognized bonus type: ${s.bonus.type}`);
+  }
+}
+
+// 9o: Small Ball synergy
+{
+  const roster = [];
+  for (let i = 0; i < 5; i++) roster.push({ bats: 'R', power: 5, contact: 7, speed: 6 });
+  assert(SynergyEngine.calculate(roster).some(s => s.id === 'small_ball'), 'Small Ball triggers with 5 contact+speed');
 }
 
 // ═══════════════════════════════════════════════════════

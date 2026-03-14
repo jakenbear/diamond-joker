@@ -10,6 +10,7 @@ import TraitManager from '../TraitManager.js';
 import CountManager from '../CountManager.js';
 import SituationalEngine from '../SituationalEngine.js';
 import SoundManager from '../SoundManager.js';
+import SynergyEngine from '../SynergyEngine.js';
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const CARD_ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
@@ -120,6 +121,7 @@ export default class GameScene extends Phaser.Scene {
     this.cardSprites = [];
     this.inputLocked = false;
     this._maxChipsThisInning = 0;
+    this.activeSynergies = SynergyEngine.calculate(this.rosterManager.getRoster());
     this.baseGraphics = [];
     this.batterTraitSprites = [];
     this.pitcherTraitSprites = [];
@@ -1802,6 +1804,16 @@ export default class GameScene extends Phaser.Scene {
         statBoosts[s.effect.stat] = (statBoosts[s.effect.stat] || 0) + s.effect.value;
       }
     }
+    // Hired Guns synergy: bonus players get +1 to all stats
+    if (batter.isBonus && this.activeSynergies) {
+      for (const syn of this.activeSynergies) {
+        if (syn.bonus.type === 'bonus_player_stat_boost') {
+          statBoosts.power = (statBoosts.power || 0) + syn.bonus.value;
+          statBoosts.contact = (statBoosts.contact || 0) + syn.bonus.value;
+          statBoosts.speed = (statBoosts.speed || 0) + syn.bonus.value;
+        }
+      }
+    }
     // Temporarily boost batter stats
     const origStats = {};
     for (const [stat, val] of Object.entries(statBoosts)) {
@@ -1833,8 +1845,12 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Bonus player lineup effects ──
     const lineupBonuses = this._applyLineupEffects(handResult, gameState);
-    // Merge lineup extra base into staff bonuses for unified handling
-    staffBonuses.extraBaseBonus += lineupBonuses.extraBaseBonus;
+
+    // ── Synergy effects ──
+    const synergyBonuses = this._applySynergyEffects(handResult, gameState);
+
+    // Merge extra base bonuses for unified handling
+    staffBonuses.extraBaseBonus += lineupBonuses.extraBaseBonus + synergyBonuses.extraBaseBonus;
 
     // Sacrifice fly (trait-based, e.g. on strikeouts)
     let sacrificeFlyRun = 0;
@@ -2092,7 +2108,7 @@ export default class GameScene extends Phaser.Scene {
 
       // ── Phase 3: Scoring Cascade for hits (after runners) ──
       this.handNameText.setText('');
-      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage, staffBonuses, lineupBonuses);
+      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage, staffBonuses, lineupBonuses, synergyBonuses);
       const totalCascadeDelay = RUNNER_DELAY + cascadeDelay;
 
       // Score popup for runs (after cascade)
@@ -2122,8 +2138,8 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Show scoring cascade: base hand → power → contact → trait → pitcher → staff → lineup → final */
-  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg, staffBonuses = null, lineupBonuses = null) {
+  /** Show scoring cascade: base hand → power → contact → trait → pitcher → staff → lineup → synergy → final */
+  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg, staffBonuses = null, lineupBonuses = null, synergyBonuses = null) {
     const steps = [];
     const stepDelay = 350;
     let runningChips = handResult.chips - bonuses.powerChips + pitcherPenalty.chips;
@@ -2194,6 +2210,13 @@ export default class GameScene extends Phaser.Scene {
     // Step 6b: Lineup bonuses (bonus players)
     if (lineupBonuses && lineupBonuses.messages.length > 0) {
       for (const msg of lineupBonuses.messages) {
+        steps.push({ text: msg.text, color: msg.color });
+      }
+    }
+
+    // Step 6c: Synergy bonuses
+    if (synergyBonuses && synergyBonuses.messages.length > 0) {
+      for (const msg of synergyBonuses.messages) {
         steps.push({ text: msg.text, color: msg.color });
       }
     }
@@ -2566,6 +2589,74 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Apply chip/mult bonuses
+    if (bonuses.chipBonus > 0 || bonuses.multBonus > 0) {
+      handResult.chips += bonuses.chipBonus;
+      handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
+      handResult.score = Math.round(handResult.chips * handResult.mult);
+    }
+
+    return bonuses;
+  }
+
+  // ── Synergy Effect Processor ──────────────────────────
+  // Applies bonuses from active lineup synergies.
+
+  _applySynergyEffects(handResult, gameState) {
+    const bonuses = { chipBonus: 0, multBonus: 0, messages: [], extraBaseBonus: 0, pairOutReduction: 0 };
+    if (!this.activeSynergies || this.activeSynergies.length === 0) return bonuses;
+
+    const batter = this.rosterManager.getCurrentBatter();
+    const isHit = !['Strikeout', 'Groundout', 'Flyout', 'Double Play', "Fielder's Choice"].includes(handResult.outcome);
+
+    for (const syn of this.activeSynergies) {
+      const eff = syn.bonus;
+      switch (eff.type) {
+        case 'add_mult_all': {
+          bonuses.multBonus += eff.value;
+          bonuses.messages.push({ text: `+${eff.value}x (${syn.name})`, color: '#ce93d8' });
+          break;
+        }
+        case 'add_chips_all': {
+          bonuses.chipBonus += eff.value;
+          bonuses.messages.push({ text: `+${eff.value} chips (${syn.name})`, color: '#ce93d8' });
+          break;
+        }
+        case 'add_mult_on_hr': {
+          if (handResult.outcome === 'Home Run') {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (${syn.name})`, color: '#ce93d8' });
+          }
+          break;
+        }
+        case 'add_mult_lefty': {
+          if (batter.bats === 'L') {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (${syn.name})`, color: '#ce93d8' });
+          }
+          break;
+        }
+        case 'team_pair_out_reduction': {
+          bonuses.pairOutReduction += eff.value;
+          break;
+        }
+        case 'team_extra_base_chance': {
+          bonuses.extraBaseBonus += eff.value;
+          break;
+        }
+        case 'add_chips_on_xbh': {
+          if (['Triple', 'Home Run'].includes(handResult.outcome)) {
+            bonuses.chipBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} chips (${syn.name})`, color: '#ce93d8' });
+          }
+          break;
+        }
+        // pitcher_control_reduction and pitcher_hit_reduction handled in PitchingScene
+        // bonus_player_stat_boost handled at at-bat start
+        default:
+          break;
+      }
+    }
+
     if (bonuses.chipBonus > 0 || bonuses.multBonus > 0) {
       handResult.chips += bonuses.chipBonus;
       handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;

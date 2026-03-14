@@ -6,6 +6,7 @@
 
 import COACHES from '../../data/coaches.js';
 import MASCOTS from '../../data/mascots.js';
+import SynergyEngine from '../SynergyEngine.js';
 
 const RARITY_COLORS = {
   common:   { fill: 0x4caf50, border: 0x66bb6a, label: '#81c784' },
@@ -55,8 +56,10 @@ export default class ShopScene extends Phaser.Scene {
     // Render active tab content
     if (this.activeTab === 'traits') {
       this._renderTraitsTab();
-    } else {
+    } else if (this.activeTab === 'staff') {
       this._renderStaffTab();
+    } else {
+      this._renderSynergiesTab();
     }
 
     this._createDoneButton();
@@ -66,8 +69,9 @@ export default class ShopScene extends Phaser.Scene {
 
   _createTabs() {
     const tabs = [
-      { key: 'traits', label: 'TRAITS', x: 540 },
-      { key: 'staff', label: 'STAFF', x: 740 },
+      { key: 'traits', label: 'TRAITS', x: 440 },
+      { key: 'staff', label: 'STAFF', x: 640 },
+      { key: 'synergies', label: 'SYNERGIES', x: 840 },
     ];
 
     tabs.forEach(tab => {
@@ -464,6 +468,64 @@ export default class ShopScene extends Phaser.Scene {
         this._exitShop();
       } else {
         this._restartScene();
+      }
+    });
+  }
+
+  // ── Synergies Tab ───────────────────────────────────────
+
+  _renderSynergiesTab() {
+    const roster = this.rosterManager.getRoster();
+    const activeSynergies = SynergyEngine.calculate(roster);
+    const activeIds = new Set(activeSynergies.map(s => s.id));
+    const allSynergies = SynergyEngine.getAll();
+
+    const activeCount = activeSynergies.length;
+    this.add.text(640, 128,
+      `Active: ${activeCount}/${allSynergies.length} synergies`, {
+      fontSize: '16px', fontFamily: 'monospace', color: '#aaaaaa',
+    }).setOrigin(0.5);
+
+    const startY = 160;
+    const rowH = 42;
+    const colW = 580;
+
+    allSynergies.forEach((syn, i) => {
+      const isActive = activeIds.has(syn.id);
+      const col = i < 7 ? 0 : 1;
+      const row = i < 7 ? i : i - 7;
+      const x = col === 0 ? 640 - colW / 2 - 10 : 640 + colW / 2 + 10;
+      const y = startY + row * rowH;
+
+      // Row background
+      this.add.rectangle(x, y, colW, 36, isActive ? 0x1a3a2a : 0x1a1a2a, 0.7)
+        .setStrokeStyle(1, isActive ? 0x4caf50 : 0x333344);
+
+      // Status icon
+      const icon = isActive ? '\u2713' : '\u2717';
+      const iconColor = isActive ? '#69f0ae' : '#555555';
+      this.add.text(x - colW / 2 + 15, y, icon, {
+        fontSize: '16px', fontFamily: 'monospace', color: iconColor, fontStyle: 'bold',
+      }).setOrigin(0, 0.5);
+
+      // Synergy name
+      this.add.text(x - colW / 2 + 40, y - 6, syn.name, {
+        fontSize: '13px', fontFamily: 'monospace',
+        color: isActive ? '#ffffff' : '#888888', fontStyle: 'bold',
+      }).setOrigin(0, 0.5);
+
+      // Description or hint
+      const desc = isActive ? syn.bonusDescription : syn.hint;
+      const descColor = isActive ? '#81c784' : '#666666';
+      this.add.text(x - colW / 2 + 40, y + 8, desc, {
+        fontSize: '10px', fontFamily: 'monospace', color: descColor,
+      }).setOrigin(0, 0.5);
+
+      // Requirement text (right side)
+      if (isActive) {
+        this.add.text(x + colW / 2 - 15, y, 'ACTIVE', {
+          fontSize: '10px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+        }).setOrigin(1, 0.5);
       }
     });
   }
