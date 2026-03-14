@@ -1,0 +1,168 @@
+class_name BonusPlayers
+extends RefCounted
+
+# Bonus player definitions — enhanced archetypes earned from card packs.
+# Not team-affiliated. Each has boosted stats, a fixed innate trait,
+# and a passive lineup effect (Joker-like, applies to all batters).
+
+static var DATA: Array[Dictionary] = [
+	# Power Archetype
+	{
+		"id": "knuckles_mcbride",
+		"name": "\"Knuckles\" McBride",
+		"pos": "1B",
+		"power": 9, "contact": 4, "speed": 5, "bats": "R",
+		"innate_trait_id": "cleanup_crew",
+		"lineup_effect": {"type": "team_add_chips_on_xbh", "value": 1},
+		"lineup_description": "All batters: +1 chip on doubles+",
+		"rarity": "common",
+	},
+	{
+		"id": "hammer_jones",
+		"name": "Hammer Jones",
+		"pos": "DH",
+		"power": 10, "contact": 3, "speed": 3, "bats": "R",
+		"innate_trait_id": "slugger_serum",
+		"lineup_effect": {"type": "team_power_mult", "value": 1.5, "threshold": 8},
+		"lineup_description": "Power 8+ batters: x1.5 mult",
+		"rarity": "rare",
+	},
+	{
+		"id": "dynamite_diaz",
+		"name": "Dynamite Diaz",
+		"pos": "RF",
+		"power": 8, "contact": 5, "speed": 6, "bats": "L",
+		"innate_trait_id": "hot_corner",
+		"lineup_effect": {"type": "team_add_chips_on_xbh", "value": 2},
+		"lineup_description": "All batters: +2 chips on doubles+",
+		"rarity": "uncommon",
+	},
+
+	# Contact Archetype
+	{
+		"id": "silk_santiago",
+		"name": "Silk Santiago",
+		"pos": "SS",
+		"power": 4, "contact": 9, "speed": 7, "bats": "L",
+		"innate_trait_id": "contact_lens",
+		"lineup_effect": {"type": "team_pair_out_reduction", "value": 0.05},
+		"lineup_description": "All batters: pair out chance -5%",
+		"rarity": "common",
+	},
+	{
+		"id": "professor_park",
+		"name": "Professor Park",
+		"pos": "2B",
+		"power": 3, "contact": 10, "speed": 5, "bats": "R",
+		"innate_trait_id": "eye_of_the_tiger",
+		"lineup_effect": {"type": "team_contact_save_boost", "value": 0.10},
+		"lineup_description": "All batters: +10% contact save chance",
+		"rarity": "uncommon",
+	},
+	{
+		"id": "doc_daniels",
+		"name": "Doc Daniels",
+		"pos": "C",
+		"power": 5, "contact": 8, "speed": 4, "bats": "R",
+		"innate_trait_id": "walk_machine",
+		"lineup_effect": {"type": "team_first_pitch_mult", "value": 1.0},
+		"lineup_description": "All batters: +1.0 mult on first-pitch swings",
+		"rarity": "uncommon",
+	},
+
+	# Speed Archetype
+	{
+		"id": "ghost_runner",
+		"name": "Ghost Runner",
+		"pos": "CF",
+		"power": 3, "contact": 6, "speed": 10, "bats": "L",
+		"innate_trait_id": "stolen_base",
+		"lineup_effect": {"type": "team_extra_base_chance", "value": 0.05},
+		"lineup_description": "All batters: +5% extra base chance",
+		"rarity": "common",
+	},
+	{
+		"id": "flash_freeman",
+		"name": "Flash Freeman",
+		"pos": "LF",
+		"power": 5, "contact": 7, "speed": 9, "bats": "L",
+		"innate_trait_id": "leadoff_king",
+		"lineup_effect": {"type": "team_extra_base_chance", "value": 0.08},
+		"lineup_description": "All batters: +8% extra base chance",
+		"rarity": "uncommon",
+	},
+
+	# Balanced / Utility
+	{
+		"id": "clutch_carter",
+		"name": "Clutch Carter",
+		"pos": "3B",
+		"power": 7, "contact": 7, "speed": 6, "bats": "R",
+		"innate_trait_id": "rally_cap",
+		"lineup_effect": {"type": "team_add_mult_on_hit", "value": 0.5},
+		"lineup_description": "All batters: +0.5 mult on hits",
+		"rarity": "common",
+	},
+	{
+		"id": "iron_mike",
+		"name": "Iron Mike",
+		"pos": "1B",
+		"power": 8, "contact": 6, "speed": 3, "bats": "R",
+		"innate_trait_id": "extra_innings",
+		"lineup_effect": {"type": "team_late_inning_chips", "value": 3},
+		"lineup_description": "All batters: +3 chips in innings 7-9",
+		"rarity": "uncommon",
+	},
+	{
+		"id": "lucky_luciano",
+		"name": "Lucky Luciano",
+		"pos": "SS",
+		"power": 5, "contact": 7, "speed": 8, "bats": "L",
+		"innate_trait_id": "bunt_single",
+		"lineup_effect": {"type": "team_strikeout_chips", "value": 2},
+		"lineup_description": "All batters: earn 2 chips on strikeouts",
+		"rarity": "common",
+	},
+	{
+		"id": "ace_malone",
+		"name": "Ace Malone",
+		"pos": "CF",
+		"power": 6, "contact": 8, "speed": 7, "bats": "R",
+		"innate_trait_id": "ace_in_the_hole",
+		"lineup_effect": {"type": "team_runner_mult", "value": 0.5},
+		"lineup_description": "All batters: +0.5 mult per runner on base",
+		"rarity": "uncommon",
+	},
+
+	# Rare Specialists
+	{
+		"id": "big_papa_ortiz",
+		"name": "Big Papa Ortiz",
+		"pos": "DH",
+		"power": 10, "contact": 5, "speed": 2, "bats": "L",
+		"innate_trait_id": "grand_ambition",
+		"lineup_effect": {"type": "team_add_mult_on_hit", "value": 1.0},
+		"lineup_description": "All batters: +1.0 mult on hits",
+		"rarity": "rare",
+	},
+	{
+		"id": "phantom_phelps",
+		"name": "Phantom Phelps",
+		"pos": "RF",
+		"power": 4, "contact": 6, "speed": 10, "bats": "L",
+		"innate_trait_id": "double_mcgee",
+		"lineup_effect": {"type": "team_extra_base_chance", "value": 0.12},
+		"lineup_description": "All batters: +12% extra base chance",
+		"rarity": "rare",
+	},
+	{
+		"id": "magnet_martinez",
+		"name": "Magnet Martinez",
+		"pos": "2B",
+		"power": 6, "contact": 9, "speed": 6, "bats": "R",
+		"innate_trait_id": "batting_gloves",
+		"lineup_effect": {"type": "team_pair_out_reduction", "value": 0.08},
+		"lineup_description": "All batters: pair out chance -8%",
+		"rarity": "rare",
+	},
+]

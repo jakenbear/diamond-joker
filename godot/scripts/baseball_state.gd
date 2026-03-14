@@ -38,6 +38,8 @@ var opponent_runs_by_inning: Array[int] = []
 var _current_inning_player_runs: int = 0
 var _at_bats_this_inning: int = 0
 var pairs_played_this_inning: int = 0
+var staff: Array[Dictionary] = []  # Active coaches and mascots
+var staff_slots: int = 2           # Start with 2 slots, expandable to 4
 
 
 func reset() -> void:
@@ -56,6 +58,8 @@ func reset() -> void:
 	_current_inning_player_runs = 0
 	_at_bats_this_inning = 0
 	pairs_played_this_inning = 0
+	staff = []
+	staff_slots = 2
 
 
 func get_total_chips() -> int:
@@ -67,6 +71,33 @@ func spend_chips(amount: int) -> bool:
 		return false
 	total_chips -= amount
 	return true
+
+
+# Staff (Coaches & Mascots)
+
+func add_staff(item: Dictionary) -> bool:
+	if staff.size() >= staff_slots:
+		return false
+	staff.append(item)
+	if item.get("effect", {}).get("type") == "unlock_staff_slot":
+		staff_slots = mini(4, staff_slots + item["effect"]["value"])
+	return true
+
+
+func remove_staff(id: String) -> bool:
+	for i in staff.size():
+		if staff[i]["id"] == id:
+			staff.remove_at(i)
+			return true
+	return false
+
+
+func get_staff() -> Array[Dictionary]:
+	return staff
+
+
+func get_staff_by_effect(effect_type: String) -> Array[Dictionary]:
+	return staff.filter(func(s): return s.get("effect", {}).get("type") == effect_type)
 
 
 func should_show_shop() -> bool:
