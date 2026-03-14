@@ -202,15 +202,15 @@ func resolve() -> Dictionary:
 
 
 static func _pitcher_outcome(margin: int) -> String:
-	if margin >= 30: return "Strikeout"
-	if margin >= 10: return "Flyout" if randf() < 0.5 else "Groundout"
+	if margin >= 15: return "Strikeout"
+	if margin >= 5: return "Flyout" if randf() < 0.5 else "Groundout"
 	return "Groundout"
 
 
 static func _batter_outcome(margin: int) -> String:
-	if margin >= 50: return "Home Run"
-	if margin >= 25: return "Triple" if randf() < 0.5 else "Double"
-	if margin >= 10: return "Double"
+	if margin >= 15: return "Home Run"
+	if margin >= 8: return "Triple" if randf() < 0.5 else "Double"
+	if margin >= 3: return "Double"
 	return "Single"
 
 

@@ -164,15 +164,15 @@ export default class ShowdownEngine {
   }
 
   static _pitcherOutcome(margin) {
-    if (margin >= 30) return 'Strikeout';
-    if (margin >= 10) return Math.random() < 0.5 ? 'Flyout' : 'Groundout';
+    if (margin >= 15) return 'Strikeout';
+    if (margin >= 5) return Math.random() < 0.5 ? 'Flyout' : 'Groundout';
     return 'Groundout';
   }
 
   static _batterOutcome(margin) {
-    if (margin >= 50) return 'Home Run';
-    if (margin >= 25) return Math.random() < 0.5 ? 'Triple' : 'Double';
-    if (margin >= 10) return 'Double';
+    if (margin >= 15) return 'Home Run';
+    if (margin >= 8) return Math.random() < 0.5 ? 'Triple' : 'Double';
+    if (margin >= 3) return 'Double';
     return 'Single';
   }
 
