@@ -195,19 +195,19 @@ export default class ShopScene extends Phaser.Scene {
     const startX = 640 - (available.length - 1) * 150;
     available.forEach((item, i) => {
       const x = startX + i * 300;
-      this._createStaffCard(item, x, 280, slotsUsed < slotsTotal);
+      this._createStaffCard(item, x, 300, slotsUsed < slotsTotal);
     });
 
-    // Current staff display at bottom
+    // Current staff display below cards
     if (staff.length > 0) {
-      this.add.text(640, 450, 'ACTIVE STAFF', {
+      this.add.text(640, 480, 'ACTIVE STAFF', {
         fontSize: '16px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
       }).setOrigin(0.5);
 
-      this.add.rectangle(640, 452, 500, 2, 0x334455);
+      this.add.rectangle(640, 482, 500, 2, 0x334455);
 
       staff.forEach((item, i) => {
-        const y = 480 + i * 50;
+        const y = 510 + i * 50;
         this._createActiveStaffRow(item, y);
       });
     }
@@ -569,10 +569,10 @@ export default class ShopScene extends Phaser.Scene {
   }
 
   _createDoneButton() {
-    const doneBg = this.add.rectangle(640, 680, 200, 46, 0x37474f, 0.9)
+    const doneBg = this.add.rectangle(640, 660, 200, 46, 0x37474f, 0.9)
       .setInteractive({ useHandCursor: true })
       .setStrokeStyle(2, 0x546e7a);
-    this.add.text(640, 680, 'DONE', {
+    this.add.text(640, 660, 'DONE', {
       fontSize: '22px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5);
 
