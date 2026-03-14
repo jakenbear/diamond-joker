@@ -204,7 +204,7 @@ export default class ShopScene extends Phaser.Scene {
         fontSize: '16px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
       }).setOrigin(0.5);
 
-      this.add.rectangle(640, 482, 500, 2, 0x334455);
+      this.add.rectangle(640, 496, 500, 2, 0x334455);
 
       staff.forEach((item, i) => {
         const y = 510 + i * 50;
