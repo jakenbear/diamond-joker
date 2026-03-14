@@ -87,40 +87,42 @@ When the deck runs low, the discard pile is reshuffled back in.
 9. Runners advance, runs score, peanuts earned
 10. Next batter (9-player lineup cycles)
 
-### Rank Quality — The Pair Gamble
+### Rank Quality — Every Hand Is a Gamble
 
-Pairs, Two Pair, and Three of a Kind aren't guaranteed hits. Lower-rank cards have a higher chance of becoming outs:
+All hands below Full House have an out chance. Only Full House, Four of a Kind, Straight Flush, and Royal Flush are guaranteed hits.
 
 **Pair out chance:**
 ```
-outChance = 0.80 - (pairRank - 2) × 0.06 + twoStrikePenalty + pairPenalty
+outChance = 0.95 - (pairRank - 2) × 0.03 + twoStrikePenalty + pairPenalty
 ```
 
 | Pair Rank | Base Out % | Survives |
 |-----------|-----------|----------|
-| 2s | 80% | 20% |
-| 5s | 62% | 38% |
-| 8s | 44% | 56% |
-| 10s | 32% | 68% |
-| Kings | 14% | 86% |
-| Aces | 8% | 92% |
+| 2s | 95% | 5% |
+| 5s | 86% | 14% |
+| 8s | 77% | 23% |
+| 10s | 71% | 29% |
+| Kings | 62% | 38% |
+| Aces | 59% | 41% |
 
 - Two-strike penalty: +10%
 - Face card pairs (10+): bonus peanuts = pairRank - 9
 
-**Two Pair:** 20% out chance on low pairs (2–5). 50/50 groundout/flyout.
-**Three of a Kind:** 10% out chance on low ranks. Always flyout on failure.
+**Two Pair:** 55% base out chance. Pair penalty stacks at half rate (+12%/pair).
+**Three of a Kind:** 35% base out chance.
+**Straight / Flush:** 10% base out chance (small upset).
+**Full House+:** 0% out chance (guaranteed hits — reward for building strong hands).
 
 ### "Pitcher Adjusts" — Pair Degradation
 
-The more pairs you play in a single inning, the worse they get. The pitcher reads your strategy.
+The more pairs/two-pairs you play in a single inning, the worse they get. The pitcher reads your strategy.
 
-| Pair # This Inning | Extra Out Chance |
-|--------------------|-----------------|
-| 1st | +0% |
-| 2nd | +15% |
-| 3rd | +30% |
-| 4th+ | +45% |
+| Pair # This Inning | Extra Out Chance (Pair) | Extra Out Chance (Two Pair) |
+|--------------------|------------------------|---------------------------|
+| 1st | +0% | +0% |
+| 2nd | +25% | +12% |
+| 3rd | +50% | +24% |
+| 4th+ | +75% | +36% |
 
 Capped at 95% max out chance. Resets each half-inning.
 

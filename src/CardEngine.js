@@ -177,8 +177,8 @@ export default class CardEngine {
       // else stays Home Run (80%)
     }
 
-    // ── Rank-scaled quality for Pair, Two Pair, Three of a Kind ──
-    if (handIdx === 8 || handIdx === 7 || handIdx === 6) {
+    // ── Rank-scaled quality — out chances for Pair through Flush ──
+    if (handIdx >= 4 && handIdx <= 8) {
       const qualityResult = CardEngine._applyRankQuality(entry, pairRank, handIdx, strikeCount, gameState);
       if (qualityResult) {
         entry = qualityResult;
@@ -271,64 +271,63 @@ export default class CardEngine {
 
   /**
    * Apply rank-scaled quality rules.
-   * Low ranks (2-5) risk groundout/flyout, scaled by hand strength.
-   * High ranks (10-A) get bonus peanuts.
-   *   Pair:            ~40% out (60% groundout, 40% flyout)
-   *   Two Pair:        20% out (50/50 groundout/flyout)
-   *   Three of a Kind: 10% out (flyout)
+   * All hands below Full House have some out chance.
+   * Pair out formula: 0.95 - (rank-2)*0.03 + pairPenalty + twoStrikePenalty
+   *   Pair of 2s: 95% out, Pair of Aces: 59% out (before penalties)
+   *   Two Pair: 55% base out
+   *   Three of a Kind: 35% base out
+   *   Straight / Flush: 10% base out
+   * pairPenalty: +0.25 per pair/two-pair played this inning (stacks fast)
    */
   static _applyRankQuality(entry, pairRank, handIdx, strikeCount = 0, gameState = null) {
-    if (handIdx === 8) {
-      const twoStrikePenalty = strikeCount >= 2 ? 0.10 : 0;
-      const pairsPlayed = gameState?.baseballState?.pairsPlayedThisInning || 0;
-      const pairPenalty = pairsPlayed * 0.15;
-      const outChance = Math.min(0.95, Math.max(0.05, 0.80 - (pairRank - 2) * 0.06 + twoStrikePenalty + pairPenalty));
+    const pairsPlayed = gameState?.baseballState?.pairsPlayedThisInning || 0;
 
-      // Increment the counter for next pair this inning
+    let outChance = 0;
+
+    if (handIdx === 8) {
+      // Pair
+      const twoStrikePenalty = strikeCount >= 2 ? 0.10 : 0;
+      const pairPenalty = pairsPlayed * 0.25;
+      outChance = 0.95 - (pairRank - 2) * 0.03 + twoStrikePenalty + pairPenalty;
+
+      // Increment pair counter
       if (gameState?.baseballState) {
         gameState.baseballState.pairsPlayedThisInning++;
       }
+    } else if (handIdx === 7) {
+      // Two Pair
+      const pairPenalty = pairsPlayed * 0.12;
+      outChance = 0.55 + pairPenalty;
 
-      if (Math.random() < outChance) {
-        const outType = Math.random() < 0.40 ? 'Flyout' : 'Groundout';
-        return {
-          handName: outType,
-          outcome: outType,
-          peanuts: 0,
-          mult: 1,
-          score: 0,
-          wasGroundout: true,
-          originalHand: entry.handName,
-          pairRank,
-        };
+      if (gameState?.baseballState) {
+        gameState.baseballState.pairsPlayedThisInning++;
       }
-      // Survived — high ranks still get bonus peanuts
-      if (pairRank >= 10) {
-        const bonus = pairRank - 9;
-        return { ...entry, peanuts: entry.peanuts + bonus };
-      }
-      return null;
+    } else if (handIdx === 6) {
+      // Three of a Kind
+      outChance = 0.35;
+    } else if (handIdx === 5 || handIdx === 4) {
+      // Straight or Flush
+      outChance = 0.10;
     }
 
-    // Two Pair / Three of a Kind: keep existing low-rank penalties only
-    if (pairRank >= 2 && pairRank <= 5) {
-      const outChance = handIdx === 7 ? 0.2 : 0.1;
-      if (Math.random() < outChance) {
-        const outType = handIdx === 6 ? 'Flyout' : (Math.random() < 0.50 ? 'Flyout' : 'Groundout');
-        return {
-          handName: outType,
-          outcome: outType,
-          peanuts: 0,
-          mult: 1,
-          score: 0,
-          wasGroundout: true,
-          originalHand: entry.handName,
-        };
-      }
+    outChance = Math.min(0.95, Math.max(0.05, outChance));
+
+    if (Math.random() < outChance) {
+      const outType = Math.random() < 0.40 ? 'Flyout' : 'Groundout';
+      return {
+        handName: outType,
+        outcome: outType,
+        peanuts: 0,
+        mult: 1,
+        score: 0,
+        wasGroundout: true,
+        originalHand: entry.handName,
+        pairRank,
+      };
     }
 
-    // High rank: 10-14 → Bonus peanuts (Two Pair / Three of a Kind)
-    if (pairRank >= 10) {
+    // Survived — high pair ranks get bonus peanuts (Pair, Two Pair, Three of a Kind only)
+    if (pairRank >= 10 && handIdx >= 6) {
       const bonus = pairRank - 9;
       return { ...entry, peanuts: entry.peanuts + bonus };
     }

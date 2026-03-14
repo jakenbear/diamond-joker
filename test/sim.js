@@ -82,36 +82,42 @@ group('1a. Hand Evaluation');
   assert(r.peanuts === 3 && r.mult === 2.5, 'Full House peanuts/mult');
 }
 {
+  // Flush/Straight have 10% out chance — check detection via originalHand fallback
   const flush = makeCards([[2,'D'],[5,'D'],[8,'D'],[11,'D'],[13,'D']]);
   const r = CardEngine.evaluateHand(flush);
-  assert(r.handName === 'Flush', 'Flush detected');
-  assert(r.peanuts === 5 && r.mult === 5, 'Flush peanuts/mult');
+  const flushName = r.originalHand || r.handName;
+  assert(flushName === 'Flush', 'Flush detected');
+  if (r.handName === 'Flush') assert(r.peanuts === 5 && r.mult === 5, 'Flush peanuts/mult');
 }
 {
   const straight = makeCards([[6,'H'],[7,'D'],[8,'C'],[9,'S'],[10,'H']]);
   const r = CardEngine.evaluateHand(straight);
-  assert(r.handName === 'Straight', 'Straight detected');
-  assert(r.peanuts === 4 && r.mult === 4, 'Straight peanuts/mult');
+  const straightName = r.originalHand || r.handName;
+  assert(straightName === 'Straight', 'Straight detected');
+  if (r.handName === 'Straight') assert(r.peanuts === 4 && r.mult === 4, 'Straight peanuts/mult');
 }
 {
   // Ace-low straight: A-2-3-4-5
   const aceLow = makeCards([[14,'H'],[2,'D'],[3,'C'],[4,'S'],[5,'H']]);
   const r = CardEngine.evaluateHand(aceLow);
-  assert(r.handName === 'Straight', 'Ace-low straight (A-2-3-4-5) detected');
+  const aceLowName = r.originalHand || r.handName;
+  assert(aceLowName === 'Straight', 'Ace-low straight (A-2-3-4-5) detected');
 }
 {
   const tok = makeCards([[6,'H'],[6,'D'],[6,'C'],[9,'S'],[11,'H']]);
   const r = CardEngine.evaluateHand(tok);
-  // rank 6 is mid-range, no quality modification
-  assert(r.handName === 'Three of a Kind', 'Three of a Kind detected');
-  assert(r.peanuts === 3 && r.mult === 3, 'Three of a Kind peanuts/mult');
+  // Three of a Kind has 35% out chance
+  const tokName = r.originalHand || r.handName;
+  assert(tokName === 'Three of a Kind', 'Three of a Kind detected');
+  if (r.handName === 'Three of a Kind') assert(r.peanuts === 3 && r.mult === 3, 'Three of a Kind peanuts/mult');
 }
 {
-  // Two Pair with mid-range ranks (no quality modification)
+  // Two Pair has 55% out chance — check detection via originalHand fallback
   const tp = makeCards([[8,'H'],[8,'D'],[9,'C'],[9,'S'],[2,'H']]);
   const r = CardEngine.evaluateHand(tp);
-  assert(r.handName === 'Two Pair', 'Two Pair detected');
-  assert(r.peanuts === 2 && r.mult === 2, 'Two Pair peanuts/mult');
+  const tpName = r.originalHand || r.handName;
+  assert(tpName === 'Two Pair', 'Two Pair detected');
+  if (r.handName === 'Two Pair') assert(r.peanuts === 2 && r.mult === 2, 'Two Pair peanuts/mult');
 }
 {
   // Pair with Aces (high rank, low groundout chance ~8%)
@@ -186,7 +192,7 @@ group('1b. Rank Quality (statistical, N=1000)');
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const rate = outs / N;
-  assertClose(rate, 0.64, 0.84, `Low Pair (3s) out rate ~74%`);
+  assertClose(rate, 0.82, 0.98, `Low Pair (3s) out rate ~92%`);
 }
 {
   // Mid pair (rank 8): ~44% out rate (0.80 - 6*0.06 = 0.44)
@@ -198,7 +204,7 @@ group('1b. Rank Quality (statistical, N=1000)');
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const rate = outs / N;
-  assertClose(rate, 0.34, 0.54, `Mid Pair (8s) out rate ~44%`);
+  assertClose(rate, 0.67, 0.87, `Mid Pair (8s) out rate ~77%`);
 }
 {
   // High pair (rank A): ~8% out rate (0.80 - 12*0.06 = 0.08)
@@ -210,10 +216,10 @@ group('1b. Rank Quality (statistical, N=1000)');
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const rate = outs / N;
-  assertClose(rate, 0.02, 0.16, `High Pair (Aces) out rate ~8%`);
+  assertClose(rate, 0.49, 0.69, `High Pair (Aces) out rate ~59%`);
 }
 {
-  // Low Two Pair: ~20% out rate, split groundout/flyout
+  // Two Pair: ~55% base out rate
   let outs = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
@@ -222,7 +228,7 @@ group('1b. Rank Quality (statistical, N=1000)');
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const rate = outs / N;
-  assertClose(rate, 0.10, 0.30, `Low Two Pair out rate ~20%`);
+  assertClose(rate, 0.45, 0.65, `Two Pair out rate ~55%`);
 }
 {
   // Low Three of a Kind: ~10% flyout rate (unchanged)
@@ -2196,8 +2202,8 @@ console.log('\n── Pitcher Adjusts: escalating out chance ──');
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const outRate = outs / trials;
-  assert(outRate > 0.35, `Aces with 3 prior pairs: out rate ${(outRate*100).toFixed(1)}% > 35%`);
-  assert(outRate < 0.75, `Aces with 3 prior pairs: out rate ${(outRate*100).toFixed(1)}% < 75%`);
+  assert(outRate > 0.85, `Aces with 3 prior pairs: out rate ${(outRate*100).toFixed(1)}% > 85%`);
+  assert(outRate <= 0.98, `Aces with 3 prior pairs: out rate ${(outRate*100).toFixed(1)}% <= 98%`);
 }
 
 {
