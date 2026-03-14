@@ -162,23 +162,18 @@ export default class GameScene extends Phaser.Scene {
   _createScoreboard() {
     this.add.rectangle(640, 25, 1280, 50, 0x0d3311).setDepth(0);
 
-    // Line 1: Score + Chips (centered)
-    this.scoreText = this.add.text(640, 6, '', {
+    // Score + Chips (vertically centered in bar)
+    this.scoreText = this.add.text(640, 13, '', {
       fontSize: '20px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(1);
 
-    // Small "(you)" indicator under player team name
-    this.youIndicator = this.add.text(0, 28, '(you)', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#69f0ae',
-    }).setOrigin(0.5, 0).setDepth(1).setAlpha(0.7);
-
-    // Line 2 left: INN + Outs
-    this.inningOutsText = this.add.text(BATTER_X + PANEL_W / 2 + 20, 32, '', {
+    // Left: INN + Outs
+    this.inningOutsText = this.add.text(BATTER_X + PANEL_W / 2 + 20, 16, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ffffff',
     }).setDepth(1);
 
-    // Line 2 right: B + S count (right-aligned before pitcher panel)
-    this.countText = this.add.text(PITCHER_X - PANEL_W / 2 - 10, 32, '', {
+    // Right: B + S count (right-aligned before pitcher panel)
+    this.countText = this.add.text(PITCHER_X - PANEL_W / 2 - 10, 16, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#ffffff',
     }).setOrigin(1, 0).setDepth(1);
 
@@ -198,16 +193,6 @@ export default class GameScene extends Phaser.Scene {
     const oppTeam = this.rosterManager.getOpponentTeam();
     const oppName = oppTeam ? oppTeam.id : 'OPP';
     this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}    Chips: ${s.totalChips}`);
-
-    // Position "(you)" indicator under the player team name
-    this.scoreText.updateText();
-    const scoreLeft = this.scoreText.x - this.scoreText.width / 2;
-    const measuredWidth = this.add.text(0, -100, playerName, {
-      fontSize: '20px', fontFamily: 'monospace',
-    });
-    const playerNameWidth = measuredWidth.width;
-    measuredWidth.destroy();
-    this.youIndicator.setX(scoreLeft + playerNameWidth / 2);
 
     // Line 2 left: INN + Outs
     const outDots = [];
