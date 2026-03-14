@@ -170,24 +170,25 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '22px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(1);
 
-    // Big outs display (original style)
-    this.outsText = this.add.text(PITCHER_X - PANEL_W / 2 - 20, 10, '', {
-      fontSize: '20px', fontFamily: 'monospace', color: '#ff8a80',
+    // Outs + Count display — same line, same size
+    const statusX = PITCHER_X - PANEL_W / 2 - 30;
+    this.outsText = this.add.text(statusX, 10, '', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ff8a80',
     }).setOrigin(1, 0).setDepth(1);
 
-    // B/S count — small, stacked to the right of outs
-    const countX = PITCHER_X - PANEL_W / 2 + 5;
-    this.add.text(countX, 8, 'B', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#66bb6a', fontStyle: 'bold',
+    // Ball/Strike count — same row, right of outs
+    const countStartX = statusX + 10;
+    this.ballsLabel = this.add.text(countStartX, 8, 'B', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#66bb6a', fontStyle: 'bold',
     }).setDepth(1);
-    this.ballsDots = this.add.text(countX + 12, 8, '', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#66bb6a',
+    this.ballsDots = this.add.text(countStartX + 16, 8, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#66bb6a',
     }).setDepth(1);
-    this.add.text(countX, 21, 'S', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#ff5252', fontStyle: 'bold',
+    this.strikesLabel = this.add.text(countStartX, 24, 'S', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ff5252', fontStyle: 'bold',
     }).setDepth(1);
-    this.strikesDots = this.add.text(countX + 12, 21, '', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#ff5252',
+    this.strikesDots = this.add.text(countStartX + 16, 24, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ff5252',
     }).setDepth(1);
 
     this.countManager = new CountManager();
@@ -748,14 +749,14 @@ export default class GameScene extends Phaser.Scene {
     // Update discard button label with count + risk color
     if (this.discardBtn) {
       if (count.strikes === 0) {
-        this.discardBtn.label.setText(`DISCARD (${countStr})`);
-        this.discardBtn.label.setColor('#a5d6a7');
+        this.discardBtn.txt.setText(`DISCARD (${countStr})`);
+        this.discardBtn.txt.setColor('#a5d6a7');
       } else if (count.strikes === 1) {
-        this.discardBtn.label.setText(`DISCARD (${countStr})`);
-        this.discardBtn.label.setColor('#fff176');
+        this.discardBtn.txt.setText(`DISCARD (${countStr})`);
+        this.discardBtn.txt.setColor('#fff176');
       } else {
-        this.discardBtn.label.setText(`DISCARD (${countStr}) DANGER`);
-        this.discardBtn.label.setColor('#ff8a80');
+        this.discardBtn.txt.setText(`DISCARD (${countStr}) DANGER`);
+        this.discardBtn.txt.setColor('#ff8a80');
       }
     }
   }
