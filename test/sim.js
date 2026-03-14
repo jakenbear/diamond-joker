@@ -2712,6 +2712,79 @@ console.log('\n\x1b[1m--- Part 9: Player Synergies ---\x1b[0m');
   assert(SynergyEngine.calculate(roster).some(s => s.id === 'small_ball'), 'Small Ball triggers with 5 contact+speed');
 }
 
+// ═══════════════════════════════════════════════════════════
+// 10. COUNT-BASED DISCARD SYSTEM
+// ═══════════════════════════════════════════════════════════
+
+group('10a. CountManager — New Pitch Formula');
+{
+  // Test: recordDiscard now requires 3 params
+  const cm = new CountManager();
+  const result = cm.recordDiscard(5, 5, 5);
+  assert(
+    'isStrike' in result && 'isBall' in result && 'isFoul' in result && 'isStrikeout' in result && 'isWalk' in result,
+    'recordDiscard returns all expected fields'
+  );
+
+  // Test: before 2 strikes, result is either STRIKE or BALL (never FOUL)
+  const cm2 = new CountManager();
+  let sawFoulBefore2Strikes = false;
+  for (let i = 0; i < 200; i++) {
+    cm2.reset();
+    const r = cm2.recordDiscard(5, 5, 5);
+    if (r.isFoul) sawFoulBefore2Strikes = true;
+  }
+  assert(!sawFoulBefore2Strikes, 'No fouls before 2 strikes');
+
+  // Test: at 2 strikes, FOUL is possible (high contact batter)
+  let foulCount = 0;
+  const N = 2000;
+  for (let i = 0; i < N; i++) {
+    const cm3 = new CountManager();
+    cm3.strikes = 2;
+    const r = cm3.recordDiscard(5, 5, 9);
+    if (r.isFoul) foulCount++;
+  }
+  assertClose(foulCount, 500, 900, `High contact fouls at 2 strikes (${foulCount}/${N})`);
+
+  // Test: at 2 strikes with low contact, fewer fouls
+  let lowContactFouls = 0;
+  for (let i = 0; i < N; i++) {
+    const cm4 = new CountManager();
+    cm4.strikes = 2;
+    const r = cm4.recordDiscard(5, 5, 3);
+    if (r.isFoul) lowContactFouls++;
+  }
+  assertClose(lowContactFouls, 100, 400, `Low contact fouls at 2 strikes (${lowContactFouls}/${N})`);
+
+  // Test: high velocity + control pitcher gets more strikes
+  let highPitcherStrikes = 0;
+  for (let i = 0; i < N; i++) {
+    const cm5 = new CountManager();
+    const r = cm5.recordDiscard(9, 8, 5);
+    if (r.isStrike) highPitcherStrikes++;
+  }
+  assertClose(highPitcherStrikes, 700, 1400, `Elite pitcher strike rate (${highPitcherStrikes}/${N})`);
+
+  // Test: high contact batter gets more balls
+  let highContactBalls = 0;
+  for (let i = 0; i < N; i++) {
+    const cm6 = new CountManager();
+    const r = cm6.recordDiscard(5, 5, 9);
+    if (r.isBall) highContactBalls++;
+  }
+  assertClose(highContactBalls, 1100, 1700, `High contact ball rate (${highContactBalls}/${N})`);
+
+  // Test: strike chance clamped between 0.15 and 0.65
+  let extremeLowStrikes = 0;
+  for (let i = 0; i < N; i++) {
+    const cm7 = new CountManager();
+    const r = cm7.recordDiscard(1, 1, 10);
+    if (r.isStrike) extremeLowStrikes++;
+  }
+  assertClose(extremeLowStrikes, 200, 500, `Min clamp strike rate (${extremeLowStrikes}/${N})`);
+}
+
 // ═══════════════════════════════════════════════════════
 //  SUMMARY
 // ═══════════════════════════════════════════════════════
