@@ -65,6 +65,11 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
+    // Mascot spritesheet (5 cols × 3 rows, 72×72 per frame at 4x)
+    this.load.spritesheet('mascots', 'assets/animals/mascots_4x.png', {
+      frameWidth: 72, frameHeight: 72,
+    });
+
     // Set nearest-neighbor filtering on card textures only (keeps text smooth)
     this.load.on('complete', () => {
       for (const s of suits) {
@@ -84,6 +89,10 @@ export default class GameScene extends Phaser.Scene {
             this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
           }
         }
+      }
+      // Nearest-neighbor on mascot spritesheet
+      if (this.textures.exists('mascots')) {
+        this.textures.get('mascots').setFilter(Phaser.Textures.FilterMode.NEAREST);
       }
     });
   }
@@ -763,18 +772,24 @@ export default class GameScene extends Phaser.Scene {
       this.add.rectangle(stackX + stackW / 2, cardY + 12, stackW - 12, 32, badgeColor, 0.5)
         .setStrokeStyle(1, isCoach ? 0x26a69a : 0xffa000, 0.6).setDepth(1);
 
-      const badge = isCoach ? 'C' : 'M';
-      this.add.text(stackX + 14, cardY + 5, badge, {
-        fontSize: '11px', fontFamily: 'monospace', color: textColor, fontStyle: 'bold',
-      }).setDepth(2);
+      // Mascot sprite or coach badge
+      if (!isCoach && item.spriteIndex !== undefined && this.textures.exists('mascots')) {
+        this.add.image(stackX + 20, cardY + 12, 'mascots', item.spriteIndex)
+          .setOrigin(0.5).setScale(0.4).setDepth(2);
+      } else {
+        const badge = isCoach ? 'C' : 'M';
+        this.add.text(stackX + 14, cardY + 5, badge, {
+          fontSize: '11px', fontFamily: 'monospace', color: textColor, fontStyle: 'bold',
+        }).setDepth(2);
+      }
 
-      this.add.text(stackX + 28, cardY + 4, item.name, {
+      this.add.text(stackX + 38, cardY + 4, item.name, {
         fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       }).setDepth(2);
 
-      this.add.text(stackX + 28, cardY + 16, item.description, {
+      this.add.text(stackX + 38, cardY + 16, item.description, {
         fontSize: '8px', fontFamily: 'monospace', color: '#aaaaaa',
-        wordWrap: { width: stackW - 40 },
+        wordWrap: { width: stackW - 50 },
       }).setDepth(2);
     });
   }

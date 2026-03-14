@@ -258,13 +258,20 @@ export default class ShopScene extends Phaser.Scene {
       fontSize: '10px', fontFamily: 'monospace', color: colors.label,
     }).setOrigin(0.5);
 
+    // Mascot sprite (if available)
+    if (!isCoach && item.spriteIndex !== undefined && this.textures.exists('mascots')) {
+      this.add.image(x, y - 65, 'mascots', item.spriteIndex)
+        .setOrigin(0.5).setDepth(1);
+    }
+
     // Name
-    this.add.text(x, y - 75, item.name, {
+    const nameY = (!isCoach && item.spriteIndex !== undefined) ? y - 25 : y - 75;
+    this.add.text(x, nameY, item.name, {
       fontSize: '18px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Description
-    this.add.text(x, y - 20, item.description, {
+    this.add.text(x, y + 10, item.description, {
       fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center', wordWrap: { width: 200 },
     }).setOrigin(0.5);
@@ -301,9 +308,15 @@ export default class ShopScene extends Phaser.Scene {
     this.add.rectangle(640, y, 600, 40, 0x111d2a, 0.6)
       .setStrokeStyle(1, 0x222d3a);
 
-    this.add.text(360, y, isCoach ? 'C' : 'M', {
-      fontSize: '14px', fontFamily: 'monospace', color: badgeColor, fontStyle: 'bold',
-    }).setOrigin(0.5);
+    // Mascot sprite or coach badge
+    if (!isCoach && item.spriteIndex !== undefined && this.textures.exists('mascots')) {
+      this.add.image(360, y, 'mascots', item.spriteIndex)
+        .setOrigin(0.5).setScale(0.45);
+    } else {
+      this.add.text(360, y, isCoach ? 'C' : 'M', {
+        fontSize: '14px', fontFamily: 'monospace', color: badgeColor, fontStyle: 'bold',
+      }).setOrigin(0.5);
+    }
 
     this.add.text(390, y, item.name, {
       fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
