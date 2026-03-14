@@ -732,11 +732,32 @@ export default class GameScene extends Phaser.Scene {
     this._updateInfoText();
   }
 
+  _canDiscard() {
+    return !this.countManager.isStrikeout() && !this.countManager.isWalk();
+  }
+
   _updateInfoText() {
+    const count = this.countManager.getCount();
+    const countStr = `${count.balls}-${count.strikes}`;
+    const freeTakeStr = this.freeTakesRemaining > 0 ? ` | Free takes: ${this.freeTakesRemaining}` : '';
     this.discardInfo.setText(
-      `Discards: ${this.cardEngine.discardsRemaining} | Select cards to PLAY or DISCARD`
+      `Count: ${countStr}${freeTakeStr} | Select cards to PLAY or DISCARD`
     );
     this.deckInfo.setText(`Deck: ${this.cardEngine.deck.length}`);
+
+    // Update discard button label with count + risk color
+    if (this.discardBtn) {
+      if (count.strikes === 0) {
+        this.discardBtn.label.setText(`DISCARD (${countStr})`);
+        this.discardBtn.label.setColor('#a5d6a7');
+      } else if (count.strikes === 1) {
+        this.discardBtn.label.setText(`DISCARD (${countStr})`);
+        this.discardBtn.label.setColor('#fff176');
+      } else {
+        this.discardBtn.label.setText(`DISCARD (${countStr}) DANGER`);
+        this.discardBtn.label.setColor('#ff8a80');
+      }
+    }
   }
 
   // ── Game Log ─────────────────────────────────────────
@@ -1567,18 +1588,14 @@ export default class GameScene extends Phaser.Scene {
     // ── Staff effects at at-bat start ──
     const staff = this.baseball.getStaff();
 
-    // Bench Coach: +1 discard for all
-    const staffDiscards = staff
+    // Free takes: discards that don't add to count (Batting Gloves, Fresh Cleats, Bench Coach)
+    const staffFreeTakes = staff
       .filter(s => s.effect.type === 'team_add_discard')
       .reduce((sum, s) => sum + s.effect.value, 0);
-
-    // Bonus discards from batter traits (e.g. Batting Gloves) + staff
-    const bonusDiscards = batter.traits
+    const traitFreeTakes = batter.traits
       .filter(t => t.effect && t.effect.type === 'add_discard')
-      .reduce((sum, t) => sum + (t.effect.value || 1), 0) + staffDiscards;
-    if (bonusDiscards > 0) {
-      this.cardEngine.discardsRemaining += bonusDiscards;
-    }
+      .reduce((sum, t) => sum + (t.effect.value || 1), 0);
+    this.freeTakesRemaining = staffFreeTakes + traitFreeTakes;
 
     // Pinch Crab / Card Shark Parrot: draw extra cards
     const extraDraw = staff
@@ -1603,7 +1620,7 @@ export default class GameScene extends Phaser.Scene {
     this._renderHand();
     this._updateScoreboard();
     this._updateInfoText();
-    this._setButtonsEnabled(true, this.cardEngine.discardsRemaining > 0);
+    this._setButtonsEnabled(true, this._canDiscard());
     this.inputLocked = false;
 
     // HBP check at start of at-bat
@@ -1645,30 +1662,44 @@ export default class GameScene extends Phaser.Scene {
 
   _onDiscard() {
     if (this.selectedIndices.size === 0) return;
-    if (this.cardEngine.discardsRemaining <= 0) return;
+    if (!this._canDiscard()) return;
     SoundManager.discard();
 
     this.inputLocked = true;
     this.handPreviewText.setAlpha(0);
     this.scorePreviewText.setAlpha(0);
+    this.discardCount = (this.discardCount || 0) + 1;
+
+    // Free takes bypass the count (Batting Gloves, Fresh Cleats, Bench Coach)
+    if (this.freeTakesRemaining > 0) {
+      this.freeTakesRemaining--;
+      this.resultText.setText('FREE TAKE!');
+      this.resultText.setColor('#81d4fa');
+      this.resultText.setAlpha(1);
+      this.resultText.setScale(1);
+      this.tweens.add({ targets: this.resultText, alpha: 0, duration: 400, delay: 600 });
+      this._updateScoreboard();
+      this._doCardDiscard();
+      return;
+    }
 
     // Record pitch in count manager
     const pitcher = this.rosterManager.getCurrentPitcher();
-    const pitchResult = this.countManager.recordDiscard(pitcher.control);
-    this.discardCount = (this.discardCount || 0) + 1;
+    const batter = this.rosterManager.getCurrentBatter();
+    const pitchResult = this.countManager.recordDiscard(pitcher.velocity, pitcher.control, batter.contact);
 
     // Build callout text from count result
     let calloutText = '';
     let calloutColor = '#ff5252';
-    if (pitchResult.isBall && pitchResult.isStrike) {
-      calloutText = `BALL ${this.countManager.getCount().balls} + STRIKE ${this.countManager.getCount().strikes}!`;
-      calloutColor = '#ffab40';
-    } else if (pitchResult.isBall) {
+    if (pitchResult.isBall) {
       calloutText = `BALL ${this.countManager.getCount().balls}!`;
       calloutColor = '#66bb6a';
     } else if (pitchResult.isFoul) {
       calloutText = 'FOUL!';
       calloutColor = '#ffab40';
+    } else if (pitchResult.isStrikeout) {
+      calloutText = 'STRIKE 3!';
+      calloutColor = '#ff5252';
     } else if (pitchResult.isStrike) {
       calloutText = `STRIKE ${this.countManager.getCount().strikes}!`;
       calloutColor = '#ff5252';
@@ -1678,12 +1709,7 @@ export default class GameScene extends Phaser.Scene {
     this.resultText.setColor(calloutColor);
     this.resultText.setAlpha(1);
     this.resultText.setScale(1);
-    this.tweens.add({
-      targets: this.resultText,
-      alpha: 0,
-      duration: 400,
-      delay: 600,
-    });
+    this.tweens.add({ targets: this.resultText, alpha: 0, duration: 400, delay: 600 });
 
     this._updateScoreboard();
 
@@ -1694,21 +1720,11 @@ export default class GameScene extends Phaser.Scene {
       this.baseball.advanceAllRunners();
       this._updateScoreboard();
       this._addGameLog('Wild pitch — runner advances!', '#ffab40');
-      // Show wild pitch text after the strike/ball callout fades
       this.time.delayedCall(700, () => {
         this.handNameText.setText(wildPitch.description);
         this.handNameText.setColor('#ffab40');
-        this.tweens.add({
-          targets: this.handNameText,
-          alpha: { from: 0, to: 1 },
-          duration: 200,
-        });
-        this.tweens.add({
-          targets: this.handNameText,
-          alpha: 0,
-          duration: 300,
-          delay: 800,
-        });
+        this.tweens.add({ targets: this.handNameText, alpha: { from: 0, to: 1 }, duration: 200 });
+        this.tweens.add({ targets: this.handNameText, alpha: 0, duration: 300, delay: 800 });
       });
     }
 
@@ -1719,17 +1735,40 @@ export default class GameScene extends Phaser.Scene {
         this.resultText.setColor('#66bb6a');
         this.resultText.setAlpha(1);
         this.resultText.setScale(1);
-        this.tweens.add({
-          targets: this.resultText,
-          scale: { from: 1.3, to: 1 },
-          duration: 300,
-          ease: 'Back.easeOut',
-        });
+        this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
 
         const walkBatter = this.rosterManager.getCurrentBatter();
         this.baseball.resolveOutcome('Walk', 0, walkBatter);
         const walkCount = this.countManager.getCount();
         this._addGameLog(`${walkBatter.name.split(' ').pop()}: Walk (${walkCount.balls}-${walkCount.strikes})`, '#66bb6a');
+        this._updateScoreboard();
+        this._clearCards();
+        if (this.batterSprite) this.batterSprite.setVisible(false);
+
+        this.rosterManager.advanceBatter();
+        this.time.delayedCall(600, () => this._updateBatterPanel());
+        this.time.delayedCall(1500, () => {
+          if (this.baseball.isGameOver()) { this._endGame(); return; }
+          if (this.baseball.state === 'SWITCH_SIDE') { this._showMidInningTransition(); return; }
+          this._startAtBat();
+        });
+      });
+      return;
+    }
+
+    // Strikeout from count — 3 strikes, at-bat over
+    if (pitchResult.isStrikeout) {
+      this.time.delayedCall(800, () => {
+        this.resultText.setText('STRUCK OUT!');
+        this.resultText.setColor('#ff5252');
+        this.resultText.setAlpha(1);
+        this.resultText.setScale(1);
+        this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
+
+        const kBatter = this.rosterManager.getCurrentBatter();
+        this.baseball.resolveOutcome('Strikeout', 0, kBatter);
+        const kCount = this.countManager.getCount();
+        this._addGameLog(`${kBatter.name.split(' ').pop()}: Struck out looking (${kCount.balls}-${kCount.strikes})`, '#ff5252');
         this._updateScoreboard();
         this._clearCards();
         if (this.batterSprite) this.batterSprite.setVisible(false);
@@ -1752,12 +1791,7 @@ export default class GameScene extends Phaser.Scene {
         this.resultText.setColor('#ff8a80');
         this.resultText.setAlpha(1);
         this.resultText.setScale(1);
-        this.tweens.add({
-          targets: this.resultText,
-          scale: { from: 1.3, to: 1 },
-          duration: 300,
-          ease: 'Back.easeOut',
-        });
+        this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
 
         const foulBatter = this.rosterManager.getCurrentBatter();
         this.baseball.resolveOutcome('Flyout', 0, foulBatter);
@@ -1776,6 +1810,12 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Normal discard — replace cards
+    this._doCardDiscard();
+  }
+
+  /** Animate discarded cards flying away, replace them, and re-render hand */
+  _doCardDiscard() {
     const displayIndices = [...this.selectedIndices];
     displayIndices.forEach(idx => {
       const cs = this.cardSprites[idx];
@@ -1789,7 +1829,6 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.time.delayedCall(250, () => {
-      // Map display indices → actual hand indices for CardEngine
       const handIndices = displayIndices
         .map(di => this._displayToHand[di] !== undefined ? this._displayToHand[di] : di);
       this.cardEngine.discard(handIndices);
@@ -1802,11 +1841,10 @@ export default class GameScene extends Phaser.Scene {
         }
       }
 
-      // Reset deal order for new hand composition
       this.dealOrder = this.cardEngine.hand.map((_, i) => i);
       this._renderHand();
       this._updateInfoText();
-      this._setButtonsEnabled(true, this.cardEngine.discardsRemaining > 0);
+      this._setButtonsEnabled(true, this._canDiscard());
       this.inputLocked = false;
     });
   }
@@ -2484,7 +2522,6 @@ export default class GameScene extends Phaser.Scene {
     // Discard all cards (at-bat is over)
     this.cardEngine.discardPile.push(...this.cardEngine.hand);
     this.cardEngine.hand = [];
-    this.cardEngine.discardsRemaining = this.cardEngine.deckConfig.discards;
 
     this.resultText.setText('SAC BUNT!');
     this.resultText.setColor('#ffab40');
