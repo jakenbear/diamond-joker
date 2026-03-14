@@ -7,6 +7,8 @@
  */
 import { PITCH_TYPES, assignPitchRepertoire } from '../RosterManager.js';
 import SoundManager from '../SoundManager.js';
+import SynergyEngine from '../SynergyEngine.js';
+import ShowdownEngine from '../ShowdownEngine.js';
 
 const TEAM_SPRITE_KEY = { 'Canada': 'canada', 'USA': 'usa', 'Japan': 'japan', 'Mexico': 'mexico' };
 
@@ -44,7 +46,8 @@ export default class PitchingScene extends Phaser.Scene {
     this._createScoreboard();
     this._createBaseDiamond();
     this._createResultDisplay();
-    this._createGameLog();
+    this._createStaffStack();
+    this._createRosterButton();
     this._createPitcherPanel();
     this._createBatterPanel();
 
@@ -68,7 +71,7 @@ export default class PitchingScene extends Phaser.Scene {
       fontSize: '20px', fontFamily: 'monospace', color: '#ff8a80',
     }).setOrigin(1, 0).setDepth(8);
 
-    this.chipBalanceText = this.add.text(640, 33, '', {
+    this.peanutBalanceText = this.add.text(640, 33, '', {
       fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(8);
 
@@ -88,7 +91,7 @@ export default class PitchingScene extends Phaser.Scene {
     const oppName = oppTeam ? oppTeam.id : 'OPP';
     const liveOppScore = s.opponentScore + (this._pitchState ? this._pitchState.runs : 0);
     this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${liveOppScore} ${oppName}`);
-    this.chipBalanceText.setText(`Chips: ${s.totalChips}`);
+    this.peanutBalanceText.setText(`Peanuts: ${s.totalPeanuts}`);
 
     // Position "(you)" under player team name
     this.scoreText.updateText();
@@ -106,122 +109,81 @@ export default class PitchingScene extends Phaser.Scene {
     this.outsText.setText(`Outs: ${outDots.join(' ')}`);
   }
 
-  // ── Base Diamond ────────────────────────────────────────
+  // ── Base Diamond (scorebug mini-diamond) ────────────────
 
   _createBaseDiamond() {
-    const cx = 640, cy = 280;
-    const size = 55;
-    const g = this.add.graphics().setDepth(2);
+    // Prominent diamond — right of center, above the board
+    const cx = 950, cy = 85;
+    const bs = 22; // base square size
+    const gap = 32; // distance from center to each base
+
+    // Diamond background panel
+    this.add.rectangle(cx, cy, gap * 2 + bs + 20, gap * 2 + bs + 20, 0x0a1f0d, 0.6)
+      .setStrokeStyle(1, 0x2e7d32, 0.4).setDepth(7).setAngle(45);
+
+    // Diamond outline
+    const g = this.add.graphics().setDepth(8);
     g.lineStyle(2, 0x4caf50, 0.6);
     g.beginPath();
-    g.moveTo(cx, cy - size);
-    g.lineTo(cx + size, cy);
-    g.lineTo(cx, cy + size);
-    g.lineTo(cx - size, cy);
+    g.moveTo(cx, cy - gap);           // 2nd
+    g.lineTo(cx + gap, cy);           // 1st
+    g.lineTo(cx, cy + gap);           // home
+    g.lineTo(cx - gap, cy);           // 3rd
     g.closePath();
     g.strokePath();
 
-    // Base positions: 1st (right), 2nd (top), 3rd (left)
-    this.basePositions = [
-      { x: cx + size, y: cy },
-      { x: cx, y: cy - size },
-      { x: cx - size, y: cy },
+    // Base squares: 1st (right), 2nd (top), 3rd (left)
+    const emptyColor = 0x444444;
+    this._baseBugSquares = [
+      this.add.rectangle(cx + gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 1st
+      this.add.rectangle(cx, cy - gap, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 2nd
+      this.add.rectangle(cx - gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 3rd
     ];
+
+    // Runner name text below the diamond
+    this._baseBugRunnerText = this.add.text(cx, cy + gap + 16, '', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#ffd600',
+    }).setOrigin(0.5, 0).setDepth(9);
+
+    // Keep these for _advanceOppRunners / _handleIBB compatibility
+    this.basePositions = [
+      { x: cx + gap, y: cy },
+      { x: cx, y: cy - gap },
+      { x: cx - gap, y: cy },
+    ];
+    this.homePosition = { x: cx, y: cy + gap };
     this.runners = [null, null, null];
     this.runnerLabels = [null, null, null];
-    this.homePosition = { x: cx, y: cy + size };
 
-    // Pitcher sprite at mound (your team)
-    const team = this.rosterManager.getTeam();
-    const teamKey = team ? TEAM_SPRITE_KEY[team.name] : 'usa';
-    const pitcherKey = `sprite_${teamKey}_pitcher`;
-    if (this.textures.exists(pitcherKey)) {
-      const myPitcher = this.rosterManager.getMyPitcher();
-      const pitcherLefty = myPitcher && myPitcher.throws === 'L';
-      this.pitcherMoundSprite = this.add.image(cx, cy, pitcherKey)
-        .setScale(2).setDepth(3).setFlipX(pitcherLefty);
-    }
-
-    // Opponent batter sprite at home plate (updated each at-bat for handedness)
-    const oppTeam = this.rosterManager.getOpponentTeam();
-    const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
-    const batterKey = `sprite_${oppKey}_batter`;
     this._pitchDiamondCx = cx;
     this._pitchDiamondCy = cy;
-    this._pitchDiamondSize = size;
-    if (this.textures.exists(batterKey)) {
-      const oppBatter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
-      const isLefty = oppBatter && oppBatter.bats === 'L';
-      const xOff = isLefty ? 18 : -18;
-      this.oppBatterSprite = this.add.image(cx + xOff, cy + size - 5, batterKey)
-        .setScale(2).setDepth(3).setFlipX(isLefty);
-    }
+    this._pitchDiamondSize = gap;
   }
 
   _updateBases(bases) {
-    const homePos = this.homePosition;
-    // Process 3rd → 2nd → 1st (lead runners advance first)
-    const order = [2, 1, 0];
-    for (const i of order) {
-      const bp = this.basePositions[i];
-      const stagger = (2 - i) * 200;
-      if (bases[i] && !this.runners[i]) {
-        const fromPos = i === 0 ? homePos : this.basePositions[i - 1];
-        const oppTeam = this.rosterManager.getOpponentTeam();
-        const oppKey = oppTeam ? TEAM_SPRITE_KEY[oppTeam.name] : 'usa';
-        const runnerKey = `sprite_${oppKey}_runner`;
-        const runner = this.textures.exists(runnerKey)
-          ? this.add.image(fromPos.x, fromPos.y, runnerKey).setScale(2).setDepth(3).setFlipX(true)
-          : this.add.circle(fromPos.x, fromPos.y, 7, 0xffd600).setDepth(3);
-        this._spawnRunnerTrail(fromPos, bp);
-        this.tweens.add({ targets: runner, x: bp.x, y: bp.y, duration: 500, delay: stagger, ease: 'Quad.easeInOut' });
-        this.runners[i] = runner;
-      } else if (!bases[i] && this.runners[i]) {
-        const toPos = i === 2 ? homePos : this.basePositions[i + 1];
-        this._spawnRunnerTrail(bp, toPos);
-        const runnerRef = this.runners[i];
-        this.tweens.add({
-          targets: runnerRef, x: toPos.x, y: toPos.y, alpha: 0, duration: 500,
-          delay: stagger, ease: 'Quad.easeIn',
-          onComplete: () => runnerRef.destroy(),
-        });
-        this.runners[i] = null;
-      }
+    const litColor = 0xffd600;
+    const emptyColor = 0x333333;
 
-      // Runner name label
-      if (this.runnerLabels[i]) {
-        this.runnerLabels[i].destroy();
-        this.runnerLabels[i] = null;
-      }
+    for (let i = 0; i < 3; i++) {
+      const occupied = !!bases[i];
+      this._baseBugSquares[i].setFillStyle(occupied ? litColor : emptyColor);
+      this.runners[i] = occupied ? bases[i] : null;
+    }
+
+    // Show runner names below diamond
+    const names = [];
+    const labels = ['1B', '2B', '3B'];
+    for (let i = 0; i < 3; i++) {
       if (bases[i] && typeof bases[i] === 'object' && bases[i].name) {
-        const lastName = bases[i].name.split(' ').pop();
-        const labelY = i === 1 ? bp.y - 18 : bp.y - 16;
-        const label = this.add.text(bp.x, labelY, lastName, {
-          fontSize: '8px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
-        }).setOrigin(0.5, 1).setDepth(4).setAlpha(0);
-        this.tweens.add({ targets: label, alpha: 0.9, duration: 300, delay: 200 });
-        this.runnerLabels[i] = label;
+        const last = bases[i].name.split(' ').pop();
+        names.push(`${labels[i]}: ${last}`);
       }
     }
-  }
-
-  _spawnRunnerTrail(from, to) {
-    const steps = 5;
-    for (let s = 1; s <= steps; s++) {
-      const t = s / (steps + 1);
-      const x = from.x + (to.x - from.x) * t;
-      const y = from.y + (to.y - from.y) * t;
-      const dot = this.add.circle(x, y, 3, 0xffd600, 0.6).setDepth(2);
-      this.tweens.add({
-        targets: dot, alpha: 0, scale: 0.3,
-        duration: 400, delay: s * 40,
-        onComplete: () => dot.destroy(),
-      });
-    }
+    this._baseBugRunnerText.setText(names.join('  '));
   }
 
   _showStrikeoutK() {
-    const k = this.add.text(640, 280, 'K', {
+    const k = this.add.text(640, 270, 'K', {
       fontSize: '120px', fontFamily: 'monospace', color: '#ff5252', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(15).setAlpha(0);
     this.tweens.add({
@@ -255,52 +217,213 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Result Display ──────────────────────────────────────
 
   _createResultDisplay() {
-    this.resultText = this.add.text(640, 370, '', {
-      fontSize: '22px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    this.resultText = this.add.text(640, 345, '', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: 600 },
-    }).setOrigin(0.5).setDepth(3);
+    }).setOrigin(0.5).setDepth(10);
 
-    this.handNameText = this.add.text(640, 400, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+    this.handNameText = this.add.text(640, 370, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#81c784',
       align: 'center', wordWrap: { width: 600 },
-    }).setOrigin(0.5).setDepth(3);
+    }).setOrigin(0.5).setDepth(10);
   }
 
-  // ── Game Log ────────────────────────────────────────────
+  // ── Staff Card Stack (bottom-left, replaces game log) ──
 
-  _createGameLog() {
-    const logX = 10, logY = 495, logW = 220, logH = 210;
+  _createStaffStack() {
+    const stackX = 10;
+    const stackY = 495;
+    const stackW = 220;
+    const stackH = 170;
 
-    this.add.rectangle(logX + logW / 2, logY + logH / 2, logW, logH, 0x0a1f0d, 0.8)
+    this.add.rectangle(stackX + stackW / 2, stackY + stackH / 2, stackW, stackH, 0x0a1f0d, 0.8)
       .setStrokeStyle(1, 0x2e7d32, 0.5).setDepth(0);
-    this.add.text(logX + 8, logY + 4, 'GAME LOG', {
+
+    this.add.text(stackX + 8, stackY + 4, 'STAFF', {
       fontSize: '9px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setDepth(1);
 
-    this.gameLogText = this.add.text(logX + 8, logY + 18, '', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#b0bec5',
-      wordWrap: { width: logW - 16 }, lineSpacing: 2,
-    }).setDepth(1);
+    const staff = this.baseball.getStaff();
+    if (staff.length === 0) {
+      this.add.text(stackX + stackW / 2, stackY + stackH / 2, 'No staff hired', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#555555',
+      }).setOrigin(0.5).setDepth(1);
+      return;
+    }
 
-    const mask = this.add.rectangle(logX + logW / 2, logY + logH / 2 + 8, logW, logH - 16, 0xffffff)
-      .setVisible(false);
-    this.gameLogText.setMask(mask.createGeometryMask());
+    staff.forEach((item, i) => {
+      const cardY = stackY + 20 + i * 38;
+      const isCoach = item.category === 'coach';
+      const badgeColor = isCoach ? 0x00695c : 0x6d4c00;
+      const textColor = isCoach ? '#80cbc4' : '#ffab40';
 
-    // Render existing entries
-    this._refreshGameLog();
+      this.add.rectangle(stackX + stackW / 2, cardY + 12, stackW - 12, 32, badgeColor, 0.5)
+        .setStrokeStyle(1, isCoach ? 0x26a69a : 0xffa000, 0.6).setDepth(1);
+
+      const badge = isCoach ? 'C' : 'M';
+      this.add.text(stackX + 14, cardY + 5, badge, {
+        fontSize: '11px', fontFamily: 'monospace', color: textColor, fontStyle: 'bold',
+      }).setDepth(2);
+
+      this.add.text(stackX + 28, cardY + 4, item.name, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setDepth(2);
+
+      this.add.text(stackX + 28, cardY + 16, item.description, {
+        fontSize: '8px', fontFamily: 'monospace', color: '#aaaaaa',
+        wordWrap: { width: stackW - 40 },
+      }).setDepth(2);
+    });
   }
+
+  // ── Game Log (data only, rendered in roster overlay) ──
 
   _addGameLog(entry, color = '#b0bec5') {
     const s = this.baseball.getStatus();
     const prefix = `${s.inning}${s.half === 'top' ? '\u25b2' : '\u25bc'}`;
     this.gameLogEntries.push({ text: `${prefix} ${entry}`, color });
     if (this.gameLogEntries.length > 40) this.gameLogEntries.shift();
-    this._refreshGameLog();
   }
 
-  _refreshGameLog() {
-    const visible = this.gameLogEntries.slice(-15);
-    this.gameLogText.setText(visible.map(e => e.text).join('\n'));
+  // ── Roster Overlay ────────────────────────────────────
+
+  _createRosterButton() {
+    const btnX = 10 + 220 / 2;
+    const btnY = 495 + 175;
+    const btnW = 220;
+    const btnH = 28;
+
+    const bg = this.add.rectangle(btnX, btnY, btnW, btnH, 0x1a3a2a, 0.9)
+      .setStrokeStyle(1, 0x4caf50).setDepth(3)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(btnX, btnY, 'ROSTER', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(4);
+
+    bg.on('pointerover', () => bg.setStrokeStyle(1, 0xffd600));
+    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x4caf50));
+    bg.on('pointerdown', () => this._toggleRosterOverlay());
+
+    this.rosterOverlayVisible = false;
+    this.rosterOverlayElements = [];
+  }
+
+  _toggleRosterOverlay() {
+    if (this.rosterOverlayVisible) {
+      this.rosterOverlayElements.forEach(el => el.destroy());
+      this.rosterOverlayElements = [];
+      this.rosterOverlayVisible = false;
+      return;
+    }
+    this.rosterOverlayVisible = true;
+    const els = this.rosterOverlayElements;
+
+    const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.92)
+      .setDepth(50).setInteractive();
+    els.push(overlay);
+
+    const closeBg = this.add.rectangle(1220, 40, 80, 32, 0x8b0000)
+      .setStrokeStyle(1, 0xaa2222).setDepth(51)
+      .setInteractive({ useHandCursor: true });
+    const closeTxt = this.add.text(1220, 40, 'CLOSE', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(52);
+    closeBg.on('pointerdown', () => this._toggleRosterOverlay());
+    els.push(closeBg, closeTxt);
+
+    els.push(this.add.text(640, 25, 'LINEUP', {
+      fontSize: '24px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    const roster = this.rosterManager.getRoster();
+    const currentIdx = this.rosterManager.getCurrentBatterIndex();
+    const rosterX = 60;
+    const startY = 60;
+    const rowH = 44;
+
+    roster.forEach((player, i) => {
+      const y = startY + i * rowH;
+      const isNext = i === currentIdx;
+      const isBonus = player.isBonus;
+
+      const rowBg = this.add.rectangle(310, y + 16, 520, 38,
+        isBonus ? 0x2a2a1a : 0x111d2a, 0.7)
+        .setStrokeStyle(1, isNext ? 0x69f0ae : 0x222d3a).setDepth(51);
+      els.push(rowBg);
+
+      if (isNext) {
+        els.push(this.add.text(rosterX - 5, y + 8, '\u25b6', {
+          fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae',
+        }).setDepth(52));
+      }
+
+      const posLabel = player.pos ? `${player.pos} ` : '';
+      const nameColor = isBonus ? '#ffd600' : (isNext ? '#69f0ae' : '#ffffff');
+      els.push(this.add.text(rosterX + 12, y + 6, `${i + 1}. ${posLabel}${player.name}`, {
+        fontSize: '12px', fontFamily: 'monospace', color: nameColor, fontStyle: 'bold',
+      }).setDepth(52));
+
+      const batsLabel = player.bats === 'L' ? 'L' : 'R';
+      els.push(this.add.text(rosterX + 12, y + 20, `${batsLabel}  PWR:${player.power} CNT:${player.contact} SPD:${player.speed}`, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#81c784',
+      }).setDepth(52));
+
+      if (player.traits && player.traits.length > 0) {
+        const traitNames = player.traits.map(t => t.name).join(', ');
+        els.push(this.add.text(380, y + 13, traitNames, {
+          fontSize: '9px', fontFamily: 'monospace', color: '#ce93d8',
+          wordWrap: { width: 200 },
+        }).setOrigin(0, 0.5).setDepth(52));
+      }
+    });
+
+    // Synergies (right side)
+    const synX = 620;
+    els.push(this.add.text(synX + 150, 55, 'SYNERGIES', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ce93d8', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    const allSynergies = SynergyEngine.getAll();
+    const activeSynergies = SynergyEngine.calculate(roster);
+    const activeIds = new Set(activeSynergies.map(s => s.id));
+
+    allSynergies.forEach((syn, i) => {
+      const y = 75 + i * 30;
+      const isActive = activeIds.has(syn.id);
+      const icon = isActive ? '\u2713' : '\u2717';
+      const iconColor = isActive ? '#69f0ae' : '#444444';
+
+      els.push(this.add.text(synX, y, icon, {
+        fontSize: '13px', fontFamily: 'monospace', color: iconColor, fontStyle: 'bold',
+      }).setDepth(52));
+
+      els.push(this.add.text(synX + 20, y, syn.name, {
+        fontSize: '11px', fontFamily: 'monospace',
+        color: isActive ? '#ffffff' : '#666666', fontStyle: isActive ? 'bold' : '',
+      }).setDepth(52));
+
+      const desc = isActive ? syn.bonusDescription : syn.hint;
+      els.push(this.add.text(synX + 180, y, desc, {
+        fontSize: '9px', fontFamily: 'monospace', color: isActive ? '#81c784' : '#555555',
+      }).setDepth(52));
+    });
+
+    // Game Log (bottom-right)
+    const logX = synX;
+    const logTopY = 445;
+    els.push(this.add.text(logX + 150, logTopY - 5, 'GAME LOG', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    els.push(this.add.rectangle(logX + 150, logTopY + 105, 620, 190, 0x0a1f0d, 0.6)
+      .setStrokeStyle(1, 0x2e7d32, 0.4).setDepth(51));
+
+    const visible = this.gameLogEntries.slice(-12);
+    const logText = visible.map(e => e.text).join('\n');
+    els.push(this.add.text(logX + 10, logTopY + 15, logText || '(no entries yet)', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#b0bec5',
+      wordWrap: { width: 600 }, lineSpacing: 2,
+    }).setDepth(52));
   }
 
   // ── Player Panels ──────────────────────────────────────
@@ -369,11 +492,6 @@ export default class PitchingScene extends Phaser.Scene {
     const pitcher = this.rosterManager.getMyPitcher();
     const stamina = this.rosterManager.getMyPitcherStamina();
     const staminaPct = Math.round(stamina * 100);
-
-    // Update pitcher mound sprite flip for handedness
-    if (this.pitcherMoundSprite) {
-      this.pitcherMoundSprite.setFlipX(pitcher.throws === 'L');
-    }
 
     this.myPitcherNameText.setText(pitcher.name);
     const team = this.rosterManager.getTeam();
@@ -446,13 +564,6 @@ export default class PitchingScene extends Phaser.Scene {
     const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
     const idx = this.rosterManager.opponentBatterIndex;
 
-    // Update opponent batter sprite position based on handedness
-    if (this.oppBatterSprite) {
-      const isLefty = batter.bats === 'L';
-      this.oppBatterSprite.setX(this._pitchDiamondCx + (isLefty ? 18 : -18));
-      this.oppBatterSprite.setFlipX(isLefty);
-    }
-
     this.oppBatterNameText.setText(batter.name);
     const pos = batter.pos ? ` | ${batter.pos}` : '';
     this.oppBatterNumText.setText(`#${idx + 1} in lineup${pos}`);
@@ -498,6 +609,7 @@ export default class PitchingScene extends Phaser.Scene {
       myPitcher,
       logElements: [],
       logIndex: 0,
+      atBatNumber: 0,
     };
 
     this.resultText.setColor('#ffffff');
@@ -507,103 +619,598 @@ export default class PitchingScene extends Phaser.Scene {
     this._updatePitcherPanel();
     this._updateBatterPanel();
     this._updateBases(this._pitchState.bases);
-    this._showPitchSelection();
+    this._startNewAtBat();
   }
 
-  _showPitchSelection() {
-    this.resultText.setText('Select a pitch');
-    this.resultText.setColor('#b0bec5');
-    this.handNameText.setText('');
+  // ── Showdown Flow ─────────────────────────────────────
 
+  _startNewAtBat() {
+    this._pitchState.atBatNumber++;
     this._updatePitcherPanel();
     this._updateBatterPanel();
-    this._createPitchButtons();
+
+    const pitcher = this.rosterManager.getMyPitcher();
+    const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
+
+    this.showdownEngine = new ShowdownEngine(pitcher);
+    this.showdownEngine.start(batter, this._pitchState.outs, this._pitchState.inning);
+    if (this._pitchState.atBatNumber > 1) {
+      this.showdownEngine.degradeDeck(this._pitchState.atBatNumber);
+    }
+
+    // Drain a base stamina cost per at-bat
+    this.rosterManager.myPitcherStamina = Math.max(0, this.rosterManager.myPitcherStamina - 0.03);
+
+    this.resultText.setText(`Showdown vs ${batter.name}`);
+    this.resultText.setColor('#ffe082');
+    this.handNameText.setText('');
+
+    // Show IBB option first, then deal flop
+    this._showPreFlopChoice();
   }
 
-  _createPitchButtons() {
+  _showPreFlopChoice() {
+    // Offer IBB or proceed to showdown
+    this._destroyPitchButtons();
+    this._destroyBoardElements();
+    this._pitchButtons = [];
+
+    const pitcher = this.rosterManager.getMyPitcher();
+    const repertoire = assignPitchRepertoire(pitcher);
+    const stamina = this.rosterManager.getMyPitcherStamina();
+
+    // "Deal" button to start the showdown
+    const dealX = 640, dealY = 560;
+    const dealBg = this.add.rectangle(dealX, dealY, 200, 50, 0x2e7d32, 0.9)
+      .setStrokeStyle(2, 0x4caf50).setDepth(5)
+      .setInteractive({ useHandCursor: true });
+    const dealTxt = this.add.text(dealX, dealY, 'DEAL', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(6);
+    dealBg.on('pointerover', () => dealBg.setStrokeStyle(3, 0xffd600));
+    dealBg.on('pointerout', () => dealBg.setStrokeStyle(2, 0x4caf50));
+    dealBg.on('pointerdown', () => {
+      this._destroyPitchButtons();
+      this._dealShowdownFlop();
+    });
+    this._pitchButtons.push(dealBg, dealTxt);
+
+    // IBB button
+    const ibbX = 840, ibbY = 560;
+    const ibbBg = this.add.rectangle(ibbX, ibbY, 140, 50, 0x757575, 0.9)
+      .setStrokeStyle(2, 0x999999).setDepth(5)
+      .setInteractive({ useHandCursor: true });
+    const ibbTxt = this.add.text(ibbX, ibbY, 'IBB', {
+      fontSize: '18px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(6);
+    ibbBg.on('pointerover', () => ibbBg.setStrokeStyle(3, 0xffd600));
+    ibbBg.on('pointerout', () => ibbBg.setStrokeStyle(2, 0x999999));
+    ibbBg.on('pointerdown', () => {
+      this._destroyPitchButtons();
+      this._handleIBB();
+    });
+    this._pitchButtons.push(ibbBg, ibbTxt);
+
+    // Bullpen button if stamina low
+    const bullpenAvailable = this.rosterManager.getAvailableBullpen();
+    if (stamina <= 0.30 && bullpenAvailable.length > 0) {
+      const bpX = 440, bpY = 560;
+      const bpBg = this.add.rectangle(bpX, bpY, 180, 50, 0x1565c0, 0.9)
+        .setStrokeStyle(2, 0x42a5f5).setDepth(5)
+        .setInteractive({ useHandCursor: true });
+      const bpTxt = this.add.text(bpX, bpY, `BULLPEN (${bullpenAvailable.length})`, {
+        fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(6);
+      bpBg.on('pointerover', () => bpBg.setStrokeStyle(3, 0xffd600));
+      bpBg.on('pointerout', () => bpBg.setStrokeStyle(2, 0x42a5f5));
+      bpBg.on('pointerdown', () => this._showBullpenSelection());
+      this._pitchButtons.push(bpBg, bpTxt);
+    }
+
+    // Show pitcher hole cards preview
+    this._renderHoleCards();
+  }
+
+  _dealShowdownFlop() {
+    this.showdownEngine.dealFlop();
+    this._renderShowdownBoard();
+    this._showPitchAbilities('flop');
+  }
+
+  _dealShowdownTurn() {
+    // Un-hide face-down cards from breaking ball at new stage
+    this.showdownEngine.faceDownIndices = [];
+    this.showdownEngine.dealTurn();
+    this._renderShowdownBoard();
+    this._showPitchAbilities('turn');
+  }
+
+  _dealShowdownRiver() {
+    this.showdownEngine.faceDownIndices = [];
+    this.showdownEngine.dealRiver();
+    this._renderShowdownBoard();
+    this._showPitchAbilities('river');
+  }
+
+  // ── Board Rendering ─────────────────────────────────────
+
+  _renderHoleCards() {
+    this._destroyBoardElements();
+    this._boardElements = [];
+
+    const state = this.showdownEngine.getState();
+
+    // Pitcher hole cards (bottom)
+    const holeY = 450;
+    const holeStartX = 600;
+    this._boardElements.push(this.add.text(holeStartX - 55, holeY, 'YOU', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5));
+    state.pitcherHole.forEach((card, i) => {
+      const x = holeStartX + i * 70;
+      this._renderCardOnBoard(x, holeY, card, true, false, 'pitcher');
+    });
+
+    // Batter hole cards (top — face-down)
+    const batterY = 130;
+    this._boardElements.push(this.add.text(holeStartX - 55, batterY, 'OPP', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5));
+    state.batterHole.forEach((card, i) => {
+      const x = holeStartX + i * 70;
+      this._renderCardOnBoard(x, batterY, card, false, false, 'batter');
+    });
+  }
+
+  _renderShowdownBoard() {
+    this._destroyBoardElements();
+    this._boardElements = [];
+
+    const state = this.showdownEngine.getState();
+
+    // Community cards (center row)
+    const commY = 270;
+    const commCount = state.community.length;
+    const commStartX = 640 - (commCount - 1) * 45;
+    state.community.forEach((card, i) => {
+      const x = commStartX + i * 90;
+      const faceDown = state.faceDownIndices.includes(i);
+      const locked = state.lockedIndices.includes(i);
+      this._renderCardOnBoard(x, commY, card, !faceDown, locked, 'community');
+    });
+
+    // Pitcher hole cards (below community)
+    const holeY = 450;
+    const holeStartX = 600;
+    this._boardElements.push(this.add.text(holeStartX - 55, holeY, 'YOU', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5));
+    state.pitcherHole.forEach((card, i) => {
+      const x = holeStartX + i * 70;
+      this._renderCardOnBoard(x, holeY, card, true, false, 'pitcher');
+    });
+
+    // Batter hole cards (above community)
+    const batterY = 130;
+    this._boardElements.push(this.add.text(holeStartX - 55, batterY, 'OPP', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5));
+    state.batterHole.forEach((card, i) => {
+      const x = holeStartX + i * 70;
+      const revealed = state.revealedBatterCards.includes(i);
+      this._renderCardOnBoard(x, batterY, card, revealed, false, 'batter');
+    });
+  }
+
+  _renderCardOnBoard(x, y, card, faceUp, locked, owner) {
+    const CARD_BW = 58;
+    const CARD_BH = 80;
+    const ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
+    const ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
+
+    if (faceUp) {
+      const key = `card_${ASSET_SUITS[card.suit]}${ASSET_RANKS[card.rank]}`;
+      const scaleX = CARD_BW / 32;
+      const scaleY = CARD_BH / 42;
+      const bg = this.add.image(x, y, key)
+        .setScale(scaleX, scaleY).setDepth(5);
+      if (locked) {
+        const border = this.add.rectangle(x, y, CARD_BW + 4, CARD_BH + 4, 0x000000, 0)
+          .setStrokeStyle(3, 0xffd600).setDepth(6);
+        const lockIcon = this.add.text(x + 22, y - 32, '\uD83D\uDD12', {
+          fontSize: '10px',
+        }).setOrigin(0.5).setDepth(7);
+        this._boardElements.push(border, lockIcon);
+      }
+      this._boardElements.push(bg);
+    } else {
+      const backKey = owner === 'batter' ? 'card_back_red' : 'card_back';
+      const scaleX = CARD_BW / 32;
+      const scaleY = CARD_BH / 42;
+      const bg = this.add.image(x, y, backKey)
+        .setScale(scaleX, scaleY).setDepth(5);
+      this._boardElements.push(bg);
+    }
+  }
+
+  _destroyBoardElements() {
+    if (this._boardElements) {
+      this._boardElements.forEach(el => el.destroy());
+      this._boardElements = null;
+    }
+  }
+
+  // ── Pitch Ability Selection ─────────────────────────────
+
+  _showPitchAbilities(stage) {
     this._destroyPitchButtons();
     this._pitchButtons = [];
 
     const pitcher = this.rosterManager.getMyPitcher();
     const repertoire = assignPitchRepertoire(pitcher);
-    const keys = [...repertoire, 'ibb'];
+    const used = this.showdownEngine.pitchesUsed;
+
     const pitchColors = {
       fastball: 0xe53935, breaking: 0x1e88e5, slider: 0xfb8c00, changeup: 0x43a047,
       cutter: 0xab47bc, curveball: 0x1565c0, sinker: 0x6d4c41, splitter: 0xd84315,
       twoseam: 0xc62828, knuckle: 0x00838f, screwball: 0x7b1fa2, palmball: 0x2e7d32,
-      ibb: 0x757575,
     };
-    const colors = keys.map(k => pitchColors[k] || 0x757575);
-    const stamina = this.rosterManager.getMyPitcherStamina();
 
-    const pitchSpacing = 120;
-    const pitchStartX = 640 - ((keys.length - 1) * pitchSpacing) / 2;
+    this.resultText.setText(`${stage.toUpperCase()} — Pick a pitch ability`);
+    this.resultText.setColor('#ffe082');
 
-    keys.forEach((key, i) => {
+    const stageNum = { flop: 1, turn: 2, river: 3 }[stage];
+    this.handNameText.setText(`Stage ${stageNum}/3`);
+    this.handNameText.setColor('#81c784');
+
+    const btnY = 640;
+    const btnW = 165;
+    const btnH = 75;
+    const spacing = btnW + 10;
+    const totalW = repertoire.length * spacing + 90; // +90 for skip button
+    const startX = 640 - totalW / 2 + btnW / 2;
+
+    repertoire.forEach((key, i) => {
+      const x = startX + i * spacing;
+      const isUsed = used.includes(key);
       const pitch = PITCH_TYPES[key];
-      const x = pitchStartX + i * pitchSpacing;
-      const y = HAND_Y;
+      const color = isUsed ? 0x333333 : (pitchColors[key] || 0x555555);
 
-      const cardSprite = this.add.image(x, y, 'card_back_red')
-        .setDisplaySize(CARD_W, CARD_H).setDepth(5).setTint(colors[i]);
-      const bg = this.add.rectangle(x, y, CARD_W, CARD_H, 0x000000, 0)
-        .setDepth(5).setStrokeStyle(2, 0xffffff)
-        .setInteractive({ useHandCursor: true });
+      const bg = this.add.rectangle(x, btnY, btnW, btnH, color, isUsed ? 0.4 : 0.9)
+        .setStrokeStyle(2, isUsed ? 0x444444 : 0xffffff).setDepth(5);
 
-      const nameText = this.add.text(x, y - 45, pitch.name, {
-        fontSize: '13px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
-        align: 'center', wordWrap: { width: CARD_W - 10 },
+      const nameText = this.add.text(x, btnY - 22, pitch.name, {
+        fontSize: '14px', fontFamily: 'monospace',
+        color: isUsed ? '#666666' : '#ffffff', fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(6);
 
-      const costPct = Math.round(pitch.staminaCost * 100);
-      const costLabel = key === 'ibb' ? 'FREE' : `-${costPct}%`;
-      const costText = this.add.text(x, y - 15, costLabel, {
-        fontSize: '11px', fontFamily: 'monospace', color: '#ffd600',
+      const effectText = this.add.text(x, btnY + 5, this._showdownEffectDesc(key), {
+        fontSize: '10px', fontFamily: 'monospace',
+        color: isUsed ? '#555555' : '#dddddd',
+        align: 'center', wordWrap: { width: btnW - 14 },
       }).setOrigin(0.5).setDepth(6);
 
-      const descText = this.add.text(x, y + 15, this._pitchShortDesc(key), {
-        fontSize: '9px', fontFamily: 'monospace', color: '#cccccc',
-        align: 'center', wordWrap: { width: CARD_W - 10 },
+      const statusText = this.add.text(x, btnY + 30, isUsed ? 'USED' : 'READY', {
+        fontSize: '10px', fontFamily: 'monospace',
+        color: isUsed ? '#ff5252' : '#69f0ae', fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(6);
 
-      const nameY = y - 45, costY = y - 15, descY = y + 15;
-      bg.on('pointerover', () => {
-        bg.setStrokeStyle(3, 0xffd600);
-        this.tweens.add({ targets: [bg, cardSprite], y: y - 8, duration: 100 });
-        this.tweens.add({ targets: nameText, y: nameY - 8, duration: 100 });
-        this.tweens.add({ targets: costText, y: costY - 8, duration: 100 });
-        this.tweens.add({ targets: descText, y: descY - 8, duration: 100 });
-      });
-      bg.on('pointerout', () => {
-        bg.setStrokeStyle(2, 0xffffff);
-        this.tweens.add({ targets: [bg, cardSprite], y: y, duration: 100 });
-        this.tweens.add({ targets: nameText, y: nameY, duration: 100 });
-        this.tweens.add({ targets: costText, y: costY, duration: 100 });
-        this.tweens.add({ targets: descText, y: descY, duration: 100 });
-      });
-      bg.on('pointerdown', () => this._onPitchSelected(key));
+      if (!isUsed) {
+        bg.setInteractive({ useHandCursor: true });
+        bg.on('pointerover', () => {
+          bg.setStrokeStyle(3, 0xffd600);
+          this.tweens.add({ targets: [bg, nameText, effectText, statusText], y: '-=5', duration: 80 });
+        });
+        bg.on('pointerout', () => {
+          bg.setStrokeStyle(2, 0xffffff);
+          this.tweens.add({ targets: [bg, nameText, effectText, statusText], y: '+=5', duration: 80 });
+        });
+        bg.on('pointerdown', () => this._onShowdownPitchSelected(key, stage));
+      }
 
-      this._pitchButtons.push(cardSprite, bg, nameText, costText, descText);
+      this._pitchButtons.push(bg, nameText, effectText, statusText);
     });
 
-    // Bullpen button
-    const bullpenAvailable = this.rosterManager.getAvailableBullpen();
-    if (stamina <= 0.30 && bullpenAvailable.length > 0) {
-      const bpX = 640;
-      const bpY = HAND_Y + CARD_H / 2 + 30;
-      const bpBg = this.add.rectangle(bpX, bpY, 200, 32, 0x1565c0)
-        .setStrokeStyle(2, 0x42a5f5)
-        .setInteractive({ useHandCursor: true })
-        .setDepth(5);
-      const bpTxt = this.add.text(bpX, bpY, `BULLPEN (${bullpenAvailable.length} available)`, {
-        fontSize: '12px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(6);
+    // "Skip" button — don't use a pitch this stage
+    const skipX = startX + repertoire.length * spacing;
+    const skipBg = this.add.rectangle(skipX, btnY, 85, btnH, 0x555555, 0.7)
+      .setStrokeStyle(2, 0x777777).setDepth(5)
+      .setInteractive({ useHandCursor: true });
+    const skipTxt = this.add.text(skipX, btnY, 'SKIP', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#aaaaaa', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(6);
+    skipBg.on('pointerover', () => skipBg.setStrokeStyle(3, 0xffd600));
+    skipBg.on('pointerout', () => skipBg.setStrokeStyle(2, 0x777777));
+    skipBg.on('pointerdown', () => this._advanceShowdownStage(stage, null));
+    this._pitchButtons.push(skipBg, skipTxt);
+  }
 
-      bpBg.on('pointerover', () => bpBg.setStrokeStyle(2, 0xffd600));
-      bpBg.on('pointerout', () => bpBg.setStrokeStyle(2, 0x42a5f5));
-      bpBg.on('pointerdown', () => this._showBullpenSelection());
+  _showdownEffectDesc(key) {
+    const descs = {
+      fastball: 'Swap hole card\nfrom top 30%',
+      breaking: 'Flip community\ncard face-down',
+      slider: 'Replace a\ncommunity card',
+      changeup: 'Peek at batter\nhole card',
+      cutter: 'Lock a card\nin place',
+      curveball: 'Downgrade batter\nbest card -2',
+      sinker: 'All community\ncards -1 rank',
+      splitter: 'Destroy a\ncommunity card',
+      twoseam: 'Shift a card\nsuit to match',
+      knuckle: 'Randomize a\ncommunity card',
+      screwball: 'Replace a batter\nhole card',
+      palmball: 'Hide next\ncommunity card',
+    };
+    return descs[key] || '';
+  }
 
-      this._pitchButtons.push(bpBg, bpTxt);
+  _onShowdownPitchSelected(pitchKey, stage) {
+    this._destroyPitchButtons();
+    SoundManager.pitchSelect();
+
+    // For targeted effects, auto-pick a reasonable target
+    const state = this.showdownEngine.getState();
+    const opts = {};
+    if (['slider', 'cutter', 'splitter', 'twoseam', 'knuckle', 'breaking'].includes(pitchKey)) {
+      // Target the community card that would help the batter most
+      // Simple heuristic: highest rank unlocked card
+      let bestIdx = 0, bestRank = -1;
+      state.community.forEach((c, i) => {
+        if (!state.lockedIndices.includes(i) && c.rank > bestRank) {
+          bestRank = c.rank;
+          bestIdx = i;
+        }
+      });
+      opts.targetIndex = bestIdx;
+    }
+    if (pitchKey === 'fastball') {
+      // Swap the weaker hole card
+      opts.swapIndex = state.pitcherHole[0].rank <= state.pitcherHole[1].rank ? 0 : 1;
+    }
+
+    const result = this.showdownEngine.applyPitch(pitchKey, opts);
+
+    // Show effect feedback
+    const pitch = PITCH_TYPES[pitchKey];
+    if (result.success) {
+      this.handNameText.setText(`${pitch.name} — ${this._effectFeedback(pitchKey, result)}`);
+      this.handNameText.setColor('#69f0ae');
+    } else {
+      this.handNameText.setText(`${pitch.name} failed: ${result.reason}`);
+      this.handNameText.setColor('#ff5252');
+    }
+
+    // Re-render board to show effect
+    this._renderShowdownBoard();
+
+    // Advance after brief pause
+    this.time.delayedCall(800, () => this._advanceShowdownStage(stage, pitchKey));
+  }
+
+  _effectFeedback(key, result) {
+    switch (key) {
+      case 'fastball': return `Swapped for ${this._rankName(result.drawn.rank)}${result.drawn.suit}`;
+      case 'changeup': return `Revealed: ${this._rankName(result.revealed.rank)}${result.revealed.suit}`;
+      case 'slider': return `Replaced ${this._rankName(result.replaced.rank)} with new card`;
+      case 'cutter': return 'Card locked!';
+      case 'curveball': return result.downgraded ? 'Batter card downgraded!' : 'Misfired!';
+      case 'sinker': return 'All community ranks -1';
+      case 'splitter': return 'Card destroyed!';
+      case 'twoseam': return `Suit shifted: ${result.oldSuit} → ${result.newSuit}`;
+      case 'knuckle': return 'Card randomized!';
+      case 'screwball': return 'Batter card replaced!';
+      case 'palmball': return 'Next card hidden';
+      case 'breaking': return 'Card flipped face-down';
+      default: return '';
+    }
+  }
+
+  _rankName(rank) {
+    const names = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+    return names[rank] || rank.toString();
+  }
+
+  _advanceShowdownStage(currentStage, pitchUsed) {
+    this._destroyPitchButtons();
+
+    if (currentStage === 'flop') {
+      this.time.delayedCall(300, () => this._dealShowdownTurn());
+    } else if (currentStage === 'turn') {
+      this.time.delayedCall(300, () => this._dealShowdownRiver());
+    } else {
+      // River done — resolve
+      this.time.delayedCall(300, () => this._resolveShowdown());
+    }
+  }
+
+  _resolveShowdown() {
+    this._destroyPitchButtons();
+    const result = this.showdownEngine.resolve();
+
+    // Show both hands
+    this._renderShowdownBoard();
+
+    // Reveal batter cards
+    this.showdownEngine._revealedBatterCards = [0, 1];
+    this._renderShowdownBoard();
+
+    const winnerLabel = result.winner === 'pitcher' ? 'YOU WIN' : 'BATTER WINS';
+    const winnerColor = result.isOut ? '#69f0ae' : '#ff5252';
+    this.resultText.setText(`${winnerLabel} — ${result.outcome}!`);
+    this.resultText.setColor(winnerColor);
+
+    const pHandName = result.pitcherHand.handName || 'High Card';
+    const bHandName = result.batterHand.handName || 'High Card';
+    this.handNameText.setText(`You: ${pHandName} (${result.pitcherHand.score}) vs Batter: ${bHandName} (${result.batterHand.score})`);
+    this.handNameText.setColor('#b0bec5');
+
+    // Apply pitch-effect stamina drain
+    const pitchStaminaDrain = this.showdownEngine.getStaminaDrained();
+    if (pitchStaminaDrain > 0) {
+      this.rosterManager.myPitcherStamina = Math.max(0, this.rosterManager.myPitcherStamina - pitchStaminaDrain);
+    }
+
+    // Apply result to pitch state
+    this.time.delayedCall(1500, () => this._applyShowdownResult(result));
+  }
+
+  _applyShowdownResult(result) {
+    this._destroyBoardElements();
+
+    const ps = this._pitchState;
+    const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
+    const oppBatterLast = batter.name.split(' ').pop().slice(0, 8);
+
+    if (result.isOut) {
+      ps.outs++;
+      if (result.outcome === 'Strikeout') {
+        SoundManager.strikeout();
+        this._showStrikeoutK();
+        this._addGameLog(`${oppBatterLast}: Strikeout K`, '#999999');
+      } else {
+        SoundManager.out();
+        this._addGameLog(`${oppBatterLast}: ${result.outcome}`, '#999999');
+      }
+    } else {
+      SoundManager.hit();
+      const basesGained = { 'Single': 1, 'Double': 2, 'Triple': 3, 'Home Run': 4 }[result.outcome] || 1;
+      const scored = this._advanceOppRunners(ps.bases, basesGained, batter);
+      ps.runs += scored;
+      if (scored > 0) {
+        SoundManager.runScored();
+        this._showScorePopup(`+${scored} RUN${scored > 1 ? 'S' : ''}!`, '#ff8a80');
+        this._updateScoreboard();
+      }
+      const runNote = scored > 0 ? ` +${scored}R` : '';
+      this._addGameLog(`${oppBatterLast}: ${result.outcome}${runNote}`, '#ff8a80');
+    }
+
+    // Show result in log strip (bottom-left, below cards, above pitch buttons)
+    const icon = result.isOut ? '\u274c' : '\u2705';
+    let text = `${icon} ${batter.name} - ${result.outcome}`;
+    if (!result.isOut) {
+      const basesGained = { 'Single': 1, 'Double': 2, 'Triple': 3, 'Home Run': 4 }[result.outcome] || 1;
+      if (basesGained >= 4) text += ' (all score)';
+    }
+    const color = result.isOut ? '#999999' : '#ff8a80';
+    const LOG_START_Y = 525;
+    const LOG_LINE_H = 20;
+    const MAX_VISIBLE = 3;
+    const LOG_X = 350;
+    if (ps.logIndex >= MAX_VISIBLE) {
+      const oldest = ps.logElements.shift();
+      this.tweens.add({ targets: oldest, alpha: 0, duration: 150, onComplete: () => oldest.destroy() });
+      ps.logElements.forEach(el => {
+        this.tweens.add({ targets: el, y: el.y - LOG_LINE_H, duration: 150 });
+      });
+    }
+    const displayIdx = Math.min(ps.logIndex, MAX_VISIBLE - 1);
+    const logY = LOG_START_Y + displayIdx * LOG_LINE_H;
+    const logLine = this.add.text(LOG_X, logY + 5, text, {
+      fontSize: '12px', fontFamily: 'monospace', color,
+    }).setOrigin(0, 0.5).setDepth(4).setAlpha(0);
+    ps.logElements.push(logLine);
+    ps.logIndex++;
+    this.tweens.add({ targets: logLine, alpha: 1, y: logY, duration: 200 });
+
+    this._updateBases(ps.bases);
+    this.rosterManager.opponentBatterIndex = (this.rosterManager.opponentBatterIndex + 1) % 9;
+
+    // Check end conditions
+    const status = this.baseball.getStatus();
+    const liveOppScore = status.opponentScore + ps.runs;
+    if (status.inning >= 9 && liveOppScore > status.playerScore) {
+      this.time.delayedCall(800, () => this._finishOpponentHalf());
+    } else if (ps.outs >= 3) {
+      this.time.delayedCall(800, () => this._finishOpponentHalf());
+    } else {
+      this.time.delayedCall(600, () => this._startNewAtBat());
+    }
+  }
+
+  /**
+   * Advance opponent runners on the bases (simplified).
+   * Mirrors BaseballState._advanceRunners logic.
+   */
+  _advanceOppRunners(bases, basesGained, batter) {
+    let runs = 0;
+    if (basesGained >= 4) {
+      // Home run: everyone scores
+      for (let i = 0; i < 3; i++) {
+        if (bases[i]) { runs++; bases[i] = null; }
+      }
+      runs++; // batter
+      return runs;
+    }
+    // Advance existing runners
+    for (let i = 2; i >= 0; i--) {
+      if (!bases[i]) continue;
+      const runner = bases[i];
+      bases[i] = null;
+      const newPos = i + basesGained;
+      if (newPos >= 3) { runs++; }
+      else { bases[newPos] = runner; }
+    }
+    // Place batter
+    if (basesGained >= 1 && basesGained <= 3) {
+      bases[basesGained - 1] = batter;
+    }
+    return runs;
+  }
+
+  _handleIBB() {
+    const ps = this._pitchState;
+    const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
+    const oppBatterLast = batter.name.split(' ').pop().slice(0, 8);
+
+    // Walk logic: force advance
+    let scored = 0;
+    let forceUpTo = -1;
+    for (let i = 0; i < 3; i++) {
+      if (ps.bases[i]) { forceUpTo = i; } else { break; }
+    }
+    for (let i = forceUpTo; i >= 0; i--) {
+      const runner = ps.bases[i];
+      ps.bases[i] = null;
+      if (i + 1 >= 3) { scored++; } else { ps.bases[i + 1] = runner; }
+    }
+    ps.bases[0] = batter;
+    ps.runs += scored;
+
+    SoundManager.walk();
+    if (scored > 0) {
+      SoundManager.runScored();
+      this._showScorePopup(`+${scored} RUN${scored > 1 ? 'S' : ''}!`, '#ff8a80');
+      this._updateScoreboard();
+    }
+
+    this._addGameLog(`${oppBatterLast}: Walk (IBB)`, '#ffe082');
+    this.resultText.setText(`IBB — ${batter.name} walks`);
+    this.resultText.setColor('#ffe082');
+    this.handNameText.setText('');
+
+    this._updateBases(ps.bases);
+    this.rosterManager.opponentBatterIndex = (this.rosterManager.opponentBatterIndex + 1) % 9;
+
+    const status = this.baseball.getStatus();
+    const liveOppScore = status.opponentScore + ps.runs;
+    if (status.inning >= 9 && liveOppScore > status.playerScore) {
+      this.time.delayedCall(800, () => this._finishOpponentHalf());
+    } else if (ps.outs >= 3) {
+      this.time.delayedCall(800, () => this._finishOpponentHalf());
+    } else {
+      this.time.delayedCall(600, () => this._startNewAtBat());
+    }
+  }
+
+  _showPitchSelection() {
+    // Legacy — redirect to showdown flow
+    this._startNewAtBat();
+  }
+
+  _destroyPitchButtons() {
+    if (this._pitchButtons) {
+      this._pitchButtons.forEach(el => el.destroy());
+      this._pitchButtons = null;
     }
   }
 
@@ -675,7 +1282,7 @@ export default class PitchingScene extends Phaser.Scene {
         this.handNameText.setText('');
         this._updatePitcherPanel();
 
-        this.time.delayedCall(1500, () => this._showPitchSelection());
+        this.time.delayedCall(1500, () => this._startNewAtBat());
       });
 
       this._pitchButtons.push(bg, nameText, velText, ctrlText, staText, freshText);
@@ -709,133 +1316,10 @@ export default class PitchingScene extends Phaser.Scene {
     });
     keepBg.on('pointerdown', () => {
       this._destroyPitchButtons();
-      this._showPitchSelection();
+      this._startNewAtBat();
     });
 
     this._pitchButtons.push(keepBg, keepText, keepSub);
-  }
-
-  _pitchShortDesc(key) {
-    const descs = {
-      fastball: 'High K\nMore XBH',
-      breaking: 'Hard to hit\nWalk risk',
-      slider: 'Weak contact\nLow XBH',
-      changeup: 'Saves arm\nSafe hits',
-      cutter: 'Good Ks\nJams hitters',
-      curveball: 'Big break\nNeeds control',
-      sinker: 'Groundballs\nEasy contact',
-      splitter: 'Whiff pitch\nHigh cost',
-      twoseam: 'Heavy ball\nWeak contact',
-      knuckle: 'Wild pitch\nVery cheap',
-      screwball: 'Rare break\nHard to hit',
-      palmball: 'Slow & safe\nVery cheap',
-      ibb: 'Free pass\nto 1st base',
-    };
-    return descs[key] || '';
-  }
-
-  _destroyPitchButtons() {
-    if (this._pitchButtons) {
-      this._pitchButtons.forEach(el => el.destroy());
-      this._pitchButtons = null;
-    }
-  }
-
-  _onPitchSelected(pitchType) {
-    this._destroyPitchButtons();
-    SoundManager.pitchSelect();
-
-    const ps = this._pitchState;
-    const inning = this.baseball.getStatus().inning;
-    const result = this.rosterManager.simSingleAtBat(inning, pitchType, ps.bases);
-
-    if (result.isOut) {
-      ps.outs++;
-      if (result.outcome === 'Strikeout') {
-        SoundManager.strikeout();
-        this._showStrikeoutK();
-      } else {
-        SoundManager.out();
-      }
-    } else if (result.walked) {
-      SoundManager.walk();
-    } else {
-      SoundManager.hit();
-    }
-    if (result.scored > 0) {
-      SoundManager.runScored();
-      this._showScorePopup(`+${result.scored} RUN${result.scored > 1 ? 'S' : ''}!`, '#ff8a80');
-    }
-    ps.runs += result.scored || 0;
-    if (result.scored > 0) this._updateScoreboard();
-
-    // Game log entry
-    const oppBatterLast = result.batter.name.split(' ').pop().slice(0, 8);
-    const pitchAbbr = {
-      Fastball: 'FB', 'Breaking Ball': 'BRK', Slider: 'SLD', Changeup: 'CHG',
-      Cutter: 'CUT', Curveball: 'CRV', Sinker: 'SNK', Splitter: 'SPL',
-      'Two-Seam': '2S', Knuckleball: 'KNK', Screwball: 'SCR', Palmball: 'PLM',
-      'Intentional Walk': 'IBB',
-    };
-    const pitchShort = pitchAbbr[PITCH_TYPES[pitchType]?.name] || pitchType;
-    // For strikeouts, show a realistic ball-strike count
-    let countStr = '';
-    if (result.outcome === 'Strikeout') {
-      const fakeBalls = [0, 0, 1, 1, 2, 2, 3][Math.floor(Math.random() * 7)];
-      countStr = ` ${fakeBalls}-3`;
-    }
-    if (result.isOut) {
-      this._addGameLog(`${oppBatterLast}: ${result.outcome}${countStr} ${pitchShort}`, '#999999');
-    } else {
-      const runNote = result.scored > 0 ? ` +${result.scored}R` : '';
-      this._addGameLog(`${oppBatterLast}: ${result.outcome}${runNote} ${pitchShort}`, '#ff8a80');
-    }
-
-    // Show result line
-    const icon = result.isOut ? '\u274c' : (result.walked ? '\ud83d\udeb6' : '\u2705');
-    let text = `${icon} ${result.batter.name} - ${result.outcome}`;
-    if (!result.isOut && result.scored > 0) {
-      text += ` (${result.scored} run${result.scored > 1 ? 's' : ''})`;
-    }
-
-    const color = result.isOut ? '#999999' : (result.scored > 0 ? '#ff8a80' : '#ffe082');
-    const LOG_START_Y = 420;
-    const LOG_LINE_H = 26;
-    const MAX_VISIBLE = 4;
-
-    // Scroll existing entries up if we've exceeded the visible limit
-    if (ps.logIndex >= MAX_VISIBLE) {
-      const oldest = ps.logElements.shift();
-      this.tweens.add({ targets: oldest, alpha: 0, duration: 150, onComplete: () => oldest.destroy() });
-      ps.logElements.forEach(el => {
-        this.tweens.add({ targets: el, y: el.y - LOG_LINE_H, duration: 150 });
-      });
-    }
-
-    const displayIdx = Math.min(ps.logIndex, MAX_VISIBLE - 1);
-    const logY = LOG_START_Y + displayIdx * LOG_LINE_H;
-    const logLine = this.add.text(640, logY + 5, text, {
-      fontSize: '14px', fontFamily: 'monospace', color,
-    }).setOrigin(0.5).setDepth(4).setAlpha(0);
-    ps.logElements.push(logLine);
-    ps.logIndex++;
-
-    this.tweens.add({
-      targets: logLine, alpha: 1, y: logY, duration: 200,
-    });
-
-    this._updateBases(ps.bases);
-
-    // Walk-off check: opponent takes the lead in 9th inning or later
-    const status = this.baseball.getStatus();
-    const liveOppScore = status.opponentScore + ps.runs;
-    if (status.inning >= 9 && liveOppScore > status.playerScore) {
-      this.time.delayedCall(800, () => this._finishOpponentHalf());
-    } else if (ps.outs >= 3) {
-      this.time.delayedCall(800, () => this._finishOpponentHalf());
-    } else {
-      this.time.delayedCall(600, () => this._showPitchSelection());
-    }
   }
 
   _finishOpponentHalf() {

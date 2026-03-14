@@ -13,12 +13,12 @@ const OUTCOME_EFFECTS = {
   'Double':             { basesToMove: 2, isOut: false },
   'Triple':             { basesToMove: 3, isOut: false },
   'Home Run':           { basesToMove: 4, isOut: false },
-  'Walk':               { basesToMove: 1, isOut: false },
+  'Walk':               { basesToMove: 1, isOut: false, isWalk: true },
   'Double Play':        { basesToMove: 0, isOut: true, outsRecorded: 2 },
   'Fielder\'s Choice':  { basesToMove: 0, isOut: true, fieldsersChoice: true },
   'Error':              { basesToMove: 1, isOut: false },
   'Dropped Third Strike': { basesToMove: 1, isOut: false },
-  'HBP':                { basesToMove: 1, isOut: false },
+  'HBP':                { basesToMove: 1, isOut: false, isWalk: true },
   'Sac Bunt':           { basesToMove: 0, isOut: true, sacBunt: true },
 };
 
@@ -36,7 +36,7 @@ export default class BaseballState {
     this.opponentScore = 0;
     this.state = 'BATTING';  // BATTING | RESOLVE | SWITCH_SIDE | GAME_OVER
     this.lastResult = null;
-    this.totalChips = 0;
+    this.totalPeanuts = 0;
     this.shopVisited = new Set(); // Track which innings we've shown shop for
     // Per-inning run tracking for box score (index 0 = inning 1)
     this.playerRunsByInning = [];
@@ -44,18 +44,54 @@ export default class BaseballState {
     this._currentInningPlayerRuns = 0;
     this._atBatsThisInning = 0;  // Track at-bats for first_batter_of_inning
     this.pairsPlayedThisInning = 0;
+    this.tripsPlayedThisInning = 0;
+    this.straightsPlayedThisInning = 0;
+    this.flushesPlayedThisInning = 0;
+    this.staff = [];       // Active coaches and mascots
+    this.staffSlots = 2;   // Start with 2 slots, expandable to 4
   }
 
-  /** Get total accumulated chips (currency for shop) */
-  getTotalChips() {
-    return this.totalChips;
+  /** Get total accumulated peanuts (currency for shop) */
+  getTotalPeanuts() {
+    return this.totalPeanuts;
   }
 
-  /** Spend chips in the shop. Returns true if successful. */
-  spendChips(amount) {
-    if (this.totalChips < amount) return false;
-    this.totalChips -= amount;
+  /** Spend peanuts in the shop. Returns true if successful. */
+  spendPeanuts(amount) {
+    if (this.totalPeanuts < amount) return false;
+    this.totalPeanuts -= amount;
     return true;
+  }
+
+  // ── Staff (Coaches & Mascots) ──────────────────────────
+
+  /** Add a coach or mascot to a staff slot. Returns false if full. */
+  addStaff(item) {
+    if (this.staff.length >= this.staffSlots) return false;
+    this.staff.push(item);
+    // Equipment Manager: auto-unlock slot on purchase
+    if (item.effect && item.effect.type === 'unlock_staff_slot') {
+      this.staffSlots = Math.min(4, this.staffSlots + item.effect.value);
+    }
+    return true;
+  }
+
+  /** Remove a staff member by ID. Returns false if not found. */
+  removeStaff(id) {
+    const idx = this.staff.findIndex(s => s.id === id);
+    if (idx === -1) return false;
+    this.staff.splice(idx, 1);
+    return true;
+  }
+
+  /** Get all active staff. */
+  getStaff() {
+    return this.staff;
+  }
+
+  /** Get staff filtered by effect type. */
+  getStaffByEffect(effectType) {
+    return this.staff.filter(s => s.effect && s.effect.type === effectType);
   }
 
   /**
@@ -86,7 +122,7 @@ export default class BaseballState {
   /**
    * Resolve an outcome from a played hand.
    * @param {string} outcome - The baseball outcome name
-   * @param {number} handScore - Score from the hand (chips * mult) to accumulate
+   * @param {number} handScore - Score from the hand (peanuts * mult) to accumulate
    * Returns { runsScored, description, state }
    */
   resolveOutcome(outcome, handScore = 0, batter = null) {
@@ -97,8 +133,8 @@ export default class BaseballState {
 
     this._atBatsThisInning++;
 
-    // Accumulate chips from hand score
-    this.totalChips += Math.floor(handScore);
+    // Accumulate peanuts from hand score
+    this.totalPeanuts += Math.floor(handScore);
 
     let runsScored = 0;
     let description = outcome;
@@ -141,7 +177,7 @@ export default class BaseballState {
         this.state = 'BATTING';
       }
     } else {
-      runsScored = this._advanceRunners(effect.basesToMove, batter);
+      runsScored = this._advanceRunners(effect.basesToMove, batter, effect.isWalk);
 
       if (this.half === 'top') {
         this.playerScore += runsScored;
@@ -221,7 +257,7 @@ export default class BaseballState {
    * Advance runners by a number of bases. Batter also occupies a base (unless HR/4).
    * Returns runs scored.
    */
-  _advanceRunners(basesToMove, batter = null) {
+  _advanceRunners(basesToMove, batter = null, isWalk = false) {
     let runs = 0;
 
     if (basesToMove >= 4) {
@@ -231,7 +267,35 @@ export default class BaseballState {
       return runs;
     }
 
-    // Advance existing runners from 3rd base backward
+    if (isWalk) {
+      // Walk/HBP: only advance runners in a continuous forced chain from 1st
+      // Find how far the force extends (1st occupied, 1st+2nd, 1st+2nd+3rd)
+      let forceUpTo = -1; // highest base index that is forced
+      for (let i = 0; i < 3; i++) {
+        if (this.bases[i]) {
+          forceUpTo = i;
+        } else {
+          break; // chain broken
+        }
+      }
+
+      // Advance forced runners from highest to lowest
+      for (let i = forceUpTo; i >= 0; i--) {
+        const runner = this.bases[i];
+        this.bases[i] = null;
+        if (i + 1 >= 3) {
+          runs++; // scores from 3rd
+        } else {
+          this.bases[i + 1] = runner;
+        }
+      }
+
+      // Place batter on 1st
+      this.bases[0] = batter || true;
+      return runs;
+    }
+
+    // Hits: advance all existing runners by basesToMove
     for (let i = 2; i >= 0; i--) {
       if (!this.bases[i]) continue;
       const runner = this.bases[i];
@@ -303,6 +367,9 @@ export default class BaseballState {
       this.inning++;
       this._atBatsThisInning = 0;
       this.pairsPlayedThisInning = 0;
+      this.tripsPlayedThisInning = 0;
+      this.straightsPlayedThisInning = 0;
+      this.flushesPlayedThisInning = 0;
 
       // Check game over after 9 innings
       if (this.inning > 9 && this.playerScore !== this.opponentScore) {
@@ -360,7 +427,7 @@ export default class BaseballState {
       playerScore: this.playerScore,
       opponentScore: this.opponentScore,
       state: this.state,
-      totalChips: this.totalChips,
+      totalPeanuts: this.totalPeanuts,
       playerRunsByInning: [...this.playerRunsByInning],
       opponentRunsByInning: [...this.opponentRunsByInning],
       currentInningPlayerRuns: this._currentInningPlayerRuns,
@@ -381,7 +448,7 @@ export default class BaseballState {
       opponentScore: this.opponentScore,
       won: this.playerScore > this.opponentScore,
       innings: this.inning,
-      totalChips: this.totalChips,
+      totalPeanuts: this.totalPeanuts,
       playerRunsByInning: [...this.playerRunsByInning],
       opponentRunsByInning: [...this.opponentRunsByInning],
     };

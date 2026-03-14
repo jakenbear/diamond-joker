@@ -14,12 +14,12 @@ const OUTCOME_EFFECTS: Dictionary = {
 	"Double":             {"bases_to_move": 2, "is_out": false},
 	"Triple":             {"bases_to_move": 3, "is_out": false},
 	"Home Run":           {"bases_to_move": 4, "is_out": false},
-	"Walk":               {"bases_to_move": 1, "is_out": false},
+	"Walk":               {"bases_to_move": 1, "is_out": false, "is_walk": true},
 	"Double Play":        {"bases_to_move": 0, "is_out": true, "outs_recorded": 2},
 	"Fielder's Choice":   {"bases_to_move": 0, "is_out": true, "fielders_choice": true},
 	"Error":              {"bases_to_move": 1, "is_out": false},
 	"Dropped Third Strike": {"bases_to_move": 1, "is_out": false},
-	"HBP":                {"bases_to_move": 1, "is_out": false},
+	"HBP":                {"bases_to_move": 1, "is_out": false, "is_walk": true},
 	"Sac Bunt":           {"bases_to_move": 0, "is_out": true, "sac_bunt": true},
 }
 
@@ -31,13 +31,18 @@ var player_score: int = 0
 var opponent_score: int = 0
 var state: int = State.BATTING
 var last_result: Dictionary = {}
-var total_chips: int = 0
+var total_peanuts: int = 0
 var shop_visited: Dictionary = {}  # inning -> true
 var player_runs_by_inning: Array[int] = []
 var opponent_runs_by_inning: Array[int] = []
 var _current_inning_player_runs: int = 0
 var _at_bats_this_inning: int = 0
 var pairs_played_this_inning: int = 0
+var trips_played_this_inning: int = 0
+var straights_played_this_inning: int = 0
+var flushes_played_this_inning: int = 0
+var staff: Array[Dictionary] = []  # Active coaches and mascots
+var staff_slots: int = 2           # Start with 2 slots, expandable to 4
 
 
 func reset() -> void:
@@ -49,24 +54,56 @@ func reset() -> void:
 	opponent_score = 0
 	state = State.BATTING
 	last_result = {}
-	total_chips = 0
+	total_peanuts = 0
 	shop_visited = {}
 	player_runs_by_inning = []
 	opponent_runs_by_inning = []
 	_current_inning_player_runs = 0
 	_at_bats_this_inning = 0
 	pairs_played_this_inning = 0
+	trips_played_this_inning = 0
+	straights_played_this_inning = 0
+	flushes_played_this_inning = 0
+	staff = []
+	staff_slots = 2
 
 
-func get_total_chips() -> int:
-	return total_chips
+func get_total_peanuts() -> int:
+	return total_peanuts
 
 
-func spend_chips(amount: int) -> bool:
-	if total_chips < amount:
+func spend_peanuts(amount: int) -> bool:
+	if total_peanuts < amount:
 		return false
-	total_chips -= amount
+	total_peanuts -= amount
 	return true
+
+
+# Staff (Coaches & Mascots)
+
+func add_staff(item: Dictionary) -> bool:
+	if staff.size() >= staff_slots:
+		return false
+	staff.append(item)
+	if item.get("effect", {}).get("type") == "unlock_staff_slot":
+		staff_slots = mini(4, staff_slots + item["effect"]["value"])
+	return true
+
+
+func remove_staff(id: String) -> bool:
+	for i in staff.size():
+		if staff[i]["id"] == id:
+			staff.remove_at(i)
+			return true
+	return false
+
+
+func get_staff() -> Array[Dictionary]:
+	return staff
+
+
+func get_staff_by_effect(effect_type: String) -> Array[Dictionary]:
+	return staff.filter(func(s): return s.get("effect", {}).get("type") == effect_type)
 
 
 func should_show_shop() -> bool:
@@ -95,7 +132,7 @@ func resolve_outcome(outcome: String, hand_score: int = 0, batter = null) -> Dic
 		return {"runs_scored": 0, "description": "Unknown outcome", "state": state}
 
 	_at_bats_this_inning += 1
-	total_chips += int(hand_score)
+	total_peanuts += int(hand_score)
 
 	var runs_scored: int = 0
 	var description: String = outcome
@@ -136,7 +173,7 @@ func resolve_outcome(outcome: String, hand_score: int = 0, batter = null) -> Dic
 		else:
 			state = State.BATTING
 	else:
-		runs_scored = _advance_runners(effect.get("bases_to_move", 0), batter)
+		runs_scored = _advance_runners(effect.get("bases_to_move", 0), batter, effect.get("is_walk", false))
 
 		if half == "top":
 			player_score += runs_scored
@@ -194,7 +231,7 @@ func advance_all_runners() -> int:
 	return runs
 
 
-func _advance_runners(bases_to_move: int, batter = null) -> int:
+func _advance_runners(bases_to_move: int, batter = null, is_walk: bool = false) -> int:
 	var runs: int = 0
 
 	if bases_to_move >= 4:
@@ -206,7 +243,25 @@ func _advance_runners(bases_to_move: int, batter = null) -> int:
 		bases = [null, null, null]
 		return runs
 
-	# Advance existing runners from 3rd base backward
+	if is_walk:
+		# Walk/HBP: only advance runners in a continuous forced chain from 1st
+		var force_up_to: int = -1
+		for i in range(3):
+			if bases[i]:
+				force_up_to = i
+			else:
+				break
+		for i in range(force_up_to, -1, -1):
+			var runner = bases[i]
+			bases[i] = null
+			if i + 1 >= 3:
+				runs += 1
+			else:
+				bases[i + 1] = runner
+		bases[0] = batter if batter else true
+		return runs
+
+	# Hits: advance existing runners from 3rd base backward
 	for i in range(2, -1, -1):
 		if not bases[i]:
 			continue
@@ -259,6 +314,9 @@ func switch_side(sim_runs = null) -> Dictionary:
 		inning += 1
 		_at_bats_this_inning = 0
 		pairs_played_this_inning = 0
+		trips_played_this_inning = 0
+		straights_played_this_inning = 0
+		flushes_played_this_inning = 0
 
 		if inning > 9 and player_score != opponent_score:
 			state = State.GAME_OVER
@@ -300,7 +358,7 @@ func get_status() -> Dictionary:
 		"player_score": player_score,
 		"opponent_score": opponent_score,
 		"state": state,
-		"total_chips": total_chips,
+		"total_peanuts": total_peanuts,
 		"player_runs_by_inning": player_runs_by_inning.duplicate(),
 		"opponent_runs_by_inning": opponent_runs_by_inning.duplicate(),
 		"current_inning_player_runs": _current_inning_player_runs,
@@ -320,7 +378,7 @@ func get_result() -> Dictionary:
 		"opponent_score": opponent_score,
 		"won": player_score > opponent_score,
 		"innings": inning,
-		"total_chips": total_chips,
+		"total_peanuts": total_peanuts,
 		"player_runs_by_inning": player_runs_by_inning.duplicate(),
 		"opponent_runs_by_inning": opponent_runs_by_inning.duplicate(),
 	}

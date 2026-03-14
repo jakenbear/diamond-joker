@@ -3,8 +3,10 @@
  * Manages your team (batting) and opponent team (their batters face your pitcher).
  */
 import TEAMS from '../data/teams.js';
+import BATTER_TRAITS from '../data/batter_traits.js';
 
 const MAX_TRAITS_PER_PLAYER = 2;
+const MAX_BONUS_PLAYERS = 3;
 const MAX_PITCHER_TRAITS = 2;
 
 const PITCH_TYPES = {
@@ -172,6 +174,10 @@ export default class RosterManager {
     }));
     this.currentBatterIndex = 0;
 
+    // Bonus player tracking
+    this.bonusPlayerCount = 0;
+    this.benchedPlayers = [];
+
     // Your pitcher (pitches against opponent batters)
     this.myPitcher = { ...team.pitchers[pitcherIndex] };
     this.myPitcherStamina = 1.0;
@@ -248,9 +254,13 @@ export default class RosterManager {
    * @param {boolean[]} bases - [1st, 2nd, 3rd] runner state (mutated in place)
    * @returns {{ outcome: string, isOut: boolean, basesGained: number, batter: object, walked: boolean, scored: number }}
    */
-  simSingleAtBat(inning, pitchType, bases) {
+  simSingleAtBat(inning, pitchType, bases, staffMods = null) {
     const pitcher = this.myPitcher;
-    const fatigue = this._getPitcherFatigue(pitcher, inning);
+    let fatigue = this._getPitcherFatigue(pitcher, inning);
+    // Bullpen Coach: delay fatigue onset
+    if (staffMods && staffMods.fatigueDelay > 0) {
+      fatigue = this._getPitcherFatigue(pitcher, Math.max(1, inning - staffMods.fatigueDelay));
+    }
     const pitch = PITCH_TYPES[pitchType];
     const batter = this.opponentRoster[this.opponentBatterIndex];
 
@@ -259,12 +269,13 @@ export default class RosterManager {
 
     // IBB — automatic walk
     if (pitchType === 'ibb') {
-      const scored = this._advanceRunners(bases, 1, 0, batter);
+      const scored = this._advanceRunners(bases, 1, 0, batter, true);
       this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
       return { outcome: 'Walk (IBB)', isOut: false, basesGained: 1, batter, walked: true, scored };
     }
 
-    const result = this._simAtBatWithPitch(pitcher, batter, fatigue, pitch);
+    const hitReduction = staffMods ? (staffMods.hitReduction || 0) : 0;
+    const result = this._simAtBatWithPitch(pitcher, batter, fatigue, pitch, hitReduction);
 
     // Breaking ball walk risk: max(0, (6 - control) * 0.04)
     if (pitchType === 'breaking' && !result.isOut) {
@@ -273,7 +284,7 @@ export default class RosterManager {
     if (pitchType === 'breaking') {
       const walkChance = Math.max(0, (6 - pitcher.control) * 0.04);
       if (walkChance > 0 && Math.random() < walkChance) {
-        const scored = this._advanceRunners(bases, 1, 0, batter);
+        const scored = this._advanceRunners(bases, 1, 0, batter, true);
         this.opponentBatterIndex = (this.opponentBatterIndex + 1) % 9;
         return { outcome: 'Walk', isOut: false, basesGained: 1, batter, walked: true, scored };
       }
@@ -294,7 +305,7 @@ export default class RosterManager {
    * At-bat sim with pitch type modifiers applied.
    * Stamina modulates fatigue: effectiveFatigue = inningFatigue * (0.5 + stamina * 0.5)
    */
-  _simAtBatWithPitch(pitcher, batter, fatigue, pitch) {
+  _simAtBatWithPitch(pitcher, batter, fatigue, pitch, hitReduction = 0) {
     const effectiveFatigue = fatigue * (0.5 + this.myPitcherStamina * 0.5);
 
     const pitchStrength = (pitcher.velocity * 0.6 + pitcher.control * 0.4) * effectiveFatigue;
@@ -302,7 +313,7 @@ export default class RosterManager {
 
     const matchup = batStrength - pitchStrength;
     const baseHitChance = Math.min(0.50, Math.max(0.12, 0.28 + matchup * 0.025));
-    const hitChance = Math.min(0.50, Math.max(0.05, baseHitChance + pitch.hitChanceMod));
+    const hitChance = Math.min(0.50, Math.max(0.05, baseHitChance + pitch.hitChanceMod - hitReduction));
 
     const roll = Math.random();
 
@@ -358,15 +369,54 @@ export default class RosterManager {
   equipTrait(playerIndex, traitCard) {
     const player = this.roster[playerIndex];
     if (!player) return false;
-    if (player.traits.length >= MAX_TRAITS_PER_PLAYER) return false;
+    // Bonus players can hold innate + 2 shop traits (3 total)
+    const cap = player.isBonus ? 3 : MAX_TRAITS_PER_PLAYER;
+    if (player.traits.length >= cap) return false;
     player.traits.push(traitCard);
     return true;
+  }
+
+  // ── Bonus Players ──────────────────────────────────────
+
+  /**
+   * Add a bonus player to the roster, benching the player at replaceIndex.
+   * Innate trait is auto-equipped and doesn't count toward the shop trait cap.
+   * Returns false if at max bonus players or invalid index.
+   */
+  addBonusPlayer(bonusPlayer, replaceIndex) {
+    if (this.bonusPlayerCount >= MAX_BONUS_PLAYERS) return false;
+    if (replaceIndex < 0 || replaceIndex >= this.roster.length) return false;
+
+    const benched = this.roster[replaceIndex];
+    this.benchedPlayers.push(benched);
+
+    const bp = {
+      ...bonusPlayer,
+      traits: [],
+      isBonus: true,
+      lineupIndex: replaceIndex,
+    };
+
+    // Equip innate trait (marked so it doesn't count toward shop cap)
+    const trait = BATTER_TRAITS.find(t => t.id === bonusPlayer.innateTraitId);
+    if (trait) bp.traits.push({ ...trait, isInnate: true });
+
+    this.roster[replaceIndex] = bp;
+    this.bonusPlayerCount++;
+    return true;
+  }
+
+  /** Get all active lineup effects from bonus players in the roster. */
+  getActiveLineupEffects() {
+    return this.roster
+      .filter(p => p.isBonus && p.lineupEffect)
+      .map(p => p.lineupEffect);
   }
 
   applyBatterModifiers(evalResult, gameState) {
     const batter = this.getCurrentBatter();
     const result = { ...evalResult };
-    const bonuses = { powerChips: 0, contactMult: 0, contactSave: false };
+    const bonuses = { powerPeanuts: 0, contactMult: 0, contactSave: false };
 
     // Contact save: batter can rescue a pair that became a Groundout
     if (result.wasGroundout && result.originalHand === 'Pair') {
@@ -374,7 +424,7 @@ export default class RosterManager {
       if (Math.random() < saveChance) {
         result.outcome = 'Single';
         result.handName = 'Pair';
-        result.chips = 1;
+        result.peanuts = 1;
         result.mult = 1.5;
         result.score = 2;
         result.wasGroundout = false;
@@ -390,14 +440,14 @@ export default class RosterManager {
     if (!isHit) return { result, bonuses };
 
     const powerBonus = Math.max(0, batter.power - 5);
-    bonuses.powerChips = powerBonus;
-    result.chips += powerBonus;
+    bonuses.powerPeanuts = powerBonus;
+    result.peanuts += powerBonus;
 
     const contactBonus = batter.contact / 10;
     bonuses.contactMult = contactBonus;
     result.mult = Math.round((result.mult + contactBonus) * 10) / 10;
 
-    result.score = Math.round(result.chips * result.mult);
+    result.score = Math.round(result.peanuts * result.mult);
     result.extraBaseChance = batter.speed * 0.05;
 
     return { result, bonuses };
@@ -413,13 +463,13 @@ export default class RosterManager {
 
     if (result.outcome === 'Single' || result.outcome === 'Double') {
       const velPenalty = Math.max(0, (pitcher.velocity * fatigue) - 6);
-      result.chips = Math.max(0, result.chips - Math.floor(velPenalty / 2));
+      result.peanuts = Math.max(0, result.peanuts - Math.floor(velPenalty / 2));
     }
 
     const controlPenalty = (pitcher.control * fatigue) * 0.05;
     result.mult = Math.round(Math.max(1, result.mult - controlPenalty) * 10) / 10;
 
-    result.score = Math.round(result.chips * result.mult);
+    result.score = Math.round(result.peanuts * result.mult);
     return result;
   }
 
@@ -535,7 +585,7 @@ export default class RosterManager {
   /**
    * Advance runners on bases. Returns number of runs scored.
    */
-  _advanceRunners(bases, basesGained, batterSpeed, batter = null) {
+  _advanceRunners(bases, basesGained, batterSpeed, batter = null, isWalk = false) {
     let scored = 0;
 
     if (basesGained >= 4) {
@@ -545,7 +595,30 @@ export default class RosterManager {
       return scored;
     }
 
-    // Move runners forward by basesGained
+    if (isWalk) {
+      // Walk/HBP: only advance runners in a continuous forced chain from 1st
+      let forceUpTo = -1;
+      for (let i = 0; i < 3; i++) {
+        if (bases[i]) {
+          forceUpTo = i;
+        } else {
+          break;
+        }
+      }
+      for (let i = forceUpTo; i >= 0; i--) {
+        const runner = bases[i];
+        bases[i] = null;
+        if (i + 1 >= 3) {
+          scored++;
+        } else {
+          bases[i + 1] = runner;
+        }
+      }
+      bases[0] = batter || true;
+      return scored;
+    }
+
+    // Hits: move runners forward by basesGained
     for (let i = 2; i >= 0; i--) {
       if (bases[i]) {
         const runner = bases[i];

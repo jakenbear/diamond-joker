@@ -21,12 +21,14 @@ When making ANY gameplay change (mechanics, balance, outcomes, traits, etc.):
 | `src/EffectEngine.js` | `godot/scripts/effect_engine.gd` |
 | `src/SituationalEngine.js` | `godot/scripts/situational_engine.gd` |
 | `src/TraitManager.js` | `godot/scripts/trait_manager.gd` |
+| `src/CountManager.js` | `godot/scripts/count_manager.gd` |
 | `data/hand_table.js` | `godot/scripts/data/hand_table.gd` |
 | `data/teams.js` | `godot/scripts/data/teams.gd` |
 | `data/decks.js` | `godot/scripts/data/decks.gd` |
 | `data/batter_traits.js` | `godot/scripts/data/batter_traits.gd` |
 | `data/pitcher_traits.js` | `godot/scripts/data/pitcher_traits.gd` |
 | `data/pitch_types.js` | `godot/scripts/data/pitch_types.gd` |
+| `src/ShowdownEngine.js` | `godot/scripts/showdown_engine.gd` |
 
 ## UI Scenes (Not Mirrored 1:1, But Match Functionally)
 

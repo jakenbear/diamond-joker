@@ -11,7 +11,7 @@
 **Resolution:** 1280×720
 **Session Length:** ~20–30 minutes
 
-You pick a national team, face an opponent across 9 innings. Each at-bat, you're dealt 8 cards—play a poker hand to determine the outcome. Better hands = better hits. Between innings, spend earned chips at the shop to equip trait cards that bend the rules in your favor.
+You pick a national team, face an opponent across 9 innings. Each at-bat, you're dealt 8 cards—play a poker hand to determine the outcome. Better hands = better hits. Between innings, spend earned peanuts at the shop to equip trait cards that bend the rules in your favor.
 
 ---
 
@@ -22,7 +22,7 @@ Title Screen → Team Select → [Inning Loop] → Game Over
 
 Inning Loop (per inning):
   1. Player bats (GameScene) — play cards until 3 outs
-  2. Shop (ShopScene) — buy trait cards with chips
+  2. Shop (ShopScene) — buy trait cards with peanuts
   3. Opponent bats (PitchingScene) — pick pitches until 3 outs
   4. Next inning (or Game Over after 9+)
 ```
@@ -40,15 +40,15 @@ Inning Loop (per inning):
 | Parameter | Value |
 |-----------|-------|
 | Deck size | 52 (standard poker deck) |
-| Hand size | 8 cards |
-| Discards per at-bat | 2 |
+| Hand size | 7 cards |
+| Discards | Unlimited (count-based — see Count System) |
 | Cards played | 1–5 (selected from hand) |
 
 When the deck runs low, the discard pile is reshuffled back in.
 
 ### Hand Rankings → Baseball Outcomes
 
-| Hand | Baseball Outcome | Chips | Mult | Score |
+| Hand | Baseball Outcome | Peanuts | Mult | Score |
 |------|-----------------|-------|------|-------|
 | Royal Flush | Home Run (guaranteed) | 15 | 20 | 300 |
 | Straight Flush | 80% HR / 15% Triple / 5% Double | 10 | 10 | 100 |
@@ -61,7 +61,7 @@ When the deck runs low, the discard pile is reshuffled back in.
 | Pair | Single | 1 | 1.5 | 1.5 |
 | High Card | Strikeout | 0 | 1 | 0 |
 
-**Score = floor(Chips × Mult)** — this becomes your chip income for the shop.
+**Score = floor(Peanuts × Mult)** — this becomes your peanut income for the shop.
 
 ### Hand Evaluation Rules
 - Straights and Flushes require exactly 5 cards
@@ -73,56 +73,64 @@ When the deck runs low, the discard pile is reshuffled back in.
 ## Batting Mechanics
 
 ### At-Bat Flow
-1. Draw 8 cards
-2. Optionally discard (up to 2 times) to improve your hand
-3. Select 1–5 cards and hit "Play Hand"
-4. Hand is evaluated → baseball outcome determined
-5. Batter/pitcher traits applied
-6. Situational plays checked (double play, error, etc.)
-7. Runners advance, runs score, chips earned
-8. Next batter (9-player lineup cycles)
+1. Draw 8 cards (count starts at 0-0, or 1-0 with Walk Machine)
+2. Optionally discard to improve your hand — each discard is a pitch (see Count System)
+   - STRIKE: count advances toward strikeout
+   - BALL: count advances toward walk
+   - FOUL: (at 2 strikes only) count stays, you survive
+3. If count reaches 4 balls → Walk (free base, skip to step 7)
+4. If count reaches 3 strikes → Strikeout (at-bat over, skip to step 7)
+5. Select 1–5 cards and hit "Play Hand" at any point during the count
+6. Hand is evaluated → baseball outcome determined
+7. Batter/pitcher traits applied
+8. Situational plays checked (double play, error, etc.)
+9. Runners advance, runs score, peanuts earned
+10. Next batter (9-player lineup cycles)
 
-### Rank Quality — The Pair Gamble
+### Rank Quality — Every Hand Is a Gamble
 
-Pairs, Two Pair, and Three of a Kind aren't guaranteed hits. Lower-rank cards have a higher chance of becoming outs:
+All hands below Four of a Kind have an out chance. Only Four of a Kind, Straight Flush, and Royal Flush are guaranteed hits. All tuning values live in `data/balance.js`.
 
 **Pair out chance:**
 ```
-outChance = 0.80 - (pairRank - 2) × 0.06 + twoStrikePenalty + pairPenalty
+outChance = 0.95 - (pairRank - 2) × 0.03 + twoStrikePenalty + pairPenalty
 ```
 
 | Pair Rank | Base Out % | Survives |
 |-----------|-----------|----------|
-| 2s | 80% | 20% |
-| 5s | 62% | 38% |
-| 8s | 44% | 56% |
-| 10s | 32% | 68% |
-| Kings | 14% | 86% |
-| Aces | 8% | 92% |
+| 2s | 95% | 5% |
+| 5s | 86% | 14% |
+| 8s | 77% | 23% |
+| 10s | 71% | 29% |
+| Kings | 62% | 38% |
+| Aces | 59% | 41% |
 
 - Two-strike penalty: +10%
-- Face card pairs (10+): bonus chips = pairRank - 9
+- Face card pairs (10+): bonus peanuts = pairRank - 9
 
-**Two Pair:** 20% out chance on low pairs (2–5). 50/50 groundout/flyout.
-**Three of a Kind:** 10% out chance on low ranks. Always flyout on failure.
+**Two Pair:** 65% base out chance. Pair penalty stacks at half rate (+12%/pair).
+**Three of a Kind:** 45% base out chance.
+**Straight / Flush:** 20% base out chance.
+**Full House:** 15% base out chance.
+**Four of a Kind+:** 0% out chance (guaranteed hits — reward for building strong hands).
 
-### "Pitcher Adjusts" — Pair Degradation
+### "Pitcher Adjusts" — Universal Hand Degradation
 
-The more pairs you play in a single inning, the worse they get. The pitcher reads your strategy.
+The more you play the same hand type in a single inning, the worse it gets. The pitcher reads your strategy. Each hand type is tracked independently.
 
-| Pair # This Inning | Extra Out Chance |
-|--------------------|-----------------|
-| 1st | +0% |
-| 2nd | +15% |
-| 3rd | +30% |
-| 4th+ | +45% |
+| # This Inning | Pair (+) | Two Pair (+) | Three of a Kind (+) | Straight (+) | Flush (+) |
+|----------------|----------|-------------|---------------------|-------------|-----------|
+| 1st | +0% | +0% | +0% | +0% | +0% |
+| 2nd | +25% | +12% | +15% | +20% | +20% |
+| 3rd | +50% | +24% | +30% | +40% | +40% |
+| 4th+ | +75% | +36% | +45% | +60% | +60% |
 
 Capped at 95% max out chance. Resets each half-inning.
 
 **Visual warnings** appear on the hand description:
-- 2nd pair: *"Pitcher adjusting..."* (yellow)
-- 3rd pair: *"Pitcher has your number!"* (red)
-- 4th+ pair: *"You're cooked!"* (red)
+- 2nd repeat: *"Pitcher adjusting..."* (yellow)
+- 3rd repeat: *"Pitcher has your number!"* (red)
+- 4th+ repeat: *"You're cooked!"* (red)
 
 ### Contact Rescue
 
@@ -133,45 +141,99 @@ saveChance = batter.contact × 0.04
 A contact-10 batter rescues 40% of failed pairs back to singles.
 
 ### Batter Stat Bonuses (On Hit)
-- **Power:** +max(0, power - 5) bonus chips
+- **Power:** +max(0, power - 5) bonus peanuts
 - **Contact:** +contact/10 bonus mult
 - **Speed:** speed × 5% chance for an extra base
 
 ---
 
-## Ball-Strike Count
+## Count-Based Discard System
 
-Each discard = 1 pitch thrown at you.
+The ball-strike count IS the discard system. There is no hard discard limit — the count is your limiter. Each discard simulates a pitch, creating real risk/reward tension.
+
+### Core Rules
+- Each DISCARD = a pitch is thrown → results in STRIKE, BALL, or FOUL
+- **3 strikes** → Strikeout (at-bat over, no hand played)
+- **4 balls** → Walk (batter takes first base, no hand played)
+- You can PLAY your hand at any point during the count
+- Count starts at 0-0 (unless modified by traits)
+
+### Pitch Outcome Probability
+
+**Before 2 strikes** — two outcomes (STRIKE or BALL):
 
 ```
-ballChance = max(0, (7 - pitcherControl) × 0.08)
+strikeChance = 0.55
+  + (pitcherVelocity - 5) × 0.02     // high-velo pitchers throw more strikes
+  + (pitcherControl - 5) × 0.02      // high-control pitchers hit the zone
+  - (batterContact - 5) × 0.03       // high-contact batters lay off bad pitches
+strikeChance = clamp(strikeChance, 0.25, 0.75)
+ballChance = 1.0 - strikeChance
 ```
 
-| Pitcher Control | Ball % per Pitch |
-|-----------------|-----------------|
-| 1 | 48% |
-| 3 | 32% |
-| 5 | 16% |
-| 7+ | 0% |
+**At 2 strikes** — three outcomes (FOUL, STRIKE, or BALL):
 
-- 4 balls = walk (free base, no hand evaluation)
-- Strikes cap at 2 (fouls protect you after that)
+```
+foulChance = batterContact × 0.04     // high-contact batters foul off to survive
+remaining = 1.0 - foulChance
+strikeChance = remaining × (base strikeChance from above)
+ballChance = remaining × (1.0 - base strikeChance)
+```
 
-### Count Modifiers
+### Probability Examples
 
-Your ball-strike count affects chip/mult bonuses:
+| Batter CNT | Pitcher VEL/CTL | Strike % | Foul % (at 2K) | Feel |
+|------------|-----------------|----------|-----------------|------|
+| 5 vs 5/5 | 40% | 20% | Average matchup |
+| 9 vs 5/5 | 28% | 36% | Safe to discard |
+| 3 vs 8/7 | 52% | 12% | Very risky |
+| 7 vs 6/5 | 36% | 28% | Manageable |
+| 5 vs 9/8 | 48% | 20% | Tough pitcher |
 
-| Count | Chips | Mult |
-|-------|-------|------|
-| 3-0 | +2 | +1.0 |
-| 2-0 | +1 | +0.5 |
-| 3-1 | +1 | +0.5 |
-| 3-2 | 0 | +0.5 |
-| 0-1 | 0 | -0.2 |
-| 1-2 | 0 | -0.3 |
-| 0-2 | -1 | -0.5 |
+### Strategic Scenarios
 
-Being ahead in the count rewards patience. Behind = penalized.
+| Count | Situation | Decision |
+|-------|-----------|----------|
+| 0-0 | Bad hand | Discard freely, low risk |
+| 1-1 | Mediocre hand | Depends on batter contact |
+| 0-2 | Need better hand | Very risky — only if batter has high contact (fouls) |
+| 3-0 | Decent hand | Consider discarding for the walk |
+| 3-2 | Full count | All or nothing — play your hand or gamble on one more |
+| 2-0 | Good hand | Play it — you're ahead in the count |
+
+### Count Modifiers (Chip/Mult Bonuses)
+
+Your count when you PLAY the hand affects scoring:
+
+| Count | Peanuts | Mult | Notes |
+|-------|-------|------|-------|
+| 3-0 | +2 | +1.0 | Patient eye rewarded |
+| 2-0 | +1 | +0.5 | Ahead in count |
+| 3-1 | +1 | +0.5 | Hitter's count |
+| 3-2 | 0 | +0.5 | Full count drama |
+| 0-1 | 0 | -0.2 | Slightly behind |
+| 1-2 | 0 | -0.3 | Pitcher's count |
+| 0-2 | -1 | -0.5 | In the hole |
+
+### Interaction with Existing Systems
+
+| System | How It Interacts |
+|--------|-----------------|
+| **Walk Machine trait** | Starts count at 1-0 (one free ball) |
+| **"Free take" traits** (Batting Gloves, Fresh Cleats, Bench Coach) | Grant free discards that don't add to count |
+| **Nine Lives mascot** | First strikeout-by-count each inning triggers redraw |
+| **Contact stat** | Higher contact = more fouls at 2 strikes = safer discarding |
+| **Opponent pitcher stats** | Their velocity/control affect YOUR discard risk |
+| **Bunt Single / Foul Fighter traits** | Still convert High Cards, but now you might not need to discard at all |
+
+### UI Display
+- Count shown near batter panel as dots/circles (balls = green, strikes = red)
+- DISCARD button shows current count and risk level:
+  - **Green** (0 strikes): "DISCARD (0-0)"
+  - **Yellow** (1 strike): "DISCARD (1-1)"
+  - **Red** (2 strikes): "DISCARD (0-2) DANGER"
+- Strike/ball/foul result flashes on screen after each discard
+- New cards dealt after discard animation
 
 ---
 
@@ -245,7 +307,7 @@ Low-control pitchers risk walks when throwing breaking balls.
 **Batters:**
 | Stat | Effect |
 |------|--------|
-| Power | Bonus chips on hits, XBH chance |
+| Power | Bonus peanuts on hits, XBH chance |
 | Contact | Bonus mult on hits, pair rescue chance |
 | Speed | Extra base chance, DP escape |
 
@@ -265,7 +327,7 @@ Low-control pitchers risk walks when throwing breaking balls.
 ## Trait System
 
 ### How It Works
-1. Buy trait cards at the shop with chips
+1. Buy trait cards at the shop with peanuts
 2. Assign to a specific player on your roster
 3. Each player holds max 2 traits
 4. Traits activate automatically during at-bats
@@ -278,9 +340,9 @@ Low-control pitchers risk walks when throwing breaking balls.
 
 | Rarity | Weight | Price |
 |--------|--------|-------|
-| Common | 3× | 20–25 chips |
-| Uncommon | 2× | 25–35 chips |
-| Rare | 1× | 35–45 chips |
+| Common | 3× | 20–25 peanuts |
+| Uncommon | 2× | 25–35 peanuts |
+| Rare | 1× | 35–45 peanuts |
 
 ### Batter Traits
 
@@ -299,14 +361,14 @@ Low-control pitchers risk walks when throwing breaking balls.
 | Eye of the Tiger | Common | 25 | +3 mult with 2 outs |
 | Contact Lens | Common | 20 | Low pairs never become groundouts |
 | Sacrifice Fly | Uncommon | 25 | Strikeouts with runner on 3rd score a run |
-| Hot Corner | Common | 20 | +2 chips per runner on base |
+| Hot Corner | Common | 20 | +2 peanuts per runner on base |
 | Closer | Uncommon | 30 | +5 mult in innings 7–9 |
 | Stolen Base | Uncommon | 25 | Runner on 1st auto-advances before at-bat |
 | Grand Ambition | Rare | 45 | +10 mult when bases loaded |
 | Batting Gloves | Uncommon | 35 | +1 discard per at-bat (2 → 3) |
 | Rally Cap | Uncommon | 30 | +4 mult when losing by 2+ runs |
 | Bunt Single | Common | 20 | High Card becomes weak single (1 chip, 1 mult) |
-| Cleanup Crew | Common | 25 | +3 chips on Three of a Kind or better |
+| Cleanup Crew | Common | 25 | +3 peanuts on Three of a Kind or better |
 | Walk Machine | Rare | 40 | Every at-bat starts with 1 ball (1-0 count) |
 | Dugout Fire | Uncommon | 30 | +2 mult per out this inning |
 | Lead-Off King | Common | 20 | +3 mult as first batter of inning |
@@ -318,12 +380,12 @@ These are assigned to the opposing pitcher and affect YOUR at-bats:
 
 | Trait | Effect |
 |-------|--------|
-| Heater | Low pairs auto-groundout; triples+ get +2 chips |
+| Heater | Low pairs auto-groundout; triples+ get +2 peanuts |
 | Curveball | 30% chance highest card loses 3 ranks |
 | Slider | -1 mult on all hands; -2 mult with 2 outs |
 | Knuckleball | Face cards (J/Q/K) lose 2 ranks |
 | Intimidation | -2 mult at 0 outs; +2 mult at 2 outs |
-| Painted Corner | High pairs/two pair get -1 chip |
+| Painted Corner | High pairs/two pair get -1 peanut |
 | Changeup | 25% chance two cards swap ranks |
 | Closer's Instinct | -3 mult in innings 7–9 |
 
@@ -381,7 +443,7 @@ After your batting half, before opponent bats. Once per inning, innings 1–9.
 ### Flow
 1. 3 random trait cards displayed (weighted by rarity)
 2. Buy a card → assign to a roster player (max 2 traits each)
-3. Chips deducted, shop refreshes if buys remain
+3. Peanuts deducted, shop refreshes if buys remain
 4. Hit "Done" to continue to opponent's half
 
 No duplicate traits offered (already-owned traits excluded).
@@ -391,17 +453,17 @@ No duplicate traits offered (already-owned traits excluded).
 ## Chip Economy
 
 ### Earning
-- Every at-bat: floor(chips × mult) from the played hand
+- Every at-bat: floor(peanuts × mult) from the played hand
 - Bonuses from batter stats, count modifiers, trait effects
 
 ### Spending
-- Trait cards at the shop (20–45 chips each)
-- Chips persist across the entire game (not reset per inning)
+- Trait cards at the shop (20–45 peanuts each)
+- Peanuts persist across the entire game (not reset per inning)
 
 ### Rough Progression
-- Innings 1–3: ~50–75 chips (enough for 1 trait)
-- Innings 4–6: ~100–150 chips (equip 2–3 players)
-- Innings 7–9: ~150–250 chips (build synergies)
+- Innings 1–3: ~50–75 peanuts (enough for 1 trait)
+- Innings 4–6: ~100–150 peanuts (equip 2–3 players)
+- Innings 7–9: ~150–250 peanuts (build synergies)
 
 ---
 
@@ -431,16 +493,60 @@ No duplicate traits offered (already-owned traits excluded).
 
 ---
 
+## Pitching Showdown (Hold'em Style)
+
+When the opponent bats, each at-bat is a **Texas Hold'em-style poker showdown** between your pitcher and the opposing batter.
+
+### Setup
+- Pitcher gets 2 hole cards from a velocity-scaled deck (higher velocity = higher rank cards)
+- Batter gets 2 hidden hole cards from a contact/power-scaled deck
+- Player sees their hole cards and the batter's stats
+
+### Three Stages
+1. **Flop** — 3 community cards revealed. Player picks a pitch ability.
+2. **Turn** — 4th community card. Player picks another pitch ability.
+3. **River** — 5th community card. Player picks final pitch ability.
+
+Each pitch in the pitcher's 4-pitch repertoire is a **board manipulation ability** (one use per at-bat):
+
+| Pitch | Effect |
+|-------|--------|
+| Fastball | Swap hole card from top 30% of deck |
+| Breaking Ball | Flip community card face-down |
+| Changeup | Peek at batter hole card |
+| Slider | Replace a community card |
+| Cutter | Lock a card (immune to effects) |
+| Curveball | Downgrade batter's best card -2 rank (control check) |
+| Sinker | All community cards -1 rank |
+| Splitter | Destroy a community card |
+| Two-Seam | Shift a card's suit to match majority |
+| Knuckleball | Randomize a community card |
+| Screwball | Replace a batter hole card |
+| Palmball | Hide next community card from batter |
+
+### Resolution
+Best 5-card hand from each side (2 hole + 5 community). Winner determined by hand score:
+- **Pitcher wins** → Out (Strikeout / Flyout / Groundout based on margin)
+- **Batter wins** → Hit (Single / Double / Triple / HR based on margin)
+- **Tie** → Groundout (pitcher favored)
+
+### Pitcher Stats
+- **Velocity** → Deck quality (higher ranks)
+- **Control** → Pitch effect accuracy
+- **Stamina** → Deck degrades across at-bats (top cards removed)
+
+---
+
 ## Balancing Levers
 
 Key parameters to tune:
 
 | Lever | Current Value | Effect |
 |-------|--------------|--------|
-| Hand size | 8 | More cards = more hand options |
+| Hand size | 7 | More cards = more hand options |
 | Discards | 2 | Discard depth for hand improvement |
-| Pair out base | 80% - rank×6% | How risky pairs feel |
-| Pitcher adjusts | +15% per pair | Diminishing returns on pairs |
+| Pair out base | 95% - rank×3% | How risky pairs feel |
+| Pitcher adjusts | +25%/pair, +20%/straight/flush, +15%/trips | Universal hand degradation |
 | Contact rescue | contact × 4% | Pair safety net |
 | Shop buy limits | 1/2/3 | Trait accumulation rate |
 | Fatigue rate | 8% per inning past threshold | Late-game pitcher decay |

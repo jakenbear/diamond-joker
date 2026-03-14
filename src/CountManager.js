@@ -1,25 +1,23 @@
 /**
- * CountManager.js - Tracks balls/strikes per at-bat.
+ * CountManager.js - Count-based discard system.
  * Pure logic, no Phaser dependency.
  *
- * Each discard is a pitch: always a strike (capped at 2, fouls protect),
- * with a chance of also being a ball based on pitcher control.
- * 4 balls = walk (at-bat ends immediately).
+ * Each discard = a pitch. Outcome depends on batter/pitcher stats:
+ *   Before 2 strikes: STRIKE or BALL
+ *   At 2 strikes: FOUL, STRIKE, or BALL
+ * 3 strikes = strikeout (at-bat over). 4 balls = walk.
  */
 
+import BALANCE from '../data/balance.js';
+
 const COUNT_MODIFIERS = {
-  '3-0': { chipsMod: 2, multMod: 1.0 },
-  '2-0': { chipsMod: 1, multMod: 0.5 },
-  '3-1': { chipsMod: 1, multMod: 0.5 },
-  '1-0': { chipsMod: 0, multMod: 0.3 },
-  '2-1': { chipsMod: 0, multMod: 0.3 },
-  '3-2': { chipsMod: 0, multMod: 0.5 },
-  '0-0': { chipsMod: 0, multMod: 0 },
-  '1-1': { chipsMod: 0, multMod: 0 },
-  '2-2': { chipsMod: 0, multMod: 0 },
-  '0-1': { chipsMod: 0, multMod: -0.2 },
-  '1-2': { chipsMod: 0, multMod: -0.3 },
-  '0-2': { chipsMod: -1, multMod: -0.5 },
+  '3-0': { peanutsMod: 2, multMod: 1.0 },
+  '2-0': { peanutsMod: 1, multMod: 0.5 },
+  '3-1': { peanutsMod: 1, multMod: 0.5 },
+  '3-2': { peanutsMod: 0, multMod: 0.5 },
+  '0-1': { peanutsMod: 0, multMod: -0.2 },
+  '1-2': { peanutsMod: 0, multMod: -0.3 },
+  '0-2': { peanutsMod: -1, multMod: -0.5 },
 };
 
 export default class CountManager {
@@ -37,32 +35,51 @@ export default class CountManager {
 
   /**
    * Record a discard as a pitch.
-   * Strike always increments (fouls protect at 2 strikes).
-   * Ball chance rolled based on pitcher control.
-   * @param {number} pitcherControl - opponent pitcher's control stat (1-10)
-   * @returns {{ isStrike: boolean, isBall: boolean, isWalk: boolean, isFoul: boolean }}
+   * @param {number} pitcherVelocity - pitcher velocity stat (1-10)
+   * @param {number} pitcherControl - pitcher control stat (1-10)
+   * @param {number} batterContact - batter contact stat (1-10)
+   * @returns {{ isStrike, isBall, isFoul, isStrikeout, isWalk }}
    */
-  recordDiscard(pitcherControl) {
-    const result = { isStrike: false, isBall: false, isWalk: false, isFoul: false };
+  recordDiscard(pitcherVelocity, pitcherControl, batterContact) {
+    const result = { isStrike: false, isBall: false, isFoul: false, isStrikeout: false, isWalk: false };
 
-    // Ball chance: max(0, (7 - control) * 0.08)
-    const ballChance = Math.max(0, (7 - pitcherControl) * 0.08);
-    if (ballChance > 0 && Math.random() < ballChance) {
-      this.balls++;
-      result.isBall = true;
-      if (this.balls >= 4) {
-        result.isWalk = true;
-        return result;
-      }
-    }
+    let baseStrikeChance = BALANCE.baseStrikeChance
+      + (pitcherVelocity - 5) * BALANCE.strikeVelocityScale
+      + (pitcherControl - 5) * BALANCE.strikeControlScale
+      - (batterContact - 5) * BALANCE.strikeContactScale;
+    baseStrikeChance = Math.max(BALANCE.strikeMin, Math.min(BALANCE.strikeMax, baseStrikeChance));
 
-    // Strike logic: increment unless at 2 strikes (foul protection)
     if (this.strikes < 2) {
-      this.strikes++;
-      result.isStrike = true;
+      if (Math.random() < baseStrikeChance) {
+        this.strikes++;
+        result.isStrike = true;
+      } else {
+        this.balls++;
+        result.isBall = true;
+        if (this.balls >= 4) {
+          result.isWalk = true;
+        }
+      }
     } else {
-      this.foulCount++;
-      result.isFoul = true;
+      const foulChance = batterContact * BALANCE.foulContactScale;
+      const remaining = 1.0 - foulChance;
+      const strikeChance = remaining * baseStrikeChance;
+
+      const roll = Math.random();
+      if (roll < foulChance) {
+        this.foulCount++;
+        result.isFoul = true;
+      } else if (roll < foulChance + strikeChance) {
+        this.strikes++;
+        result.isStrike = true;
+        result.isStrikeout = true;
+      } else {
+        this.balls++;
+        result.isBall = true;
+        if (this.balls >= 4) {
+          result.isWalk = true;
+        }
+      }
     }
 
     return result;
@@ -72,23 +89,19 @@ export default class CountManager {
     return { balls: this.balls, strikes: this.strikes };
   }
 
-  /**
-   * Get count-dependent modifiers for hand evaluation.
-   * @returns {{ chipsMod: number, multMod: number }}
-   */
   getCountModifiers() {
     const key = `${this.balls}-${this.strikes}`;
-    return COUNT_MODIFIERS[key] || { chipsMod: 0, multMod: 0 };
+    return COUNT_MODIFIERS[key] || { peanutsMod: 0, multMod: 0 };
   }
 
   isWalk() {
     return this.balls >= 4;
   }
 
-  /**
-   * Set starting balls (e.g. Walk Machine trait gives +1 ball).
-   * @param {number} startBalls
-   */
+  isStrikeout() {
+    return this.strikes >= 3;
+  }
+
   setStartingBalls(startBalls) {
     this.balls = Math.min(3, startBalls);
   }

@@ -9,7 +9,6 @@ const RANK_NAMES: Dictionary = {11: "J", 12: "Q", 13: "K", 14: "A"}
 var deck: Array[Dictionary] = []
 var hand: Array[Dictionary] = []
 var discard_pile: Array[Dictionary] = []
-var discards_remaining: int = 2
 var hand_size: int = 5
 var _deck_id: String = "standard"
 
@@ -17,7 +16,6 @@ var _deck_id: String = "standard"
 func _init(deck_id: String = "standard") -> void:
 	_deck_id = deck_id
 	var config: Dictionary = Decks.DECK_CONFIGS.get(deck_id, Decks.DECK_CONFIGS["standard"])
-	discards_remaining = config.get("discards", 2)
 	hand_size = config.get("hand_size", 5)
 	_build_deck()
 	shuffle()
@@ -41,8 +39,6 @@ func reset_deck() -> void:
 	shuffle()
 	hand = []
 	discard_pile = []
-	var config: Dictionary = Decks.DECK_CONFIGS.get(_deck_id, Decks.DECK_CONFIGS["standard"])
-	discards_remaining = config.get("discards", 2)
 
 
 func draw(n: int = 5) -> Array[Dictionary]:
@@ -54,10 +50,6 @@ func draw(n: int = 5) -> Array[Dictionary]:
 
 
 func discard(indices: Array[int]) -> Array[Dictionary]:
-	if discards_remaining <= 0:
-		return hand
-	discards_remaining -= 1
-
 	# Sort descending so splicing doesn't shift indices
 	var sorted_indices := indices.duplicate()
 	sorted_indices.sort()
@@ -100,8 +92,6 @@ func play_hand(selected_indices: Array[int] = [], pre_modifier: Callable = Calla
 	# All cards go to discard
 	discard_pile.append_array(hand)
 	hand = []
-	var config: Dictionary = Decks.DECK_CONFIGS.get(_deck_id, Decks.DECK_CONFIGS["standard"])
-	discards_remaining = config.get("discards", 2)
 	return result
 
 
@@ -109,8 +99,6 @@ func new_at_bat() -> Array[Dictionary]:
 	if deck.size() < hand_size:
 		reset_deck()
 	hand = []
-	var config: Dictionary = Decks.DECK_CONFIGS.get(_deck_id, Decks.DECK_CONFIGS["standard"])
-	discards_remaining = config.get("discards", 2)
 	draw(hand_size)
 	return hand
 
@@ -182,18 +170,18 @@ static func evaluate_hand(cards: Array[Dictionary], pre_modifier: Callable = Cal
 		# else stays Home Run (80%)
 
 	# Rank-scaled quality for Pair, Two Pair, Three of a Kind
-	if hand_idx == 8 or hand_idx == 7 or hand_idx == 6:
+	if hand_idx >= 3 and hand_idx <= 8:
 		var quality_result: Dictionary = _apply_rank_quality(entry, pair_rank, hand_idx, strike_count, game_state)
 		if not quality_result.is_empty():
 			entry = quality_result
 
 	entry["played_description"] = _describe_play(eval_cards, entry["hand_name"])
-	entry["score"] = roundi(entry["chips"] * entry["mult"])
+	entry["score"] = roundi(entry["peanuts"] * entry["mult"])
 
 	# Apply post-modifier
 	if post_modifier.is_valid() and not game_state.is_empty():
 		var modified: Dictionary = post_modifier.call(entry, game_state)
-		modified["score"] = roundi(modified["chips"] * modified["mult"])
+		modified["score"] = roundi(modified["peanuts"] * modified["mult"])
 		return modified
 
 	return entry
@@ -265,61 +253,66 @@ static func _get_pair_rank(freq: Dictionary) -> int:
 
 
 static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int, strike_count: int = 0, game_state: Dictionary = {}) -> Dictionary:
-	# Pairs: rank-scaled out chance
-	if hand_idx == 8:
-		var two_strike_penalty: float = 0.10 if strike_count >= 2 else 0.0
-		var bs = game_state.get("baseball_state", null)
-		var pairs_played: int = bs.pairs_played_this_inning if bs else 0
-		var pair_penalty: float = pairs_played * 0.15
-		var out_chance: float = minf(0.95, maxf(0.05, 0.80 - (pair_rank - 2) * 0.06 + two_strike_penalty + pair_penalty))
+	var bs = game_state.get("baseball_state", null)
+	var pairs_played: int = bs.pairs_played_this_inning if bs else 0
+	var trips_played: int = bs.trips_played_this_inning if bs else 0
+	var straights_played: int = bs.straights_played_this_inning if bs else 0
+	var flushes_played: int = bs.flushes_played_this_inning if bs else 0
 
-		# Increment counter for next pair this inning
+	var out_chance: float = 0.0
+
+	if hand_idx == 8:
+		# Pair
+		var two_strike_penalty: float = Balance.TWO_STRIKE_PENALTY if strike_count >= 2 else 0.0
+		var pair_penalty: float = pairs_played * Balance.PAIR_DEGRADATION
+		out_chance = Balance.PAIR_OUT_BASE - (pair_rank - 2) * Balance.PAIR_OUT_RANK_SCALE + two_strike_penalty + pair_penalty
 		if bs:
 			bs.pairs_played_this_inning += 1
+	elif hand_idx == 7:
+		# Two Pair
+		var pair_penalty: float = pairs_played * Balance.TWO_PAIR_DEGRADATION
+		out_chance = Balance.TWO_PAIR_OUT_BASE + pair_penalty
+		if bs:
+			bs.pairs_played_this_inning += 1
+	elif hand_idx == 6:
+		# Three of a Kind
+		out_chance = Balance.TRIPS_OUT_BASE + trips_played * Balance.TRIPS_DEGRADATION
+		if bs:
+			bs.trips_played_this_inning += 1
+	elif hand_idx == 5:
+		# Straight
+		out_chance = Balance.STRAIGHT_OUT_BASE + straights_played * Balance.STRAIGHT_DEGRADATION
+		if bs:
+			bs.straights_played_this_inning += 1
+	elif hand_idx == 4:
+		# Flush
+		out_chance = Balance.FLUSH_OUT_BASE + flushes_played * Balance.FLUSH_DEGRADATION
+		if bs:
+			bs.flushes_played_this_inning += 1
+	elif hand_idx == 3:
+		# Full House
+		out_chance = Balance.FULL_HOUSE_OUT_BASE
 
-		if randf() < out_chance:
-			var out_type: String = "Flyout" if randf() < 0.40 else "Groundout"
-			return {
-				"hand_name": out_type,
-				"outcome": out_type,
-				"chips": 0,
-				"mult": 1.0,
-				"score": 0,
-				"was_groundout": true,
-				"original_hand": entry["hand_name"],
-				"pair_rank": pair_rank,
-			}
-		if pair_rank >= 10:
-			var bonus: int = pair_rank - 9
-			var result: Dictionary = entry.duplicate()
-			result["chips"] = entry["chips"] + bonus
-			return result
-		return {}
+	out_chance = minf(Balance.OUT_MAX, maxf(Balance.OUT_MIN, out_chance))
 
-	# Two Pair / Three of a Kind: low-rank penalties
-	if pair_rank >= 2 and pair_rank <= 5:
-		var out_chance: float = 0.2 if hand_idx == 7 else 0.1
-		if randf() < out_chance:
-			var out_type: String
-			if hand_idx == 6:
-				out_type = "Flyout"
-			else:
-				out_type = "Flyout" if randf() < 0.50 else "Groundout"
-			return {
-				"hand_name": out_type,
-				"outcome": out_type,
-				"chips": 0,
-				"mult": 1.0,
-				"score": 0,
-				"was_groundout": true,
-				"original_hand": entry["hand_name"],
-			}
+	if randf() < out_chance:
+		var out_type: String = "Flyout" if randf() < 0.40 else "Groundout"
+		return {
+			"hand_name": out_type,
+			"outcome": out_type,
+			"peanuts": 0,
+			"mult": 1.0,
+			"score": 0,
+			"was_groundout": true,
+			"original_hand": entry["hand_name"],
+			"pair_rank": pair_rank,
+		}
 
-	# High rank bonus
-	if pair_rank >= 10:
+	# Survived — high pair rank bonus peanuts (Pair, Two Pair, Trips only)
+	if pair_rank >= 10 and hand_idx >= 6:
 		var bonus: int = pair_rank - 9
 		var result: Dictionary = entry.duplicate()
-		result["chips"] = entry["chips"] + bonus
+		result["peanuts"] = entry["peanuts"] + bonus
 		return result
 
 	return {}

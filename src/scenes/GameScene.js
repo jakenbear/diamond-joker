@@ -10,6 +10,7 @@ import TraitManager from '../TraitManager.js';
 import CountManager from '../CountManager.js';
 import SituationalEngine from '../SituationalEngine.js';
 import SoundManager from '../SoundManager.js';
+import SynergyEngine from '../SynergyEngine.js';
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const CARD_ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
@@ -17,9 +18,9 @@ const CARD_ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
 
 const CARD_W = 96;
 const CARD_H = 126;
-const CARD_SPACING = 85;
+const CARD_SPACING = 105;
 const HAND_Y = 570;
-const HAND_START_X = 640 - (7 * CARD_SPACING) / 2;
+const HAND_START_X = 640 - 3 * CARD_SPACING;
 
 // Panel constants
 const PANEL_W = 210;
@@ -64,6 +65,19 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
+    // Mascot spritesheet (5 cols × 3 rows, 72×72 per frame at 4x)
+    this.load.spritesheet('mascots', 'assets/animals/mascots_4x.png', {
+      frameWidth: 72, frameHeight: 72,
+    });
+
+    // Coach face spritesheet (6 cols × 5 rows, 96×96 per face)
+    this.load.spritesheet('faces', 'assets/sprites/faces.png', {
+      frameWidth: 96, frameHeight: 96,
+    });
+
+    // Blank card base for staff cards
+    this.load.image('card_blank', 'assets/cards/space5.png');
+
     // Set nearest-neighbor filtering on card textures only (keeps text smooth)
     this.load.on('complete', () => {
       for (const s of suits) {
@@ -82,6 +96,12 @@ export default class GameScene extends Phaser.Scene {
           if (this.textures.exists(key)) {
             this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
           }
+        }
+      }
+      // Nearest-neighbor on mascot spritesheet, faces, and blank card
+      for (const key of ['mascots', 'faces', 'card_blank']) {
+        if (this.textures.exists(key)) {
+          this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
         }
       }
     });
@@ -104,6 +124,12 @@ export default class GameScene extends Phaser.Scene {
       const oppTeam = this._initData.opponentTeam || null;
       this.rosterManager = new RosterManager(team, pitcherIdx, oppTeam);
       this.traitManager = new TraitManager();
+      // Apply innate traits from draft (one per batter)
+      if (this._initData.innateTraits) {
+        this._initData.innateTraits.forEach((trait, i) => {
+          if (trait) this.rosterManager.equipTrait(i, trait);
+        });
+      }
       // Assign pitcher traits at game start
       const pitcherTraits = TraitManager.pickPitcherTraits();
       this.rosterManager.setPitcherTraits(pitcherTraits);
@@ -113,6 +139,8 @@ export default class GameScene extends Phaser.Scene {
     this.selectedIndices = new Set();
     this.cardSprites = [];
     this.inputLocked = false;
+    this._maxPeanutsThisInning = 0;
+    this.activeSynergies = SynergyEngine.calculate(this.rosterManager.getRoster());
     this.baseGraphics = [];
     this.batterTraitSprites = [];
     this.pitcherTraitSprites = [];
@@ -127,7 +155,8 @@ export default class GameScene extends Phaser.Scene {
     this._createButtons();
     this._createSortButtons();
     this._createInfoText();
-    this._createGameLog();
+    this._createStaffStack();
+    this._createRosterButton();
 
     // Clean up in-flight timers when scene exits (prevents stale callbacks)
     this.events.once('shutdown', () => {
@@ -152,85 +181,57 @@ export default class GameScene extends Phaser.Scene {
   _createScoreboard() {
     this.add.rectangle(640, 25, 1280, 50, 0x0d3311).setDepth(0);
 
-    this.inningText = this.add.text(BATTER_X + PANEL_W / 2 + 20, 10, '', {
-      fontSize: '20px', fontFamily: 'monospace', color: '#ffffff',
-    }).setDepth(1);
-
-    this.scoreText = this.add.text(640, 8, '', {
-      fontSize: '22px', fontFamily: 'monospace', color: '#ffd600',
+    // Score + Peanuts (vertically centered in bar)
+    this.scoreText = this.add.text(640, 13, '', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ffd600',
     }).setOrigin(0.5, 0).setDepth(1);
 
-    // Big outs display (original style)
-    this.outsText = this.add.text(PITCHER_X - PANEL_W / 2 - 20, 10, '', {
-      fontSize: '20px', fontFamily: 'monospace', color: '#ff8a80',
-    }).setOrigin(1, 0).setDepth(1);
+    // Left: INN + Outs
+    this.inningOutsText = this.add.text(BATTER_X + PANEL_W / 2 + 20, 16, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff',
+    }).setDepth(1);
 
-    // B/S count — small, stacked to the right of outs
-    const countX = PITCHER_X - PANEL_W / 2 + 5;
-    this.add.text(countX, 8, 'B', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#66bb6a', fontStyle: 'bold',
-    }).setDepth(1);
-    this.ballsDots = this.add.text(countX + 12, 8, '', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#66bb6a',
-    }).setDepth(1);
-    this.add.text(countX, 21, 'S', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#ff5252', fontStyle: 'bold',
-    }).setDepth(1);
-    this.strikesDots = this.add.text(countX + 12, 21, '', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#ff5252',
-    }).setDepth(1);
+    // Right: B + S count (right-aligned before pitcher panel)
+    this.countText = this.add.text(PITCHER_X - PANEL_W / 2 - 10, 16, '', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff',
+    }).setOrigin(1, 0).setDepth(1);
 
     this.countManager = new CountManager();
 
-    this.chipBalanceText = this.add.text(640, 33, '', {
+    this.peanutBalanceText = this.add.text(640, 6, '', {
       fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
-    }).setOrigin(0.5, 0).setDepth(1);
-
-    // Small "(you)" indicator under player team name
-    this.youIndicator = this.add.text(0, 33, '(you)', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#69f0ae',
-    }).setOrigin(0.5, 0).setDepth(1).setAlpha(0.7);
+    }).setOrigin(0.5, 0).setDepth(1).setVisible(false);
 
     this._updateScoreboard();
   }
 
   _updateScoreboard() {
     const s = this.baseball.getStatus();
-    this.inningText.setText(`INN ${s.inning} ${s.half === 'top' ? '\u25b2' : '\u25bc'}`);
     const playerTeam = this.rosterManager.getTeam();
     const playerName = playerTeam ? playerTeam.id : 'YOU';
     const oppTeam = this.rosterManager.getOpponentTeam();
     const oppName = oppTeam ? oppTeam.id : 'OPP';
-    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}`);
+    this.scoreText.setText(`${playerName} ${s.playerScore}  -  ${s.opponentScore} ${oppName}    Peanuts: ${s.totalPeanuts}`);
 
-    // Position "(you)" indicator under the player team name using actual text bounds
-    this.scoreText.updateText();
-    const scoreLeft = this.scoreText.x - this.scoreText.width / 2;
-    const measuredWidth = this.add.text(0, -100, playerName, {
-      fontSize: '22px', fontFamily: 'monospace',
-    });
-    const playerNameWidth = measuredWidth.width;
-    measuredWidth.destroy();
-    this.youIndicator.setX(scoreLeft + playerNameWidth / 2);
-    this._animateChipCounter(s.totalChips);
-
+    // Line 2 left: INN + Outs
     const outDots = [];
     for (let i = 0; i < 3; i++) {
       outDots.push(i < s.outs ? '\u25cf' : '\u25cb');
     }
-    this.outsText.setText(`Outs: ${outDots.join(' ')}`);
+    const innHalf = s.half === 'top' ? '\u25b2' : '\u25bc';
+    this.inningOutsText.setText(`INN ${s.inning} ${innHalf}   Outs: ${outDots.join(' ')}`);
 
+    // Line 2 right: B + S count
     const count = this.countManager.getCount();
     const ballDots = [];
     for (let i = 0; i < 4; i++) {
       ballDots.push(i < count.balls ? '\u25cf' : '\u25cb');
     }
-    this.ballsDots.setText(ballDots.join(' '));
     const strikeDots = [];
     for (let i = 0; i < 3; i++) {
       strikeDots.push(i < count.strikes ? '\u25cf' : '\u25cb');
     }
-    this.strikesDots.setText(strikeDots.join(' '));
+    this.countText.setText(`B: ${ballDots.join(' ')}   S: ${strikeDots.join(' ')}`);
 
     if (!this._deferBaseUpdate) this._updateBases(s.bases);
   }
@@ -695,7 +696,7 @@ export default class GameScene extends Phaser.Scene {
       align: 'center', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(7).setAlpha(0);
 
-    // Live score preview: chips x mult = total (shares space with hand name)
+    // Live score preview: peanuts x mult = total (shares space with hand name)
     this.scorePreviewText = this.add.text(640, 370, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
@@ -722,56 +723,247 @@ export default class GameScene extends Phaser.Scene {
     this._updateInfoText();
   }
 
+  _canDiscard() {
+    return !this.countManager.isStrikeout() && !this.countManager.isWalk();
+  }
+
   _updateInfoText() {
+    const count = this.countManager.getCount();
+    const freeTakeStr = this.freeTakesRemaining > 0 ? ` | Free takes: ${this.freeTakesRemaining}` : '';
     this.discardInfo.setText(
-      `Discards: ${this.cardEngine.discardsRemaining} | Select cards to PLAY or DISCARD`
+      `Select cards to PLAY or DISCARD${freeTakeStr}`
     );
     this.deckInfo.setText(`Deck: ${this.cardEngine.deck.length}`);
+
+    // Tint discard button by risk level (count shown in scoreboard)
+    if (this.discardBtn) {
+      this.discardBtn.txt.setText('DISCARD');
+      if (count.strikes === 0) {
+        this.discardBtn.bg.setFillStyle(0x558b2f);  // green — safe
+      } else if (count.strikes === 1) {
+        this.discardBtn.bg.setFillStyle(0xf57f17);  // orange — caution
+      } else {
+        this.discardBtn.bg.setFillStyle(0xc62828);  // red — danger
+      }
+    }
   }
 
   // ── Game Log ─────────────────────────────────────────
 
-  _createGameLog() {
-    const logX = 10;
-    const logY = 495;
-    const logW = PANEL_W + 10;
-    const logH = 210;
+  // ── Staff Card Stack (bottom-left, replaces game log) ──
 
-    this.add.rectangle(logX + logW / 2, logY + logH / 2, logW, logH, 0x0a1f0d, 0.8)
+  _createStaffStack() {
+    const stackX = 10;
+    const stackY = 495;
+    const stackW = PANEL_W + 10;
+    const stackH = 170;
+
+    this.add.rectangle(stackX + stackW / 2, stackY + stackH / 2, stackW, stackH, 0x0a1f0d, 0.8)
       .setStrokeStyle(1, 0x2e7d32, 0.5).setDepth(0);
 
-    this.add.text(logX + 8, logY + 4, 'GAME LOG', {
+    this.add.text(stackX + 8, stackY + 4, 'STAFF', {
       fontSize: '9px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setDepth(1);
 
-    this.gameLogText = this.add.text(logX + 8, logY + 18, '', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#b0bec5',
-      wordWrap: { width: logW - 16 }, lineSpacing: 2,
-    }).setDepth(1);
+    const staff = this.baseball.getStaff();
+    if (staff.length === 0) {
+      this.add.text(stackX + stackW / 2, stackY + stackH / 2, 'No staff hired', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#555555',
+      }).setOrigin(0.5).setDepth(1);
+      return;
+    }
 
-    const mask = this.add.rectangle(logX + logW / 2, logY + logH / 2 + 8, logW, logH - 16, 0xffffff)
-      .setVisible(false);
-    this.gameLogText.setMask(mask.createGeometryMask());
+    staff.forEach((item, i) => {
+      const cardY = stackY + 20 + i * 38;
+      const isCoach = item.category === 'coach';
+      const badgeColor = isCoach ? 0x00695c : 0x6d4c00;
+      const textColor = isCoach ? '#80cbc4' : '#ffab40';
 
-    // Render existing entries from previous scene
-    this._refreshGameLog();
+      this.add.rectangle(stackX + stackW / 2, cardY + 12, stackW - 12, 32, badgeColor, 0.5)
+        .setStrokeStyle(1, isCoach ? 0x26a69a : 0xffa000, 0.6).setDepth(1);
+
+      // Mascot sprite, coach face, or text badge
+      if (!isCoach && item.spriteIndex !== undefined && this.textures.exists('mascots')) {
+        this.add.image(stackX + 20, cardY + 12, 'mascots', item.spriteIndex)
+          .setOrigin(0.5).setScale(0.35).setDepth(2);
+      } else if (isCoach && item.faceIndex !== undefined && this.textures.exists('faces')) {
+        this.add.image(stackX + 20, cardY + 12, 'faces', item.faceIndex)
+          .setOrigin(0.5).setScale(0.25).setDepth(2);
+      } else {
+        const badge = isCoach ? 'C' : 'M';
+        this.add.text(stackX + 14, cardY + 5, badge, {
+          fontSize: '11px', fontFamily: 'monospace', color: textColor, fontStyle: 'bold',
+        }).setDepth(2);
+      }
+
+      this.add.text(stackX + 38, cardY + 4, item.name, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setDepth(2);
+
+      this.add.text(stackX + 38, cardY + 16, item.description, {
+        fontSize: '8px', fontFamily: 'monospace', color: '#aaaaaa',
+        wordWrap: { width: stackW - 50 },
+      }).setDepth(2);
+    });
   }
+
+  // ── Game Log (data only, rendered in roster overlay) ──
 
   _addGameLog(entry, color = '#b0bec5') {
     const s = this.baseball.getStatus();
     const prefix = `${s.inning}${s.half === 'top' ? '\u25b2' : '\u25bc'}`;
     this.gameLogEntries.push({ text: `${prefix} ${entry}`, color });
-
-    // Keep last 40 entries
     if (this.gameLogEntries.length > 40) {
       this.gameLogEntries.shift();
     }
-    this._refreshGameLog();
   }
 
-  _refreshGameLog() {
-    const visible = this.gameLogEntries.slice(-15);
-    this.gameLogText.setText(visible.map(e => e.text).join('\n'));
+  // ── Roster Overlay ────────────────────────────────────
+
+  _createRosterButton() {
+    const btnX = 10 + (PANEL_W + 10) / 2;
+    const btnY = 495 + 175;
+    const btnW = PANEL_W + 10;
+    const btnH = 28;
+
+    const bg = this.add.rectangle(btnX, btnY, btnW, btnH, 0x1a3a2a, 0.9)
+      .setStrokeStyle(1, 0x4caf50).setDepth(3)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(btnX, btnY, 'ROSTER', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(4);
+
+    bg.on('pointerover', () => bg.setStrokeStyle(1, 0xffd600));
+    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x4caf50));
+    bg.on('pointerdown', () => this._toggleRosterOverlay());
+
+    this.rosterOverlayVisible = false;
+    this.rosterOverlayElements = [];
+  }
+
+  _toggleRosterOverlay() {
+    if (this.rosterOverlayVisible) {
+      this.rosterOverlayElements.forEach(el => el.destroy());
+      this.rosterOverlayElements = [];
+      this.rosterOverlayVisible = false;
+      return;
+    }
+    this.rosterOverlayVisible = true;
+    const els = this.rosterOverlayElements;
+
+    // Full-screen overlay
+    const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.92)
+      .setDepth(50).setInteractive();
+    els.push(overlay);
+
+    // Close button
+    const closeBg = this.add.rectangle(1220, 40, 80, 32, 0x8b0000)
+      .setStrokeStyle(1, 0xaa2222).setDepth(51)
+      .setInteractive({ useHandCursor: true });
+    const closeTxt = this.add.text(1220, 40, 'CLOSE', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(52);
+    closeBg.on('pointerdown', () => this._toggleRosterOverlay());
+    els.push(closeBg, closeTxt);
+
+    // ── Left column: LINEUP ──
+    const colL = 40;       // left edge of lineup column
+    const colLW = 560;     // lineup column width
+    const colR = 640;      // left edge of right column
+    const colRW = 580;     // right column width
+
+    els.push(this.add.text(colL + colLW / 2, 25, 'LINEUP', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    const roster = this.rosterManager.getRoster();
+    const currentIdx = this.rosterManager.getCurrentBatterIndex();
+    const rosterX = colL + 10;
+    const startY = 55;
+    const rowH = 44;
+
+    roster.forEach((player, i) => {
+      const y = startY + i * rowH;
+      const isNext = i === currentIdx;
+      const isBonus = player.isBonus;
+
+      const rowBg = this.add.rectangle(colL + colLW / 2, y + 16, colLW - 10, 38,
+        isBonus ? 0x2a2a1a : 0x111d2a, 0.7)
+        .setStrokeStyle(1, isNext ? 0x69f0ae : 0x222d3a).setDepth(51);
+      els.push(rowBg);
+
+      if (isNext) {
+        els.push(this.add.text(rosterX - 5, y + 8, '\u25b6', {
+          fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae',
+        }).setDepth(52));
+      }
+
+      const posLabel = player.pos ? `${player.pos} ` : '';
+      const nameColor = isBonus ? '#ffd600' : (isNext ? '#69f0ae' : '#ffffff');
+      els.push(this.add.text(rosterX + 12, y + 6, `${i + 1}. ${posLabel}${player.name}`, {
+        fontSize: '12px', fontFamily: 'monospace', color: nameColor, fontStyle: 'bold',
+      }).setDepth(52));
+
+      const batsLabel = player.bats === 'L' ? 'L' : 'R';
+      els.push(this.add.text(rosterX + 12, y + 20, `${batsLabel}  PWR:${player.power} CNT:${player.contact} SPD:${player.speed}`, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#81c784',
+      }).setDepth(52));
+
+      // Traits (right side of row)
+      if (player.traits && player.traits.length > 0) {
+        const traitNames = player.traits.map(t => t.name).join(', ');
+        els.push(this.add.text(colL + colLW - 20, y + 13, traitNames, {
+          fontSize: '9px', fontFamily: 'monospace', color: '#ce93d8',
+          wordWrap: { width: 200 },
+        }).setOrigin(1, 0.5).setDepth(52));
+      }
+    });
+
+    // ── Right column: SYNERGIES + GAME LOG ──
+    const synX = colR + 20;
+    els.push(this.add.text(colR + colRW / 2, 25, 'SYNERGIES', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ce93d8', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    const allSynergies = SynergyEngine.getAll();
+    const activeIds = new Set((this.activeSynergies || []).map(s => s.id));
+
+    allSynergies.forEach((syn, i) => {
+      const y = 50 + i * 28;
+      const isActive = activeIds.has(syn.id);
+      const icon = isActive ? '\u2713' : '\u2717';
+      const iconColor = isActive ? '#69f0ae' : '#444444';
+
+      els.push(this.add.text(synX, y, icon, {
+        fontSize: '13px', fontFamily: 'monospace', color: iconColor, fontStyle: 'bold',
+      }).setDepth(52));
+
+      els.push(this.add.text(synX + 20, y, syn.name, {
+        fontSize: '11px', fontFamily: 'monospace',
+        color: isActive ? '#ffffff' : '#666666', fontStyle: isActive ? 'bold' : '',
+      }).setDepth(52));
+
+      const desc = isActive ? syn.bonusDescription : syn.hint;
+      els.push(this.add.text(synX + 180, y + 1, desc, {
+        fontSize: '9px', fontFamily: 'monospace', color: isActive ? '#81c784' : '#555555',
+      }).setDepth(52));
+    });
+
+    // Game Log (below synergies in right column)
+    const logTopY = 400;
+    els.push(this.add.text(colR + colRW / 2, logTopY, 'GAME LOG', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(51));
+
+    els.push(this.add.rectangle(colR + colRW / 2, logTopY + 125, colRW - 20, 230, 0x0a1f0d, 0.6)
+      .setStrokeStyle(1, 0x2e7d32, 0.4).setDepth(51));
+
+    const visible = this.gameLogEntries.slice(-12);
+    const logText = visible.map(e => e.text).join('\n');
+    els.push(this.add.text(synX, logTopY + 20, logText || '(no entries yet)', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#b0bec5',
+      wordWrap: { width: colRW - 40 }, lineSpacing: 2,
+    }).setDepth(52));
   }
 
   // ── Buttons ───────────────────────────────────────────
@@ -1203,29 +1395,29 @@ export default class GameScene extends Phaser.Scene {
     this.handPreviewText.setColor(color);
     this.handPreviewText.setAlpha(1);
 
-    // Live chips x mult display
+    // Live peanuts x mult display
     let scorePreview = '';
     if (isDefiniteOut) {
       scorePreview = 'OUT';
       this.scorePreviewText.setColor('#ff5252');
-    } else if (isRiskyOut || result.chips > 0) {
-      // For risky outs (low pair Groundout/Flyout), look up the original hand's chips/mult
-      let baseChips = result.chips;
+    } else if (isRiskyOut || result.peanuts > 0) {
+      // For risky outs (low pair Groundout/Flyout), look up the original hand's peanuts/mult
+      let basePeanuts = result.peanuts;
       let baseMult = result.mult;
       if (isRiskyOut && result.originalHand) {
         const entry = HAND_TABLE.find(h => h.handName === result.originalHand);
-        if (entry) { baseChips = entry.chips; baseMult = entry.mult; }
+        if (entry) { basePeanuts = entry.peanuts; baseMult = entry.mult; }
       }
       const batter = this.rosterManager.getCurrentBatter();
       const powerBonus = Math.max(0, batter.power - 5);
       const contactBonus = batter.contact / 10;
-      const totalChips = baseChips + powerBonus;
+      const totalPeanuts = basePeanuts + powerBonus;
       const totalMult = Math.round((baseMult + contactBonus) * 10) / 10;
-      const total = Math.round(totalChips * totalMult);
+      const total = Math.round(totalPeanuts * totalMult);
 
-      const chipsStr = Number.isInteger(totalChips) ? totalChips : totalChips.toFixed(1);
+      const peanutsStr = Number.isInteger(totalPeanuts) ? totalPeanuts : totalPeanuts.toFixed(1);
       const multStr = Number.isInteger(totalMult) ? totalMult : totalMult.toFixed(1);
-      scorePreview = `${chipsStr} chips x ${multStr} mult = ${total}`;
+      scorePreview = `${peanutsStr} peanuts x ${multStr} mult = ${total}`;
       if (isRiskyOut) scorePreview += ' (if hit)';
 
       const tags = [];
@@ -1342,7 +1534,7 @@ export default class GameScene extends Phaser.Scene {
       }).setDepth(21);
       els.push(outcome);
 
-      const stats = this.add.text(810, y, `${h.chips}c x${h.mult}`, {
+      const stats = this.add.text(810, y, `${h.peanuts}c x${h.mult}`, {
         fontSize: '12px', fontFamily: 'monospace', color: '#666666',
       }).setDepth(21);
       els.push(stats);
@@ -1393,12 +1585,24 @@ export default class GameScene extends Phaser.Scene {
       .filter(t => t.effect && t.effect.type === 'add_hand_size')
       .reduce((sum, t) => sum + (t.effect.value || 1), 0);
 
-    // Bonus discards from batter traits (e.g. Batting Gloves)
-    const bonusDiscards = batter.traits
+    // ── Staff effects at at-bat start ──
+    const staff = this.baseball.getStaff();
+
+    // Free takes: discards that don't add to count (Batting Gloves, Fresh Cleats, Bench Coach)
+    const staffFreeTakes = staff
+      .filter(s => s.effect.type === 'team_add_discard')
+      .reduce((sum, s) => sum + s.effect.value, 0);
+    const traitFreeTakes = batter.traits
       .filter(t => t.effect && t.effect.type === 'add_discard')
       .reduce((sum, t) => sum + (t.effect.value || 1), 0);
-    if (bonusDiscards > 0) {
-      this.cardEngine.discardsRemaining += bonusDiscards;
+    this.freeTakesRemaining = staffFreeTakes + traitFreeTakes;
+
+    // Pinch Crab / Card Shark Parrot: draw extra cards
+    const extraDraw = staff
+      .filter(s => s.effect.type === 'add_hand_draw')
+      .reduce((sum, s) => sum + s.effect.value, 0);
+    if (extraDraw > 0) {
+      this.cardEngine.draw(extraDraw);
     }
 
     this.discardCount = 0;
@@ -1416,7 +1620,7 @@ export default class GameScene extends Phaser.Scene {
     this._renderHand();
     this._updateScoreboard();
     this._updateInfoText();
-    this._setButtonsEnabled(true, this.cardEngine.discardsRemaining > 0);
+    this._setButtonsEnabled(true, this._canDiscard());
     this.inputLocked = false;
 
     // HBP check at start of at-bat
@@ -1458,30 +1662,44 @@ export default class GameScene extends Phaser.Scene {
 
   _onDiscard() {
     if (this.selectedIndices.size === 0) return;
-    if (this.cardEngine.discardsRemaining <= 0) return;
+    if (!this._canDiscard()) return;
     SoundManager.discard();
 
     this.inputLocked = true;
     this.handPreviewText.setAlpha(0);
     this.scorePreviewText.setAlpha(0);
+    this.discardCount = (this.discardCount || 0) + 1;
+
+    // Free takes bypass the count (Batting Gloves, Fresh Cleats, Bench Coach)
+    if (this.freeTakesRemaining > 0) {
+      this.freeTakesRemaining--;
+      this.resultText.setText('FREE TAKE!');
+      this.resultText.setColor('#81d4fa');
+      this.resultText.setAlpha(1);
+      this.resultText.setScale(1);
+      this.tweens.add({ targets: this.resultText, alpha: 0, duration: 400, delay: 600 });
+      this._updateScoreboard();
+      this._doCardDiscard();
+      return;
+    }
 
     // Record pitch in count manager
     const pitcher = this.rosterManager.getCurrentPitcher();
-    const pitchResult = this.countManager.recordDiscard(pitcher.control);
-    this.discardCount = (this.discardCount || 0) + 1;
+    const batter = this.rosterManager.getCurrentBatter();
+    const pitchResult = this.countManager.recordDiscard(pitcher.velocity, pitcher.control, batter.contact);
 
     // Build callout text from count result
     let calloutText = '';
     let calloutColor = '#ff5252';
-    if (pitchResult.isBall && pitchResult.isStrike) {
-      calloutText = `BALL ${this.countManager.getCount().balls} + STRIKE ${this.countManager.getCount().strikes}!`;
-      calloutColor = '#ffab40';
-    } else if (pitchResult.isBall) {
+    if (pitchResult.isBall) {
       calloutText = `BALL ${this.countManager.getCount().balls}!`;
       calloutColor = '#66bb6a';
     } else if (pitchResult.isFoul) {
       calloutText = 'FOUL!';
       calloutColor = '#ffab40';
+    } else if (pitchResult.isStrikeout) {
+      calloutText = 'STRIKE 3!';
+      calloutColor = '#ff5252';
     } else if (pitchResult.isStrike) {
       calloutText = `STRIKE ${this.countManager.getCount().strikes}!`;
       calloutColor = '#ff5252';
@@ -1491,12 +1709,7 @@ export default class GameScene extends Phaser.Scene {
     this.resultText.setColor(calloutColor);
     this.resultText.setAlpha(1);
     this.resultText.setScale(1);
-    this.tweens.add({
-      targets: this.resultText,
-      alpha: 0,
-      duration: 400,
-      delay: 600,
-    });
+    this.tweens.add({ targets: this.resultText, alpha: 0, duration: 400, delay: 600 });
 
     this._updateScoreboard();
 
@@ -1507,21 +1720,11 @@ export default class GameScene extends Phaser.Scene {
       this.baseball.advanceAllRunners();
       this._updateScoreboard();
       this._addGameLog('Wild pitch — runner advances!', '#ffab40');
-      // Show wild pitch text after the strike/ball callout fades
       this.time.delayedCall(700, () => {
         this.handNameText.setText(wildPitch.description);
         this.handNameText.setColor('#ffab40');
-        this.tweens.add({
-          targets: this.handNameText,
-          alpha: { from: 0, to: 1 },
-          duration: 200,
-        });
-        this.tweens.add({
-          targets: this.handNameText,
-          alpha: 0,
-          duration: 300,
-          delay: 800,
-        });
+        this.tweens.add({ targets: this.handNameText, alpha: { from: 0, to: 1 }, duration: 200 });
+        this.tweens.add({ targets: this.handNameText, alpha: 0, duration: 300, delay: 800 });
       });
     }
 
@@ -1532,17 +1735,40 @@ export default class GameScene extends Phaser.Scene {
         this.resultText.setColor('#66bb6a');
         this.resultText.setAlpha(1);
         this.resultText.setScale(1);
-        this.tweens.add({
-          targets: this.resultText,
-          scale: { from: 1.3, to: 1 },
-          duration: 300,
-          ease: 'Back.easeOut',
-        });
+        this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
 
         const walkBatter = this.rosterManager.getCurrentBatter();
         this.baseball.resolveOutcome('Walk', 0, walkBatter);
         const walkCount = this.countManager.getCount();
         this._addGameLog(`${walkBatter.name.split(' ').pop()}: Walk (${walkCount.balls}-${walkCount.strikes})`, '#66bb6a');
+        this._updateScoreboard();
+        this._clearCards();
+        if (this.batterSprite) this.batterSprite.setVisible(false);
+
+        this.rosterManager.advanceBatter();
+        this.time.delayedCall(600, () => this._updateBatterPanel());
+        this.time.delayedCall(1500, () => {
+          if (this.baseball.isGameOver()) { this._endGame(); return; }
+          if (this.baseball.state === 'SWITCH_SIDE') { this._showMidInningTransition(); return; }
+          this._startAtBat();
+        });
+      });
+      return;
+    }
+
+    // Strikeout from count — 3 strikes, at-bat over
+    if (pitchResult.isStrikeout) {
+      this.time.delayedCall(800, () => {
+        this.resultText.setText('STRUCK OUT!');
+        this.resultText.setColor('#ff5252');
+        this.resultText.setAlpha(1);
+        this.resultText.setScale(1);
+        this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
+
+        const kBatter = this.rosterManager.getCurrentBatter();
+        this.baseball.resolveOutcome('Strikeout', 0, kBatter);
+        const kCount = this.countManager.getCount();
+        this._addGameLog(`${kBatter.name.split(' ').pop()}: Struck out looking (${kCount.balls}-${kCount.strikes})`, '#ff5252');
         this._updateScoreboard();
         this._clearCards();
         if (this.batterSprite) this.batterSprite.setVisible(false);
@@ -1565,12 +1791,7 @@ export default class GameScene extends Phaser.Scene {
         this.resultText.setColor('#ff8a80');
         this.resultText.setAlpha(1);
         this.resultText.setScale(1);
-        this.tweens.add({
-          targets: this.resultText,
-          scale: { from: 1.3, to: 1 },
-          duration: 300,
-          ease: 'Back.easeOut',
-        });
+        this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
 
         const foulBatter = this.rosterManager.getCurrentBatter();
         this.baseball.resolveOutcome('Flyout', 0, foulBatter);
@@ -1589,6 +1810,12 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Normal discard — replace cards
+    this._doCardDiscard();
+  }
+
+  /** Animate discarded cards flying away, replace them, and re-render hand */
+  _doCardDiscard() {
     const displayIndices = [...this.selectedIndices];
     displayIndices.forEach(idx => {
       const cs = this.cardSprites[idx];
@@ -1602,15 +1829,22 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.time.delayedCall(250, () => {
-      // Map display indices → actual hand indices for CardEngine
       const handIndices = displayIndices
         .map(di => this._displayToHand[di] !== undefined ? this._displayToHand[di] : di);
       this.cardEngine.discard(handIndices);
-      // Reset deal order for new hand composition
+
+      // Trash Panda: chance to draw an extra card on discard
+      const drawOnDiscard = this.baseball.getStaffByEffect('bonus_draw_on_discard');
+      for (const s of drawOnDiscard) {
+        if (Math.random() < s.effect.chance) {
+          this.cardEngine.draw(1);
+        }
+      }
+
       this.dealOrder = this.cardEngine.hand.map((_, i) => i);
       this._renderHand();
       this._updateInfoText();
-      this._setButtonsEnabled(true, this.cardEngine.discardsRemaining > 0);
+      this._setButtonsEnabled(true, this._canDiscard());
       this.inputLocked = false;
     });
   }
@@ -1674,7 +1908,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Detect pitcher post-modifier effects (we'll track after eval)
     let pitcherPostMessage = '';
-    let pitcherPostPenalty = { chips: 0, mult: 0 };
+    let pitcherPostPenalty = { peanuts: 0, mult: 0 };
 
     // Track batter post-modifier effects
     let batterPostMessage = '';
@@ -1691,9 +1925,9 @@ export default class GameScene extends Phaser.Scene {
           pitcherPostPenalty.mult = before.mult - r.mult;
           effects.push(`-${(before.mult - r.mult).toFixed(1)} mult`);
         }
-        if (r.chips < before.chips) {
-          pitcherPostPenalty.chips = before.chips - r.chips;
-          effects.push(`-${before.chips - r.chips} chips`);
+        if (r.peanuts < before.peanuts) {
+          pitcherPostPenalty.peanuts = before.peanuts - r.peanuts;
+          effects.push(`-${before.peanuts - r.peanuts} peanuts`);
         }
         if (r.mult > before.mult) effects.push(`+${(r.mult - before.mult).toFixed(1)} mult`);
         if (effects.length > 0) {
@@ -1710,7 +1944,7 @@ export default class GameScene extends Phaser.Scene {
         const effects = [];
         if (r.outcome !== before.outcome) effects.push(`${before.outcome}\u2192${r.outcome}`);
         if (r.mult > before.mult) effects.push(`+${(r.mult - before.mult).toFixed(1)} mult`);
-        if (r.chips > before.chips) effects.push(`+${r.chips - before.chips} chips`);
+        if (r.peanuts > before.peanuts) effects.push(`+${r.peanuts - before.peanuts} peanuts`);
         if (r.mult < before.mult) effects.push(`${(r.mult - before.mult).toFixed(1)} mult`);
         if (effects.length > 0) {
           const traitNames = batter.traits
@@ -1738,8 +1972,16 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
+    // Black Sheep: ignore pair penalty (reset pairs counter before eval)
+    const blackSheep = this.baseball.getStaffByEffect('ignore_pair_penalty').length > 0;
+    const savedPairsPlayed = this.baseball.pairsPlayedThisInning;
+    if (blackSheep) this.baseball.pairsPlayedThisInning = 0;
+
     // Play selected cards with combined modifiers + strike count for two-strike penalty
     let handResult = this.cardEngine.playHand(selectedArr, combinedPreMod, trackingPostMod, gameState, count.strikes);
+
+    // Restore pairs counter (it was incremented during eval, keep that increment unless Black Sheep)
+    if (blackSheep) this.baseball.pairsPlayedThisInning = savedPairsPlayed;
 
     // Apply count modifiers to hand result
     const countMods = this.countManager.getCountModifiers();
@@ -1748,10 +1990,35 @@ export default class GameScene extends Phaser.Scene {
     const totalCountMult = countMods.multMod + firstPitchBonus;
 
     const isHitForCount = handResult.outcome !== 'Strikeout' && handResult.outcome !== 'Groundout' && handResult.outcome !== 'Flyout';
-    if (isHitForCount && (countMods.chipsMod !== 0 || totalCountMult !== 0)) {
-      handResult.chips = Math.max(0, handResult.chips + countMods.chipsMod);
+    if (isHitForCount && (countMods.peanutsMod !== 0 || totalCountMult !== 0)) {
+      handResult.peanuts = Math.max(0, handResult.peanuts + countMods.peanutsMod);
       handResult.mult = Math.round(Math.max(1, handResult.mult + totalCountMult) * 10) / 10;
-      handResult.score = Math.round(handResult.chips * handResult.mult);
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
+    }
+
+    // Apply team stat boosts from staff (Batting Coach etc.)
+    const staff = this.baseball.getStaff();
+    const statBoosts = {};
+    for (const s of staff) {
+      if (s.effect && s.effect.type === 'team_stat_boost') {
+        statBoosts[s.effect.stat] = (statBoosts[s.effect.stat] || 0) + s.effect.value;
+      }
+    }
+    // Hired Guns synergy: bonus players get +1 to all stats
+    if (batter.isBonus && this.activeSynergies) {
+      for (const syn of this.activeSynergies) {
+        if (syn.bonus.type === 'bonus_player_stat_boost') {
+          statBoosts.power = (statBoosts.power || 0) + syn.bonus.value;
+          statBoosts.contact = (statBoosts.contact || 0) + syn.bonus.value;
+          statBoosts.speed = (statBoosts.speed || 0) + syn.bonus.value;
+        }
+      }
+    }
+    // Temporarily boost batter stats
+    const origStats = {};
+    for (const [stat, val] of Object.entries(statBoosts)) {
+      origStats[stat] = batter[stat];
+      batter[stat] += val;
     }
 
     // Apply stat modifiers (now returns { result, bonuses })
@@ -1759,14 +2026,31 @@ export default class GameScene extends Phaser.Scene {
     handResult = batterMod.result;
     const batterBonuses = batterMod.bonuses;
 
+    // Revert temporary stat boosts
+    for (const [stat, val] of Object.entries(origStats)) {
+      batter[stat] = val;
+    }
+
     // Re-apply batter trait post-modifiers after contact save so upgrades
     // like Slugger Serum (Pair Single→Double) can trigger on the rescued hit
     if (batterBonuses.contactSave && batterPostMod) {
       handResult = batterPostMod(handResult, gameState);
-      handResult.score = Math.round(handResult.chips * handResult.mult);
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
     }
 
     handResult = this.rosterManager.applyPitcherModifiers(handResult, gameState);
+
+    // ── Staff effects (mascots & coaches) ──
+    const staffBonuses = this._applyStaffEffects(handResult, gameState);
+
+    // ── Bonus player lineup effects ──
+    const lineupBonuses = this._applyLineupEffects(handResult, gameState);
+
+    // ── Synergy effects ──
+    const synergyBonuses = this._applySynergyEffects(handResult, gameState);
+
+    // Merge extra base bonuses for unified handling
+    staffBonuses.extraBaseBonus += lineupBonuses.extraBaseBonus + synergyBonuses.extraBaseBonus;
 
     // Sacrifice fly (trait-based, e.g. on strikeouts)
     let sacrificeFlyRun = 0;
@@ -1775,10 +2059,12 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Situational outcomes: DP, Fielder's Choice, Error
+    // Sly Fox: multiply error chance
     const situational = SituationalEngine.check(
       handResult.outcome,
       this.baseball.getStatus(),
       batter.speed,
+      staffBonuses.errorMult,
     );
     let situationalMessage = '';
     if (situational.transformed) {
@@ -1888,11 +2174,26 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    // ── Phase 1.75: Situational callout (T=pitcherDelay+batterTraitDelay+500) ──
+    // ── Phase 1.6: Staff effect callout (T=pitcherDelay+batterTraitDelay+500) ──
+    let staffDelay = 0;
+    if (staffBonuses.outcomeChanged && staffBonuses.messages.length > 0) {
+      staffDelay = 500;
+      this.time.delayedCall(pitcherDelay + batterTraitDelay + 500, () => {
+        this.handNameText.setText(`\u2b50 ${staffBonuses.messages[0].text}`);
+        this.handNameText.setColor(staffBonuses.messages[0].color);
+        this.tweens.add({
+          targets: this.handNameText,
+          alpha: { from: 0, to: 1 },
+          duration: 200,
+        });
+      });
+    }
+
+    // ── Phase 1.75: Situational callout (T=pitcherDelay+batterTraitDelay+staffDelay+500) ──
     let situationalDelay = 0;
     if (situationalMessage) {
       situationalDelay = 500;
-      this.time.delayedCall(pitcherDelay + batterTraitDelay + 500, () => {
+      this.time.delayedCall(pitcherDelay + batterTraitDelay + staffDelay + 500, () => {
         this.handNameText.setText(`\u26be ${situationalMessage}`);
         this.handNameText.setColor(situational.type === 'error' ? '#ffab40' : '#ff5252');
         this.tweens.add({
@@ -1904,15 +2205,20 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // ── Phase 2: Resolve outcome (defer base display until Phase 2.5) ──
-    const resolveStart = 900 + pitcherDelay + batterTraitDelay + situationalDelay;
+    const resolveStart = 900 + pitcherDelay + batterTraitDelay + staffDelay + situationalDelay;
     this._deferBaseUpdate = true;
 
     this.time.delayedCall(resolveStart, () => {
+      // Track max peanut hand this inning for pack triggers
+      if (handResult.score > this._maxPeanutsThisInning) {
+        this._maxPeanutsThisInning = handResult.score;
+      }
       const outcome = this.baseball.resolveOutcome(handResult.outcome, handResult.score, batter);
 
       let extraBase = { scored: 0, advanced: false };
-      if (handResult.extraBaseChance && !isOut && handResult.outcome === 'Single') {
-        extraBase = this.baseball.tryExtraBase(handResult.extraBaseChance);
+      const totalExtraBase = (handResult.extraBaseChance || 0) + staffBonuses.extraBaseBonus;
+      if (totalExtraBase > 0 && !isOut && handResult.outcome === 'Single') {
+        extraBase = this.baseball.tryExtraBase(totalExtraBase);
       }
 
       this._clearCards();
@@ -2002,7 +2308,7 @@ export default class GameScene extends Phaser.Scene {
 
       // ── Phase 3: Scoring Cascade for hits (after runners) ──
       this.handNameText.setText('');
-      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage);
+      const cascadeDelay = this._showScoringCascade(handResult, batterBonuses, pitcherPostPenalty, batterPostMessage, staffBonuses, lineupBonuses, synergyBonuses);
       const totalCascadeDelay = RUNNER_DELAY + cascadeDelay;
 
       // Score popup for runs (after cascade)
@@ -2032,29 +2338,29 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Show scoring cascade: base hand → power → contact → trait → pitcher → final */
-  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg) {
+  /** Show scoring cascade: base hand → power → contact → trait → pitcher → staff → lineup → synergy → final */
+  _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg, staffBonuses = null, lineupBonuses = null, synergyBonuses = null) {
     const steps = [];
     const stepDelay = 350;
-    let runningChips = handResult.chips - bonuses.powerChips + pitcherPenalty.chips;
+    let runningPeanuts = handResult.peanuts - bonuses.powerPeanuts + pitcherPenalty.peanuts;
     let runningMult = handResult.mult - bonuses.contactMult + pitcherPenalty.mult;
 
     // Ensure running values don't go below the base hand values
-    const baseChips = runningChips;
+    const basePeanuts = runningPeanuts;
     const baseMult = Math.round(runningMult * 10) / 10;
 
     // Step 1: Base hand
     steps.push({
-      text: `${handResult.handName} \u2192 ${baseChips} chip${baseChips !== 1 ? 's' : ''} x ${baseMult.toFixed(1)}`,
+      text: `${handResult.handName} \u2192 ${basePeanuts} peanut${basePeanuts !== 1 ? 's' : ''} x ${baseMult.toFixed(1)}`,
       color: '#ffd600',
     });
 
     // Step 2: Power bonus (if any)
-    if (bonuses.powerChips > 0) {
-      runningChips += bonuses.powerChips;
+    if (bonuses.powerPeanuts > 0) {
+      runningPeanuts += bonuses.powerPeanuts;
       const batter = this.rosterManager.getCurrentBatter();
       steps.push({
-        text: `+${bonuses.powerChips} chips (PWR ${batter.power})`,
+        text: `+${bonuses.powerPeanuts} peanuts (PWR ${batter.power})`,
         color: '#ff8a65',
       });
     }
@@ -2078,15 +2384,15 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Step 5: Pitcher penalty (if any)
-    if (pitcherPenalty.chips > 0 || pitcherPenalty.mult > 0) {
+    if (pitcherPenalty.peanuts > 0 || pitcherPenalty.mult > 0) {
       const parts = [];
       if (pitcherPenalty.mult > 0) {
         runningMult = Math.round((runningMult - pitcherPenalty.mult) * 10) / 10;
         parts.push(`-${pitcherPenalty.mult.toFixed(1)}x`);
       }
-      if (pitcherPenalty.chips > 0) {
-        runningChips -= pitcherPenalty.chips;
-        parts.push(`-${pitcherPenalty.chips} chips`);
+      if (pitcherPenalty.peanuts > 0) {
+        runningPeanuts -= pitcherPenalty.peanuts;
+        parts.push(`-${pitcherPenalty.peanuts} peanuts`);
       }
       steps.push({
         text: `${parts.join(' ')} (Pitcher)`,
@@ -2094,7 +2400,28 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    // Step 6: Final score
+    // Step 6: Staff bonuses (mascots & coaches)
+    if (staffBonuses && staffBonuses.messages.length > 0) {
+      for (const msg of staffBonuses.messages) {
+        steps.push({ text: msg.text, color: msg.color });
+      }
+    }
+
+    // Step 6b: Lineup bonuses (bonus players)
+    if (lineupBonuses && lineupBonuses.messages.length > 0) {
+      for (const msg of lineupBonuses.messages) {
+        steps.push({ text: msg.text, color: msg.color });
+      }
+    }
+
+    // Step 6c: Synergy bonuses
+    if (synergyBonuses && synergyBonuses.messages.length > 0) {
+      for (const msg of synergyBonuses.messages) {
+        steps.push({ text: msg.text, color: msg.color });
+      }
+    }
+
+    // Step 7: Final score
     steps.push({
       text: `= ${handResult.score}`,
       color: '#ffffff',
@@ -2145,11 +2472,11 @@ export default class GameScene extends Phaser.Scene {
     return steps.length * stepDelay + 350;
   }
 
-  /** Flash chip earnings below chip balance */
+  /** Flash peanut earnings below peanut balance */
   _showChipEarnings(amount) {
-    const chipBal = this.chipBalanceText;
-    const startY = chipBal.y + 18;
-    const popup = this.add.text(chipBal.x, startY, `+${amount}`, {
+    const peanutBal = this.peanutBalanceText;
+    const startY = peanutBal.y + 18;
+    const popup = this.add.text(peanutBal.x, startY, `+${amount}`, {
       fontSize: '20px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5, 0).setDepth(15).setAlpha(0);
 
@@ -2170,15 +2497,15 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Animate chip counter rolling from current to target value */
+  /** Animate peanut counter rolling from current to target value */
   _animateChipCounter(target) {
-    const current = this._displayedChips ?? target;
+    const current = this._displayedPeanuts ?? target;
     if (current === target) {
-      this.chipBalanceText.setText(`Chips: ${target}`);
-      this._displayedChips = target;
+      this.peanutBalanceText.setText(`Peanuts: ${target}`);
+      this._displayedPeanuts = target;
       return;
     }
-    this._displayedChips = target;
+    this._displayedPeanuts = target;
     const obj = { val: current };
     this.tweens.add({
       targets: obj,
@@ -2186,7 +2513,7 @@ export default class GameScene extends Phaser.Scene {
       duration: 500,
       ease: 'Quad.easeOut',
       onUpdate: () => {
-        this.chipBalanceText.setText(`Chips: ${Math.round(obj.val)}`);
+        this.peanutBalanceText.setText(`Peanuts: ${Math.round(obj.val)}`);
       },
     });
   }
@@ -2195,7 +2522,6 @@ export default class GameScene extends Phaser.Scene {
     // Discard all cards (at-bat is over)
     this.cardEngine.discardPile.push(...this.cardEngine.hand);
     this.cardEngine.hand = [];
-    this.cardEngine.discardsRemaining = this.cardEngine.deckConfig.discards;
 
     this.resultText.setText('SAC BUNT!');
     this.resultText.setColor('#ffab40');
@@ -2243,6 +2569,302 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  // ── Staff Effect Processor ─────────────────────────────────
+  // Data-driven: loops over active staff and applies effects by type.
+  // Returns { peanutBonus, multBonus, outcomeChanged, messages[] }
+
+  _applyStaffEffects(handResult, gameState) {
+    const staff = this.baseball.getStaff();
+    const bonuses = { peanutBonus: 0, multBonus: 0, outcomeChanged: false, messages: [], errorMult: 1, extraBaseBonus: 0 };
+    if (staff.length === 0) return bonuses;
+
+    for (const s of staff) {
+      if (!s.effect) continue;
+      const eff = s.effect;
+
+      switch (eff.type) {
+        // ── Mult bonuses (conditional) ──
+        case 'add_mult': {
+          let applies = true;
+          if (eff.condition) {
+            if (eff.condition.type === 'inning_range') {
+              applies = gameState.inning >= eff.condition.min && gameState.inning <= eff.condition.max;
+            } else if (eff.condition.type === 'bases_empty') {
+              applies = !gameState.bases.some(b => b);
+            }
+          }
+          if (applies) {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (${s.name})`, color: '#ffab40' });
+          }
+          break;
+        }
+
+        // ── Mult per run scored this inning ──
+        case 'mult_per_inning_run': {
+          const inningRuns = gameState.currentInningPlayerRuns || 0;
+          if (inningRuns > 0) {
+            const bonus = eff.value * inningRuns;
+            bonuses.multBonus += bonus;
+            bonuses.messages.push({ text: `+${bonus}x (${s.name}, ${inningRuns}R)`, color: '#ffab40' });
+          }
+          break;
+        }
+
+        // ── Chip bonuses ──
+        case 'flat_peanuts_per_ab': {
+          bonuses.peanutBonus += eff.value;
+          bonuses.messages.push({ text: `+${eff.value} peanuts (${s.name})`, color: '#ffd600' });
+          break;
+        }
+        case 'per_runner_peanuts': {
+          const runners = gameState.bases.filter(b => b).length;
+          if (runners > 0) {
+            const bonus = eff.value * runners;
+            bonuses.peanutBonus += bonus;
+            bonuses.messages.push({ text: `+${bonus} peanuts (${s.name}, ${runners} on)`, color: '#ffd600' });
+          }
+          break;
+        }
+
+        // ── Double peanuts (conditional) ──
+        case 'double_peanuts': {
+          let applies = false;
+          if (eff.condition && eff.condition.type === 'outcome_is') {
+            applies = handResult.outcome === eff.condition.value;
+          }
+          if (applies) {
+            bonuses.peanutBonus += handResult.peanuts;
+            bonuses.messages.push({ text: `x2 peanuts! (${s.name})`, color: '#ff6e40' });
+          }
+          break;
+        }
+
+        // ── Outcome transformations ──
+        case 'team_convert_high_card': {
+          if (handResult.handName === 'High Card' && handResult.outcome === 'Strikeout') {
+            handResult.outcome = 'Single';
+            handResult.peanuts = Math.max(handResult.peanuts, eff.peanuts || 1);
+            handResult.mult = Math.max(handResult.mult, eff.mult || 1);
+            handResult.score = Math.round(handResult.peanuts * handResult.mult);
+            bonuses.outcomeChanged = true;
+            bonuses.messages.push({ text: `High Card → Single! (${s.name})`, color: '#69f0ae' });
+          }
+          break;
+        }
+        case 'strikeout_to_walk': {
+          if (handResult.outcome === 'Strikeout' && Math.random() < eff.chance) {
+            handResult.outcome = 'Walk';
+            bonuses.outcomeChanged = true;
+            bonuses.messages.push({ text: `K → Walk! (${s.name})`, color: '#69f0ae' });
+          }
+          break;
+        }
+
+        // ── Error multiplier (passed to SituationalEngine) ──
+        case 'error_multiplier': {
+          bonuses.errorMult *= eff.value;
+          break;
+        }
+
+        // ── Extra base chance boost ──
+        case 'team_extra_base': {
+          bonuses.extraBaseBonus += eff.value;
+          break;
+        }
+
+        // ── Stat boosts (Batting Coach etc.) applied at batter level ──
+        case 'team_stat_boost':
+        // ── Effects handled at at-bat start ──
+        case 'team_add_discard':
+        case 'add_hand_draw':
+        // ── Effects handled elsewhere ──
+        case 'shop_extra_cards':
+        case 'unlock_staff_slot':
+        case 'pitcher_hit_reduction':
+        case 'pitcher_fatigue_delay':
+        case 'bonus_draw_on_discard':
+        case 'strikeout_redraw':
+        case 'ignore_pair_penalty':
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    // Apply peanut/mult bonuses to handResult
+    if (bonuses.peanutBonus > 0 || bonuses.multBonus > 0) {
+      handResult.peanuts += bonuses.peanutBonus;
+      handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
+    }
+
+    return bonuses;
+  }
+
+  // ── Bonus Player Lineup Effect Processor ──────────────
+  // Applies passive effects from bonus players in the lineup.
+  // Returns { peanutBonus, multBonus, messages[], extraBaseBonus, pairOutReduction, contactSaveBoost }
+
+  _applyLineupEffects(handResult, gameState) {
+    const effects = this.rosterManager.getActiveLineupEffects();
+    const bonuses = { peanutBonus: 0, multBonus: 0, messages: [], extraBaseBonus: 0, pairOutReduction: 0, contactSaveBoost: 0 };
+    if (effects.length === 0) return bonuses;
+
+    const isHit = !['Strikeout', 'Groundout', 'Flyout', 'Double Play', "Fielder's Choice"].includes(handResult.outcome);
+    const isXBH = ['Double', 'Triple', 'Home Run'].includes(handResult.outcome);
+
+    for (const eff of effects) {
+      switch (eff.type) {
+        case 'team_add_peanuts_on_xbh': {
+          if (isXBH) {
+            bonuses.peanutBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} peanut (XBH bonus)`, color: '#ffd600' });
+          }
+          break;
+        }
+        case 'team_pair_out_reduction': {
+          bonuses.pairOutReduction += eff.value;
+          break;
+        }
+        case 'team_extra_base_chance': {
+          bonuses.extraBaseBonus += eff.value;
+          break;
+        }
+        case 'team_power_mult': {
+          const batter = this.rosterManager.getCurrentBatter();
+          if (batter.power >= (eff.threshold || 8)) {
+            const bonus = Math.round((handResult.mult * eff.value - handResult.mult) * 10) / 10;
+            bonuses.multBonus += bonus;
+            bonuses.messages.push({ text: `x${eff.value} mult (PWR ${batter.power})`, color: '#ff8a65' });
+          }
+          break;
+        }
+        case 'team_add_mult_on_hit': {
+          if (isHit) {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (lineup bonus)`, color: '#ffab40' });
+          }
+          break;
+        }
+        case 'team_strikeout_peanuts': {
+          if (handResult.outcome === 'Strikeout') {
+            bonuses.peanutBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} peanuts (K bonus)`, color: '#ffd600' });
+          }
+          break;
+        }
+        case 'team_first_pitch_mult': {
+          if (this.discardCount === 0) {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (1st pitch)`, color: '#ffab40' });
+          }
+          break;
+        }
+        case 'team_runner_mult': {
+          const runners = gameState.bases.filter(b => b).length;
+          if (runners > 0) {
+            const bonus = eff.value * runners;
+            bonuses.multBonus += bonus;
+            bonuses.messages.push({ text: `+${bonus}x (${runners} on base)`, color: '#ffab40' });
+          }
+          break;
+        }
+        case 'team_late_inning_peanuts': {
+          if (gameState.inning >= 7) {
+            bonuses.peanutBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} peanuts (late inning)`, color: '#ffd600' });
+          }
+          break;
+        }
+        case 'team_contact_save_boost': {
+          bonuses.contactSaveBoost += eff.value;
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    // Apply peanut/mult bonuses
+    if (bonuses.peanutBonus > 0 || bonuses.multBonus > 0) {
+      handResult.peanuts += bonuses.peanutBonus;
+      handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
+    }
+
+    return bonuses;
+  }
+
+  // ── Synergy Effect Processor ──────────────────────────
+  // Applies bonuses from active lineup synergies.
+
+  _applySynergyEffects(handResult, gameState) {
+    const bonuses = { peanutBonus: 0, multBonus: 0, messages: [], extraBaseBonus: 0, pairOutReduction: 0 };
+    if (!this.activeSynergies || this.activeSynergies.length === 0) return bonuses;
+
+    const batter = this.rosterManager.getCurrentBatter();
+    const isHit = !['Strikeout', 'Groundout', 'Flyout', 'Double Play', "Fielder's Choice"].includes(handResult.outcome);
+
+    for (const syn of this.activeSynergies) {
+      const eff = syn.bonus;
+      switch (eff.type) {
+        case 'add_mult_all': {
+          bonuses.multBonus += eff.value;
+          bonuses.messages.push({ text: `+${eff.value}x (${syn.name})`, color: '#ce93d8' });
+          break;
+        }
+        case 'add_peanuts_all': {
+          bonuses.peanutBonus += eff.value;
+          bonuses.messages.push({ text: `+${eff.value} peanuts (${syn.name})`, color: '#ce93d8' });
+          break;
+        }
+        case 'add_mult_on_hr': {
+          if (handResult.outcome === 'Home Run') {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (${syn.name})`, color: '#ce93d8' });
+          }
+          break;
+        }
+        case 'add_mult_lefty': {
+          if (batter.bats === 'L') {
+            bonuses.multBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value}x (${syn.name})`, color: '#ce93d8' });
+          }
+          break;
+        }
+        case 'team_pair_out_reduction': {
+          bonuses.pairOutReduction += eff.value;
+          break;
+        }
+        case 'team_extra_base_chance': {
+          bonuses.extraBaseBonus += eff.value;
+          break;
+        }
+        case 'add_peanuts_on_xbh': {
+          if (['Triple', 'Home Run'].includes(handResult.outcome)) {
+            bonuses.peanutBonus += eff.value;
+            bonuses.messages.push({ text: `+${eff.value} peanuts (${syn.name})`, color: '#ce93d8' });
+          }
+          break;
+        }
+        // pitcher_control_reduction and pitcher_hit_reduction handled in PitchingScene
+        // bonus_player_stat_boost handled at at-bat start
+        default:
+          break;
+      }
+    }
+
+    if (bonuses.peanutBonus > 0 || bonuses.multBonus > 0) {
+      handResult.peanuts += bonuses.peanutBonus;
+      handResult.mult = Math.round((handResult.mult + bonuses.multBonus) * 10) / 10;
+      handResult.score = Math.round(handResult.peanuts * handResult.mult);
+    }
+
+    return bonuses;
+  }
+
   // Pitching methods moved to PitchingScene.js
 
   _goToShop() {
@@ -2256,6 +2878,20 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _goToPitching() {
+    // Check for card pack reward before pitching
+    const packTier = this._checkPackReward();
+    if (packTier) {
+      this.scene.start('PackOpenScene', {
+        tier: packTier,
+        rosterManager: this.rosterManager,
+        traitManager: this.traitManager,
+        baseball: this.baseball,
+        cardEngine: this.cardEngine,
+        gameLogEntries: this.gameLogEntries,
+      });
+      return;
+    }
+
     this.scene.start('PitchingScene', {
       rosterManager: this.rosterManager,
       baseball: this.baseball,
@@ -2263,6 +2899,19 @@ export default class GameScene extends Phaser.Scene {
       cardEngine: this.cardEngine,
       gameLogEntries: this.gameLogEntries,
     });
+  }
+
+  /** Check if batting performance earned a card pack. */
+  _checkPackReward() {
+    const canGetPack = this.rosterManager.bonusPlayerCount < 3;
+    if (!canGetPack) return null;
+
+    const runsThisInning = this.baseball.getStatus().currentInningPlayerRuns;
+    const hadBigHand = this._maxPeanutsThisInning >= 25;
+
+    if (runsThisInning >= 4 || hadBigHand) return 'gold';
+    if (runsThisInning >= 2) return 'bronze';
+    return null;
   }
 
   _showMidInningTransition() {

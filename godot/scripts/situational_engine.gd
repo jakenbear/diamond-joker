@@ -6,10 +6,10 @@ extends RefCounted
 # Also provides Wild Pitch and HBP checks.
 
 
-static func check(outcome: String, game_state: Dictionary, batter_speed: int) -> Dictionary:
+static func check(outcome: String, game_state: Dictionary, batter_speed: int, error_mult: float = 1.0) -> Dictionary:
 	# Error check on all outs
 	if outcome == "Groundout" or outcome == "Flyout":
-		var error_result: Dictionary = _check_error(outcome, game_state)
+		var error_result: Dictionary = _check_error(outcome, game_state, error_mult)
 		if not error_result.is_empty():
 			return error_result
 
@@ -93,10 +93,10 @@ static func _check_fielders_choice(_game_state: Dictionary) -> Dictionary:
 	return {}
 
 
-static func _check_error(outcome: String, game_state: Dictionary) -> Dictionary:
+static func _check_error(outcome: String, game_state: Dictionary, error_mult: float = 1.0) -> Dictionary:
 	var base_chance: float = 0.04
 	var late_inning_bonus: float = maxf(0.0, (game_state.get("inning", 1) - 6) * 0.01)
-	var error_chance: float = base_chance + late_inning_bonus
+	var error_chance: float = (base_chance + late_inning_bonus) * error_mult
 	if randf() < error_chance:
 		return {
 			"outcome": "Error",

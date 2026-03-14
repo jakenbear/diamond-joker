@@ -8,7 +8,7 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "heater",
 		"name": "Heater",
-		"description": "Low pairs auto-groundout. But triples+ get +2 chips.",
+		"description": "Low pairs auto-groundout. But triples+ get +2 peanuts.",
 		"rarity": "common",
 		"phase": "pitcher_post",
 		"effect": {
@@ -19,11 +19,11 @@ static var TRAITS: Array[Dictionary] = [
 					"new_hand_name": "Groundout (Heater!)",
 					"condition": {"type": "and", "conditions": [
 						{"type": "hand_is", "value": "Pair"},
-						{"type": "chips_lte", "value": 1},
+						{"type": "peanuts_lte", "value": 1},
 					]},
 				},
 				{
-					"type": "add_chips", "value": 2,
+					"type": "add_peanuts", "value": 2,
 					"condition": {"type": "hand_in", "values": ["Three of a Kind", "Four of a Kind", "Full House"]},
 				},
 			],
@@ -76,14 +76,14 @@ static var TRAITS: Array[Dictionary] = [
 	{
 		"id": "painted_corner",
 		"name": "Painted Corner",
-		"description": "High pairs/two pair get -1 chip.",
+		"description": "High pairs/two pair get -1 peanut.",
 		"rarity": "uncommon",
 		"phase": "pitcher_post",
 		"effect": {
-			"type": "add_chips", "value": -1,
+			"type": "add_peanuts", "value": -1,
 			"condition": {"type": "and", "conditions": [
 				{"type": "hand_in", "values": ["Pair", "Two Pair"]},
-				{"type": "chips_gte", "value": 3},
+				{"type": "peanuts_gte", "value": 3},
 			]},
 		},
 	},

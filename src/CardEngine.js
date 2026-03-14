@@ -8,6 +8,7 @@
 
 import HAND_TABLE from '../data/hand_table.js';
 import DECKS from '../data/decks.js';
+import BALANCE from '../data/balance.js';
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 
@@ -17,7 +18,6 @@ export default class CardEngine {
     this.deck = [];
     this.hand = [];
     this.discardPile = [];
-    this.discardsRemaining = this.deckConfig.discards;
     this.handSize = this.deckConfig.handSize;
     this._buildDeck();
     this.shuffle();
@@ -42,7 +42,6 @@ export default class CardEngine {
     this.shuffle();
     this.hand = [];
     this.discardPile = [];
-    this.discardsRemaining = this.deckConfig.discards;
   }
 
   /** Draw n cards from deck into hand */
@@ -55,9 +54,6 @@ export default class CardEngine {
 
   /** Discard selected cards (by index), draw replacements */
   discard(indices) {
-    if (this.discardsRemaining <= 0) return this.hand;
-    this.discardsRemaining--;
-
     // Sort descending so splicing doesn't shift indices
     const sorted = [...indices].sort((a, b) => b - a);
     for (const idx of sorted) {
@@ -100,7 +96,6 @@ export default class CardEngine {
     // All cards (played and unplayed) go to discard - at-bat is over
     this.discardPile.push(...this.hand);
     this.hand = [];
-    this.discardsRemaining = this.deckConfig.discards;
     return result;
   }
 
@@ -110,7 +105,6 @@ export default class CardEngine {
       this.resetDeck();
     }
     this.hand = [];
-    this.discardsRemaining = this.deckConfig.discards;
     this.draw(this.handSize);
     return this.hand;
   }
@@ -184,8 +178,8 @@ export default class CardEngine {
       // else stays Home Run (80%)
     }
 
-    // ── Rank-scaled quality for Pair, Two Pair, Three of a Kind ──
-    if (handIdx === 8 || handIdx === 7 || handIdx === 6) {
+    // ── Rank-scaled quality — out chances for Pair through Full House ──
+    if (handIdx >= 3 && handIdx <= 8) {
       const qualityResult = CardEngine._applyRankQuality(entry, pairRank, handIdx, strikeCount, gameState);
       if (qualityResult) {
         entry = qualityResult;
@@ -195,12 +189,12 @@ export default class CardEngine {
     // Add a readable description of what was played
     entry.playedDescription = CardEngine._describePlay(evalCards, entry.handName);
 
-    entry.score = Math.round(entry.chips * entry.mult);
+    entry.score = Math.round(entry.peanuts * entry.mult);
 
     // Apply post-modifier (trait cards that change the outcome)
     if (postModifier && gameState) {
       const modified = postModifier(entry, gameState);
-      modified.score = Math.round(modified.chips * modified.mult);
+      modified.score = Math.round(modified.peanuts * modified.mult);
       return modified;
     }
 
@@ -278,66 +272,71 @@ export default class CardEngine {
 
   /**
    * Apply rank-scaled quality rules.
-   * Low ranks (2-5) risk groundout/flyout, scaled by hand strength.
-   * High ranks (10-A) get bonus chips.
-   *   Pair:            ~40% out (60% groundout, 40% flyout)
-   *   Two Pair:        20% out (50/50 groundout/flyout)
-   *   Three of a Kind: 10% out (flyout)
+   * All hands below Full House have some out chance.
+   * Pair out formula: 0.95 - (rank-2)*0.03 + pairPenalty + twoStrikePenalty
+   *   Pair of 2s: 95% out, Pair of Aces: 59% out (before penalties)
+   *   Two Pair: 55% base out
+   *   Three of a Kind: 35% base out
+   *   Straight / Flush: 10% base out
+   * pairPenalty: +0.25 per pair/two-pair played this inning (stacks fast)
    */
   static _applyRankQuality(entry, pairRank, handIdx, strikeCount = 0, gameState = null) {
+    const bs = gameState?.baseballState;
+    const pairsPlayed = bs?.pairsPlayedThisInning || 0;
+    const tripsPlayed = bs?.tripsPlayedThisInning || 0;
+    const straightsPlayed = bs?.straightsPlayedThisInning || 0;
+    const flushesPlayed = bs?.flushesPlayedThisInning || 0;
+
+    let outChance = 0;
+
     if (handIdx === 8) {
-      const twoStrikePenalty = strikeCount >= 2 ? 0.10 : 0;
-      const pairsPlayed = gameState?.baseballState?.pairsPlayedThisInning || 0;
-      const pairPenalty = pairsPlayed * 0.15;
-      const outChance = Math.min(0.95, Math.max(0.05, 0.80 - (pairRank - 2) * 0.06 + twoStrikePenalty + pairPenalty));
-
-      // Increment the counter for next pair this inning
-      if (gameState?.baseballState) {
-        gameState.baseballState.pairsPlayedThisInning++;
-      }
-
-      if (Math.random() < outChance) {
-        const outType = Math.random() < 0.40 ? 'Flyout' : 'Groundout';
-        return {
-          handName: outType,
-          outcome: outType,
-          chips: 0,
-          mult: 1,
-          score: 0,
-          wasGroundout: true,
-          originalHand: entry.handName,
-          pairRank,
-        };
-      }
-      // Survived — high ranks still get bonus chips
-      if (pairRank >= 10) {
-        const bonus = pairRank - 9;
-        return { ...entry, chips: entry.chips + bonus };
-      }
-      return null;
+      // Pair
+      const twoStrikePenalty = strikeCount >= 2 ? BALANCE.twoStrikePenalty : 0;
+      const pairPenalty = pairsPlayed * BALANCE.pairDegradation;
+      outChance = BALANCE.pairOutBase - (pairRank - 2) * BALANCE.pairOutRankScale + twoStrikePenalty + pairPenalty;
+      if (bs) bs.pairsPlayedThisInning++;
+    } else if (handIdx === 7) {
+      // Two Pair
+      const pairPenalty = pairsPlayed * BALANCE.twoPairDegradation;
+      outChance = BALANCE.twoPairOutBase + pairPenalty;
+      if (bs) bs.pairsPlayedThisInning++;
+    } else if (handIdx === 6) {
+      // Three of a Kind
+      outChance = BALANCE.tripsOutBase + tripsPlayed * BALANCE.tripsDegradation;
+      if (bs) bs.tripsPlayedThisInning++;
+    } else if (handIdx === 5) {
+      // Straight
+      outChance = BALANCE.straightOutBase + straightsPlayed * BALANCE.straightDegradation;
+      if (bs) bs.straightsPlayedThisInning++;
+    } else if (handIdx === 4) {
+      // Flush
+      outChance = BALANCE.flushOutBase + flushesPlayed * BALANCE.flushDegradation;
+      if (bs) bs.flushesPlayedThisInning++;
+    } else if (handIdx === 3) {
+      // Full House
+      outChance = BALANCE.fullHouseOutBase;
     }
 
-    // Two Pair / Three of a Kind: keep existing low-rank penalties only
-    if (pairRank >= 2 && pairRank <= 5) {
-      const outChance = handIdx === 7 ? 0.2 : 0.1;
-      if (Math.random() < outChance) {
-        const outType = handIdx === 6 ? 'Flyout' : (Math.random() < 0.50 ? 'Flyout' : 'Groundout');
-        return {
-          handName: outType,
-          outcome: outType,
-          chips: 0,
-          mult: 1,
-          score: 0,
-          wasGroundout: true,
-          originalHand: entry.handName,
-        };
-      }
+    outChance = Math.min(BALANCE.outMax, Math.max(BALANCE.outMin, outChance));
+
+    if (Math.random() < outChance) {
+      const outType = Math.random() < 0.40 ? 'Flyout' : 'Groundout';
+      return {
+        handName: outType,
+        outcome: outType,
+        peanuts: 0,
+        mult: 1,
+        score: 0,
+        wasGroundout: true,
+        originalHand: entry.handName,
+        pairRank,
+      };
     }
 
-    // High rank: 10-14 → Bonus chips (Two Pair / Three of a Kind)
-    if (pairRank >= 10) {
+    // Survived — high pair ranks get bonus peanuts (Pair, Two Pair, Three of a Kind only)
+    if (pairRank >= 10 && handIdx >= 6) {
       const bonus = pairRank - 9;
-      return { ...entry, chips: entry.chips + bonus };
+      return { ...entry, peanuts: entry.peanuts + bonus };
     }
 
     return null;
