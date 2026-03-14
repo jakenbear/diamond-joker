@@ -490,6 +490,50 @@ No duplicate traits offered (already-owned traits excluded).
 
 ---
 
+## Pitching Showdown (Hold'em Style)
+
+When the opponent bats, each at-bat is a **Texas Hold'em-style poker showdown** between your pitcher and the opposing batter.
+
+### Setup
+- Pitcher gets 2 hole cards from a velocity-scaled deck (higher velocity = higher rank cards)
+- Batter gets 2 hidden hole cards from a contact/power-scaled deck
+- Player sees their hole cards and the batter's stats
+
+### Three Stages
+1. **Flop** — 3 community cards revealed. Player picks a pitch ability.
+2. **Turn** — 4th community card. Player picks another pitch ability.
+3. **River** — 5th community card. Player picks final pitch ability.
+
+Each pitch in the pitcher's 4-pitch repertoire is a **board manipulation ability** (one use per at-bat):
+
+| Pitch | Effect |
+|-------|--------|
+| Fastball | Swap hole card from top 30% of deck |
+| Breaking Ball | Flip community card face-down |
+| Changeup | Peek at batter hole card |
+| Slider | Replace a community card |
+| Cutter | Lock a card (immune to effects) |
+| Curveball | Downgrade batter's best card -2 rank (control check) |
+| Sinker | All community cards -1 rank |
+| Splitter | Destroy a community card |
+| Two-Seam | Shift a card's suit to match majority |
+| Knuckleball | Randomize a community card |
+| Screwball | Replace a batter hole card |
+| Palmball | Hide next community card from batter |
+
+### Resolution
+Best 5-card hand from each side (2 hole + 5 community). Winner determined by hand score:
+- **Pitcher wins** → Out (Strikeout / Flyout / Groundout based on margin)
+- **Batter wins** → Hit (Single / Double / Triple / HR based on margin)
+- **Tie** → Groundout (pitcher favored)
+
+### Pitcher Stats
+- **Velocity** → Deck quality (higher ranks)
+- **Control** → Pitch effect accuracy
+- **Stamina** → Deck degrades across at-bats (top cards removed)
+
+---
+
 ## Balancing Levers
 
 Key parameters to tune:
