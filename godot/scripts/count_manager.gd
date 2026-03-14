@@ -31,11 +31,11 @@ func record_discard(pitcher_velocity: int, pitcher_control: int, batter_contact:
 		"is_strikeout": false, "is_walk": false,
 	}
 
-	var base_strike_chance: float = 0.40 \
-		+ (pitcher_velocity - 5) * 0.02 \
-		+ (pitcher_control - 5) * 0.02 \
-		- (batter_contact - 5) * 0.03
-	base_strike_chance = clampf(base_strike_chance, 0.15, 0.65)
+	var base_strike_chance: float = Balance.BASE_STRIKE_CHANCE \
+		+ (pitcher_velocity - 5) * Balance.STRIKE_VELOCITY_SCALE \
+		+ (pitcher_control - 5) * Balance.STRIKE_CONTROL_SCALE \
+		- (batter_contact - 5) * Balance.STRIKE_CONTACT_SCALE
+	base_strike_chance = clampf(base_strike_chance, Balance.STRIKE_MIN, Balance.STRIKE_MAX)
 
 	if strikes < 2:
 		if randf() < base_strike_chance:
@@ -47,7 +47,7 @@ func record_discard(pitcher_velocity: int, pitcher_control: int, batter_contact:
 			if balls >= 4:
 				result["is_walk"] = true
 	else:
-		var foul_chance: float = batter_contact * 0.04
+		var foul_chance: float = batter_contact * Balance.FOUL_CONTACT_SCALE
 		var remaining: float = 1.0 - foul_chance
 		var strike_chance: float = remaining * base_strike_chance
 		var roll: float = randf()

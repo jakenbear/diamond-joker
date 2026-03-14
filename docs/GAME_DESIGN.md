@@ -89,7 +89,7 @@ When the deck runs low, the discard pile is reshuffled back in.
 
 ### Rank Quality — Every Hand Is a Gamble
 
-All hands below Full House have an out chance. Only Full House, Four of a Kind, Straight Flush, and Royal Flush are guaranteed hits.
+All hands below Four of a Kind have an out chance. Only Four of a Kind, Straight Flush, and Royal Flush are guaranteed hits. All tuning values live in `data/balance.js`.
 
 **Pair out chance:**
 ```
@@ -108,10 +108,11 @@ outChance = 0.95 - (pairRank - 2) × 0.03 + twoStrikePenalty + pairPenalty
 - Two-strike penalty: +10%
 - Face card pairs (10+): bonus peanuts = pairRank - 9
 
-**Two Pair:** 55% base out chance. Pair penalty stacks at half rate (+12%/pair).
-**Three of a Kind:** 35% base out chance.
-**Straight / Flush:** 10% base out chance (small upset).
-**Full House+:** 0% out chance (guaranteed hits — reward for building strong hands).
+**Two Pair:** 65% base out chance. Pair penalty stacks at half rate (+12%/pair).
+**Three of a Kind:** 45% base out chance.
+**Straight / Flush:** 20% base out chance.
+**Full House:** 15% base out chance.
+**Four of a Kind+:** 0% out chance (guaranteed hits — reward for building strong hands).
 
 ### "Pitcher Adjusts" — Universal Hand Degradation
 
@@ -162,11 +163,11 @@ The ball-strike count IS the discard system. There is no hard discard limit — 
 **Before 2 strikes** — two outcomes (STRIKE or BALL):
 
 ```
-strikeChance = 0.40
+strikeChance = 0.55
   + (pitcherVelocity - 5) × 0.02     // high-velo pitchers throw more strikes
   + (pitcherControl - 5) × 0.02      // high-control pitchers hit the zone
   - (batterContact - 5) × 0.03       // high-contact batters lay off bad pitches
-strikeChance = clamp(strikeChance, 0.15, 0.65)
+strikeChance = clamp(strikeChance, 0.25, 0.75)
 ballChance = 1.0 - strikeChance
 ```
 

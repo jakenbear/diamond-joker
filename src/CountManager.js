@@ -8,6 +8,8 @@
  * 3 strikes = strikeout (at-bat over). 4 balls = walk.
  */
 
+import BALANCE from '../data/balance.js';
+
 const COUNT_MODIFIERS = {
   '3-0': { peanutsMod: 2, multMod: 1.0 },
   '2-0': { peanutsMod: 1, multMod: 0.5 },
@@ -41,11 +43,11 @@ export default class CountManager {
   recordDiscard(pitcherVelocity, pitcherControl, batterContact) {
     const result = { isStrike: false, isBall: false, isFoul: false, isStrikeout: false, isWalk: false };
 
-    let baseStrikeChance = 0.40
-      + (pitcherVelocity - 5) * 0.02
-      + (pitcherControl - 5) * 0.02
-      - (batterContact - 5) * 0.03;
-    baseStrikeChance = Math.max(0.15, Math.min(0.65, baseStrikeChance));
+    let baseStrikeChance = BALANCE.baseStrikeChance
+      + (pitcherVelocity - 5) * BALANCE.strikeVelocityScale
+      + (pitcherControl - 5) * BALANCE.strikeControlScale
+      - (batterContact - 5) * BALANCE.strikeContactScale;
+    baseStrikeChance = Math.max(BALANCE.strikeMin, Math.min(BALANCE.strikeMax, baseStrikeChance));
 
     if (this.strikes < 2) {
       if (Math.random() < baseStrikeChance) {
@@ -59,7 +61,7 @@ export default class CountManager {
         }
       }
     } else {
-      const foulChance = batterContact * 0.04;
+      const foulChance = batterContact * BALANCE.foulContactScale;
       const remaining = 1.0 - foulChance;
       const strikeChance = remaining * baseStrikeChance;
 

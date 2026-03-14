@@ -228,10 +228,10 @@ group('1b. Rank Quality (statistical, N=1000)');
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const rate = outs / N;
-  assertClose(rate, 0.45, 0.65, `Two Pair out rate ~55%`);
+  assertClose(rate, 0.55, 0.75, `Two Pair out rate ~65%`);
 }
 {
-  // Low Three of a Kind: ~10% flyout rate (unchanged)
+  // Low Three of a Kind: ~18% flyout rate (45% out * 40% flyout)
   let flyouts = 0;
   const N = 1000;
   for (let i = 0; i < N; i++) {
@@ -240,7 +240,7 @@ group('1b. Rank Quality (statistical, N=1000)');
     if (r.handName === 'Flyout') flyouts++;
   }
   const rate = flyouts / N;
-  assertClose(rate, 0.03, 0.18, `Low Three of a Kind flyout rate ~10%`);
+  assertClose(rate, 0.10, 0.26, `Low Three of a Kind flyout rate ~18%`);
 }
 {
   // High pair bonus peanuts still apply when pair survives out check
@@ -1640,9 +1640,9 @@ group('Count System: recordDiscard');
     if (result.isBall) totalBalls++;
   }
   const ballRate = totalBalls / N;
-  // strikeChance = 0.40 + (3-5)*0.02 + (3-5)*0.02 - (7-5)*0.03 = 0.40-0.04-0.04-0.06 = 0.26
-  // ballRate ~0.74
-  assertClose(ballRate, 0.60, 0.88, `Weak pitcher ball rate ~74%`);
+  // strikeChance = 0.55 + (3-5)*0.02 + (3-5)*0.02 - (7-5)*0.03 = 0.55-0.04-0.04-0.06 = 0.41
+  // ballRate ~0.59
+  assertClose(ballRate, 0.45, 0.73, `Weak pitcher ball rate ~59%`);
 }
 {
   // Walk detection: force 4 balls
@@ -2235,7 +2235,7 @@ console.log('\n── Universal Pitcher Reads: Straights/Flushes/Trips degrade �
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const outRate = outs / trials;
-  assertClose(outRate, 0.38, 0.62, `3rd straight out rate ~50%: ${(outRate*100).toFixed(1)}%`);
+  assertClose(outRate, 0.48, 0.72, `3rd straight out rate ~60%: ${(outRate*100).toFixed(1)}%`);
 }
 
 {
@@ -2254,7 +2254,7 @@ console.log('\n── Universal Pitcher Reads: Straights/Flushes/Trips degrade �
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const outRate = outs / trials;
-  assertClose(outRate, 0.38, 0.62, `3rd flush out rate ~50%: ${(outRate*100).toFixed(1)}%`);
+  assertClose(outRate, 0.48, 0.72, `3rd flush out rate ~60%: ${(outRate*100).toFixed(1)}%`);
 }
 
 {
@@ -2270,7 +2270,7 @@ console.log('\n── Universal Pitcher Reads: Straights/Flushes/Trips degrade �
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const outRate = outs / trials;
-  assertClose(outRate, 0.53, 0.77, `3rd trips out rate ~65%: ${(outRate*100).toFixed(1)}%`);
+  assertClose(outRate, 0.63, 0.87, `3rd trips out rate ~75%: ${(outRate*100).toFixed(1)}%`);
 }
 
 {
@@ -2869,7 +2869,8 @@ group('10a. CountManager — New Pitch Formula');
     const r = cm5.recordDiscard(9, 8, 5);
     if (r.isStrike) highPitcherStrikes++;
   }
-  assertClose(highPitcherStrikes, 700, 1400, `Elite pitcher strike rate (${highPitcherStrikes}/${N})`);
+  // strikeChance = 0.55 + 0.08 + 0.06 = 0.69
+  assertClose(highPitcherStrikes, 1200, 1500, `Elite pitcher strike rate (${highPitcherStrikes}/${N})`);
 
   // Test: high contact batter gets more balls
   let highContactBalls = 0;
@@ -2878,16 +2879,17 @@ group('10a. CountManager — New Pitch Formula');
     const r = cm6.recordDiscard(5, 5, 9);
     if (r.isBall) highContactBalls++;
   }
-  assertClose(highContactBalls, 1100, 1700, `High contact ball rate (${highContactBalls}/${N})`);
+  // strikeChance = 0.55 - 0.12 = 0.43, ballRate ~0.57
+  assertClose(highContactBalls, 900, 1300, `High contact ball rate (${highContactBalls}/${N})`);
 
-  // Test: strike chance clamped between 0.15 and 0.65
+  // Test: strike chance clamped between 0.25 and 0.75
   let extremeLowStrikes = 0;
   for (let i = 0; i < N; i++) {
     const cm7 = new CountManager();
     const r = cm7.recordDiscard(1, 1, 10);
     if (r.isStrike) extremeLowStrikes++;
   }
-  assertClose(extremeLowStrikes, 200, 500, `Min clamp strike rate (${extremeLowStrikes}/${N})`);
+  assertClose(extremeLowStrikes, 400, 600, `Min clamp strike rate (${extremeLowStrikes}/${N})`);
 }
 
 group('10b. CountManager — Strikeout & Walk Detection');

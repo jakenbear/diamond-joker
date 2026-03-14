@@ -170,7 +170,7 @@ static func evaluate_hand(cards: Array[Dictionary], pre_modifier: Callable = Cal
 		# else stays Home Run (80%)
 
 	# Rank-scaled quality for Pair, Two Pair, Three of a Kind
-	if hand_idx >= 4 and hand_idx <= 8:
+	if hand_idx >= 3 and hand_idx <= 8:
 		var quality_result: Dictionary = _apply_rank_quality(entry, pair_rank, hand_idx, strike_count, game_state)
 		if not quality_result.is_empty():
 			entry = quality_result
@@ -262,35 +262,38 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 	var out_chance: float = 0.0
 
 	if hand_idx == 8:
-		# Pair: 0.95 - (rank-2)*0.03 + penalties
-		var two_strike_penalty: float = 0.10 if strike_count >= 2 else 0.0
-		var pair_penalty: float = pairs_played * 0.25
-		out_chance = 0.95 - (pair_rank - 2) * 0.03 + two_strike_penalty + pair_penalty
+		# Pair
+		var two_strike_penalty: float = Balance.TWO_STRIKE_PENALTY if strike_count >= 2 else 0.0
+		var pair_penalty: float = pairs_played * Balance.PAIR_DEGRADATION
+		out_chance = Balance.PAIR_OUT_BASE - (pair_rank - 2) * Balance.PAIR_OUT_RANK_SCALE + two_strike_penalty + pair_penalty
 		if bs:
 			bs.pairs_played_this_inning += 1
 	elif hand_idx == 7:
-		# Two Pair: 55% base + stacking penalty
-		var pair_penalty: float = pairs_played * 0.12
-		out_chance = 0.55 + pair_penalty
+		# Two Pair
+		var pair_penalty: float = pairs_played * Balance.TWO_PAIR_DEGRADATION
+		out_chance = Balance.TWO_PAIR_OUT_BASE + pair_penalty
 		if bs:
 			bs.pairs_played_this_inning += 1
 	elif hand_idx == 6:
-		# Three of a Kind: 35% + stacking penalty
-		out_chance = 0.35 + trips_played * 0.15
+		# Three of a Kind
+		out_chance = Balance.TRIPS_OUT_BASE + trips_played * Balance.TRIPS_DEGRADATION
 		if bs:
 			bs.trips_played_this_inning += 1
 	elif hand_idx == 5:
-		# Straight: 10% + stacking penalty
-		out_chance = 0.10 + straights_played * 0.20
+		# Straight
+		out_chance = Balance.STRAIGHT_OUT_BASE + straights_played * Balance.STRAIGHT_DEGRADATION
 		if bs:
 			bs.straights_played_this_inning += 1
 	elif hand_idx == 4:
-		# Flush: 10% + stacking penalty
-		out_chance = 0.10 + flushes_played * 0.20
+		# Flush
+		out_chance = Balance.FLUSH_OUT_BASE + flushes_played * Balance.FLUSH_DEGRADATION
 		if bs:
 			bs.flushes_played_this_inning += 1
+	elif hand_idx == 3:
+		# Full House
+		out_chance = Balance.FULL_HOUSE_OUT_BASE
 
-	out_chance = minf(0.95, maxf(0.05, out_chance))
+	out_chance = minf(Balance.OUT_MAX, maxf(Balance.OUT_MIN, out_chance))
 
 	if randf() < out_chance:
 		var out_type: String = "Flyout" if randf() < 0.40 else "Groundout"

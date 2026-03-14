@@ -8,6 +8,7 @@
 
 import HAND_TABLE from '../data/hand_table.js';
 import DECKS from '../data/decks.js';
+import BALANCE from '../data/balance.js';
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 
@@ -177,8 +178,8 @@ export default class CardEngine {
       // else stays Home Run (80%)
     }
 
-    // ── Rank-scaled quality — out chances for Pair through Flush ──
-    if (handIdx >= 4 && handIdx <= 8) {
+    // ── Rank-scaled quality — out chances for Pair through Full House ──
+    if (handIdx >= 3 && handIdx <= 8) {
       const qualityResult = CardEngine._applyRankQuality(entry, pairRank, handIdx, strikeCount, gameState);
       if (qualityResult) {
         entry = qualityResult;
@@ -290,30 +291,33 @@ export default class CardEngine {
 
     if (handIdx === 8) {
       // Pair
-      const twoStrikePenalty = strikeCount >= 2 ? 0.10 : 0;
-      const pairPenalty = pairsPlayed * 0.25;
-      outChance = 0.95 - (pairRank - 2) * 0.03 + twoStrikePenalty + pairPenalty;
+      const twoStrikePenalty = strikeCount >= 2 ? BALANCE.twoStrikePenalty : 0;
+      const pairPenalty = pairsPlayed * BALANCE.pairDegradation;
+      outChance = BALANCE.pairOutBase - (pairRank - 2) * BALANCE.pairOutRankScale + twoStrikePenalty + pairPenalty;
       if (bs) bs.pairsPlayedThisInning++;
     } else if (handIdx === 7) {
       // Two Pair
-      const pairPenalty = pairsPlayed * 0.12;
-      outChance = 0.55 + pairPenalty;
+      const pairPenalty = pairsPlayed * BALANCE.twoPairDegradation;
+      outChance = BALANCE.twoPairOutBase + pairPenalty;
       if (bs) bs.pairsPlayedThisInning++;
     } else if (handIdx === 6) {
       // Three of a Kind
-      outChance = 0.35 + tripsPlayed * 0.15;
+      outChance = BALANCE.tripsOutBase + tripsPlayed * BALANCE.tripsDegradation;
       if (bs) bs.tripsPlayedThisInning++;
     } else if (handIdx === 5) {
       // Straight
-      outChance = 0.10 + straightsPlayed * 0.20;
+      outChance = BALANCE.straightOutBase + straightsPlayed * BALANCE.straightDegradation;
       if (bs) bs.straightsPlayedThisInning++;
     } else if (handIdx === 4) {
       // Flush
-      outChance = 0.10 + flushesPlayed * 0.20;
+      outChance = BALANCE.flushOutBase + flushesPlayed * BALANCE.flushDegradation;
       if (bs) bs.flushesPlayedThisInning++;
+    } else if (handIdx === 3) {
+      // Full House
+      outChance = BALANCE.fullHouseOutBase;
     }
 
-    outChance = Math.min(0.95, Math.max(0.05, outChance));
+    outChance = Math.min(BALANCE.outMax, Math.max(BALANCE.outMin, outChance));
 
     if (Math.random() < outChance) {
       const outType = Math.random() < 0.40 ? 'Flyout' : 'Groundout';
