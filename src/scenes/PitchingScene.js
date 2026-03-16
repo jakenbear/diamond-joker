@@ -217,15 +217,16 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Result Display ──────────────────────────────────────
 
   _createResultDisplay() {
-    this.resultText = this.add.text(640, 345, '', {
-      fontSize: '20px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
-      align: 'center', wordWrap: { width: 600 },
-    }).setOrigin(0.5).setDepth(10);
+    // Pinned left, near the staff box
+    this.resultText = this.add.text(15, 440, '', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      align: 'left', wordWrap: { width: 210 },
+    }).setOrigin(0, 0).setDepth(10);
 
-    this.handNameText = this.add.text(640, 370, '', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#81c784',
-      align: 'center', wordWrap: { width: 600 },
-    }).setOrigin(0.5).setDepth(10);
+    this.handNameText = this.add.text(15, 470, '', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#81c784',
+      align: 'left', wordWrap: { width: 210 },
+    }).setOrigin(0, 0).setDepth(10);
   }
 
   // ── Staff Card Stack (bottom-left, replaces game log) ──
