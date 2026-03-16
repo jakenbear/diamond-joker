@@ -318,6 +318,45 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 	return {}
 
 
+## Returns the success chance (0–100) for a hand, without rolling.
+## Used by the UI to show "Pair of Kings (62%)" style previews.
+static func get_success_chance(hand_name: String, pair_rank: int = 0, strike_count: int = 0, game_state: Dictionary = {}) -> int:
+	var hand_names: Array[String] = [
+		"Royal Flush", "Straight Flush", "Four of a Kind", "Full House",
+		"Flush", "Straight", "Three of a Kind", "Two Pair", "Pair", "High Card",
+	]
+	var hand_idx: int = hand_names.find(hand_name)
+	if hand_idx < 0 or hand_idx < 3:
+		return 100
+
+	var bs: Dictionary = game_state.get("baseball_state", {})
+	var pairs_played: int = bs.get("pairs_played_this_inning", 0)
+	var trips_played: int = bs.get("trips_played_this_inning", 0)
+	var straights_played: int = bs.get("straights_played_this_inning", 0)
+	var flushes_played: int = bs.get("flushes_played_this_inning", 0)
+
+	var out_chance: float = 0.0
+	if hand_idx == 8:
+		var two_strike_penalty: float = Balance.TWO_STRIKE_PENALTY if strike_count >= 2 else 0.0
+		var pair_penalty: float = pairs_played * Balance.PAIR_DEGRADATION
+		out_chance = Balance.PAIR_OUT_BASE - (pair_rank - 2) * Balance.PAIR_OUT_RANK_SCALE + two_strike_penalty + pair_penalty
+	elif hand_idx == 7:
+		out_chance = Balance.TWO_PAIR_OUT_BASE + pairs_played * Balance.TWO_PAIR_DEGRADATION
+	elif hand_idx == 6:
+		out_chance = Balance.TRIPS_OUT_BASE + trips_played * Balance.TRIPS_DEGRADATION
+	elif hand_idx == 5:
+		out_chance = Balance.STRAIGHT_OUT_BASE + straights_played * Balance.STRAIGHT_DEGRADATION
+	elif hand_idx == 4:
+		out_chance = Balance.FLUSH_OUT_BASE + flushes_played * Balance.FLUSH_DEGRADATION
+	elif hand_idx == 3:
+		out_chance = Balance.FULL_HOUSE_OUT_BASE
+	else:
+		return 0
+
+	out_chance = clampf(out_chance, Balance.OUT_MIN, Balance.OUT_MAX)
+	return roundi((1.0 - out_chance) * 100)
+
+
 static func _is_straight(sorted_ranks: Array[int]) -> bool:
 	if sorted_ranks.size() != 5:
 		return false

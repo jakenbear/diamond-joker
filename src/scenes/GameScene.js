@@ -1328,67 +1328,51 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Preview with snapshot so we don't increment the real counter
-    const previewState = { baseballState: { pairsPlayedThisInning: this.baseball.pairsPlayedThisInning } };
+    const previewState = { baseballState: {
+      pairsPlayedThisInning: this.baseball.pairsPlayedThisInning,
+      tripsPlayedThisInning: this.baseball.tripsPlayedThisInning,
+      straightsPlayedThisInning: this.baseball.straightsPlayedThisInning,
+      flushesPlayedThisInning: this.baseball.flushesPlayedThisInning,
+    } };
     const result = CardEngine.evaluateHand(cards, null, null, previewState);
-    const handName = result.handName;
     const n = cards.length;
+
+    // Resolve the true hand name (Groundout/Flyout → original hand)
+    const trueHand = result.originalHand || result.handName;
+    const pairRank = result.pairRank || 0;
+    const isHighCard = trueHand === 'High Card' || trueHand === 'Strikeout';
+
+    // Get success percentage from balance system
+    const successPct = isHighCard ? 0 : CardEngine.getSuccessChance(trueHand, pairRank, 0, previewState);
 
     let preview = '';
     let color = '#ffd600';
-    // Definite outs vs risky hands (Groundout/Flyout from low pair still has a chance)
-    const isDefiniteOut = handName === 'High Card' || handName === 'Strikeout';
-    const isRiskyOut = handName === 'Groundout' || handName === 'Flyout';
 
-    if (handName === 'High Card' || handName === 'Strikeout') {
+    if (isHighCard) {
       if (n < 5) {
-        // Check if they're building toward something
         const hint = this._getHandHint(cards);
-        preview = hint || 'High Card (Strikeout)';
+        preview = hint || 'High Card — Strikeout';
         color = hint ? '#ffe082' : '#ff8a80';
       } else {
-        preview = 'High Card (Strikeout)';
+        preview = 'High Card — Strikeout';
         color = '#ff8a80';
       }
-    } else if (handName === 'Groundout' || handName === 'Flyout') {
-      // Preview got a random groundout/flyout roll — show the real hand with risk warning
-      const realHand = result.originalHand || handName;
-      preview = `${realHand} (risky — could be ${handName})`;
-      color = '#ffe082';
-      // Add pitcher adjusts warning if applicable
-      if (realHand === 'Pair' && this.baseball.pairsPlayedThisInning > 0) {
-        const count = this.baseball.pairsPlayedThisInning;
-        if (count >= 2) {
-          preview = `${realHand} (Pitcher has your number!)`;
-          color = '#ff5252';
-        } else {
-          preview += ' — Pitcher adjusting...';
-          color = '#ff8a65';
-        }
-      }
-    } else {
-      const desc = result.playedDescription || handName;
+    } else if (successPct >= 100) {
+      // Guaranteed hands (Four of a Kind+)
+      const desc = result.playedDescription || trueHand;
       preview = `${desc} \u2192 ${result.outcome}`;
-      // Color by hand strength
-      const strength = ['Royal Flush','Straight Flush','Four of a Kind','Full House','Flush','Straight','Three of a Kind','Two Pair','Pair'];
-      const idx = strength.indexOf(handName);
-      if (idx <= 2) color = '#ff6e40';     // orange-red for big hands
-      else if (idx <= 5) color = '#ffd600'; // gold
-      else color = '#81c784';               // green for small hands
-    }
+      color = '#ff6e40';
+    } else {
+      // Hands with out chance — show percentage
+      const desc = result.playedDescription || trueHand;
+      const outcome = HAND_TABLE.find(h => h.handName === trueHand)?.outcome || result.outcome;
+      preview = `${desc} \u2192 ${outcome}  (${successPct}%)`;
 
-    // Pitcher adjusts warning for pairs
-    if (handName === 'Pair' && this.baseball.pairsPlayedThisInning > 0) {
-      const count = this.baseball.pairsPlayedThisInning;
-      if (count === 1) {
-        preview += ' (Pitcher adjusting...)';
-        color = '#ffe082'; // yellow
-      } else if (count === 2) {
-        preview += ' (Pitcher has your number!)';
-        color = '#ff8a65'; // orange
-      } else {
-        preview += " (You're cooked!)";
-        color = '#ff5252'; // red
-      }
+      // Color by success chance
+      if (successPct >= 70) color = '#69f0ae';      // green — safe
+      else if (successPct >= 40) color = '#ffd600';  // gold — risky
+      else if (successPct >= 20) color = '#ff8a65';  // orange — dangerous
+      else color = '#ff5252';                         // red — near-certain out
     }
 
     this.handPreviewText.setText(preview);
@@ -1397,17 +1381,14 @@ export default class GameScene extends Phaser.Scene {
 
     // Live peanuts x mult display
     let scorePreview = '';
-    if (isDefiniteOut) {
+    if (isHighCard) {
       scorePreview = 'OUT';
       this.scorePreviewText.setColor('#ff5252');
-    } else if (isRiskyOut || result.peanuts > 0) {
-      // For risky outs (low pair Groundout/Flyout), look up the original hand's peanuts/mult
-      let basePeanuts = result.peanuts;
-      let baseMult = result.mult;
-      if (isRiskyOut && result.originalHand) {
-        const entry = HAND_TABLE.find(h => h.handName === result.originalHand);
-        if (entry) { basePeanuts = entry.peanuts; baseMult = entry.mult; }
-      }
+    } else {
+      const entry = HAND_TABLE.find(h => h.handName === trueHand);
+      const basePeanuts = entry ? entry.peanuts : result.peanuts;
+      const baseMult = entry ? entry.mult : result.mult;
+
       const batter = this.rosterManager.getCurrentBatter();
       const powerBonus = Math.max(0, batter.power - 5);
       const contactBonus = batter.contact / 10;
@@ -1417,15 +1398,14 @@ export default class GameScene extends Phaser.Scene {
 
       const peanutsStr = Number.isInteger(totalPeanuts) ? totalPeanuts : totalPeanuts.toFixed(1);
       const multStr = Number.isInteger(totalMult) ? totalMult : totalMult.toFixed(1);
-      scorePreview = `${peanutsStr} peanuts x ${multStr} mult = ${total}`;
-      if (isRiskyOut) scorePreview += ' (if hit)';
+      scorePreview = `${peanutsStr} \u{1F95C} x ${multStr} = ${total}`;
 
       const tags = [];
       if (powerBonus > 0) tags.push(`+${powerBonus} PWR`);
       if (contactBonus > 0) tags.push(`+${contactBonus.toFixed(1)} CNT`);
       if (tags.length > 0) scorePreview += `  ${tags.join(' ')}`;
 
-      this.scorePreviewText.setColor('#aaaaaa');
+      this.scorePreviewText.setColor(successPct < 100 ? '#b0bec5' : '#aaaaaa');
     }
     this.scorePreviewText.setText(scorePreview);
     this.scorePreviewText.setAlpha(scorePreview ? 1 : 0);

@@ -127,10 +127,10 @@ The more you play the same hand type in a single inning, the worse it gets. The 
 
 Capped at 95% max out chance. Resets each half-inning.
 
-**Visual warnings** appear on the hand description:
-- 2nd repeat: *"Pitcher adjusting..."* (yellow)
-- 3rd repeat: *"Pitcher has your number!"* (red)
-- 4th+ repeat: *"You're cooked!"* (red)
+**Hand preview** shows exact success percentage, color-coded:
+- `Pair of Kings → Single (62%)` — green (≥70%), gold (40–69%), orange (20–39%), red (<20%)
+- Percentage accounts for pitcher adjusts degradation automatically
+- Guaranteed hands (Four of a Kind+) show no percentage
 
 ### Contact Rescue
 

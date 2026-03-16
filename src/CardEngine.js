@@ -188,6 +188,7 @@ export default class CardEngine {
 
     // Add a readable description of what was played
     entry.playedDescription = CardEngine._describePlay(evalCards, entry.handName);
+    entry.pairRank = pairRank;
 
     entry.score = Math.round(entry.peanuts * entry.mult);
 
@@ -340,6 +341,52 @@ export default class CardEngine {
     }
 
     return null;
+  }
+
+  /**
+   * Returns the success chance (0–100) for a hand, without rolling.
+   * Used by the UI to show "Pair of Kings (62%)" style previews.
+   * @param {string} handName - e.g. 'Pair', 'Two Pair', 'Flush'
+   * @param {number} pairRank - rank of the pair (2–14), 0 if N/A
+   * @param {number} strikeCount - current strikes (0–2)
+   * @param {object} gameState - { baseballState: { pairsPlayedThisInning, ... } }
+   * @returns {number} success percentage 0–100, or 100 if guaranteed
+   */
+  static getSuccessChance(handName, pairRank = 0, strikeCount = 0, gameState = null) {
+    const HAND_NAMES = [
+      'Royal Flush','Straight Flush','Four of a Kind','Full House',
+      'Flush','Straight','Three of a Kind','Two Pair','Pair','High Card',
+    ];
+    const handIdx = HAND_NAMES.indexOf(handName);
+    if (handIdx < 0 || handIdx < 3) return 100; // guaranteed or unknown
+
+    const bs = gameState?.baseballState;
+    const pairsPlayed = bs?.pairsPlayedThisInning || 0;
+    const tripsPlayed = bs?.tripsPlayedThisInning || 0;
+    const straightsPlayed = bs?.straightsPlayedThisInning || 0;
+    const flushesPlayed = bs?.flushesPlayedThisInning || 0;
+
+    let outChance = 0;
+    if (handIdx === 8) {
+      const twoStrikePenalty = strikeCount >= 2 ? BALANCE.twoStrikePenalty : 0;
+      const pairPenalty = pairsPlayed * BALANCE.pairDegradation;
+      outChance = BALANCE.pairOutBase - (pairRank - 2) * BALANCE.pairOutRankScale + twoStrikePenalty + pairPenalty;
+    } else if (handIdx === 7) {
+      outChance = BALANCE.twoPairOutBase + pairsPlayed * BALANCE.twoPairDegradation;
+    } else if (handIdx === 6) {
+      outChance = BALANCE.tripsOutBase + tripsPlayed * BALANCE.tripsDegradation;
+    } else if (handIdx === 5) {
+      outChance = BALANCE.straightOutBase + straightsPlayed * BALANCE.straightDegradation;
+    } else if (handIdx === 4) {
+      outChance = BALANCE.flushOutBase + flushesPlayed * BALANCE.flushDegradation;
+    } else if (handIdx === 3) {
+      outChance = BALANCE.fullHouseOutBase;
+    } else {
+      return 0; // High Card = strikeout
+    }
+
+    outChance = Math.min(BALANCE.outMax, Math.max(BALANCE.outMin, outChance));
+    return Math.round((1 - outChance) * 100);
   }
 
   /** Check if sorted ranks form a straight (handles ace-low) */
