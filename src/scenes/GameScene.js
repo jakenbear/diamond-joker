@@ -677,6 +677,61 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Spawn celebrating runner sprites to the left of home plate */
+  _celebrateRuns(count) {
+    if (count <= 0) return;
+    const homeX = this.homePosition.x;
+    const homeY = this.homePosition.y;
+    const teamKey = TEAM_SPRITE_KEY[this.rosterManager.getTeam()?.name] || 'usa';
+    const runnerKey = `sprite_${teamKey}_runner`;
+    const hasSprite = this.textures.exists(runnerKey);
+
+    for (let i = 0; i < count; i++) {
+      // Stack to the left of home plate with slight spread
+      const targetX = homeX - 45 - i * 18;
+      const targetY = homeY - 8 + (i % 2 === 0 ? -4 : 4);
+
+      // Spawn at home plate, slide into celebration position
+      const sprite = hasSprite
+        ? this.add.image(homeX, homeY, runnerKey).setScale(2.5).setDepth(5).setAlpha(0)
+        : this.add.circle(homeX, homeY, 8, 0xffd600).setDepth(5).setAlpha(0);
+
+      // Slide in with stagger
+      this.tweens.add({
+        targets: sprite,
+        x: targetX,
+        y: targetY,
+        alpha: 1,
+        duration: 300,
+        delay: i * 150,
+        ease: 'Back.easeOut',
+        onComplete: () => {
+          // Wiggle dance loop
+          this.tweens.add({
+            targets: sprite,
+            angle: { from: -12, to: 12 },
+            y: targetY - 5,
+            duration: 200,
+            yoyo: true,
+            repeat: 4,
+            ease: 'Sine.easeInOut',
+            onComplete: () => {
+              // Fade out after celebration
+              this.tweens.add({
+                targets: sprite,
+                alpha: 0,
+                y: targetY - 15,
+                duration: 400,
+                delay: 200,
+                onComplete: () => sprite.destroy(),
+              });
+            },
+          });
+        },
+      });
+    }
+  }
+
   // ── Result Display (center) ───────────────────────────
 
   _createResultDisplay() {
@@ -2301,9 +2356,12 @@ export default class GameScene extends Phaser.Scene {
         this._deferBaseUpdate = false;
         this._updateBases(this.baseball.getStatus().bases);
 
-        // Run scored chime after runners visually move
+        // Run scored chime + celebration after runners visually move
         const runsForSound = (outcome.runsScored || 0) + sacrificeFlyRun + productiveRuns + extraBase.scored;
-        if (runsForSound > 0) SoundManager.runScored();
+        if (runsForSound > 0) {
+          SoundManager.runScored();
+          this._celebrateRuns(runsForSound);
+        }
       });
 
       // For outs, skip cascade — just show outcome and move on
