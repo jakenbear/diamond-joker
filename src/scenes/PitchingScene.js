@@ -112,8 +112,8 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Base Diamond (scorebug mini-diamond) ────────────────
 
   _createBaseDiamond() {
-    // Prominent diamond — right of center, above the board
-    const cx = 950, cy = 85;
+    // Prominent diamond — right of center, shifted left and down
+    const cx = 880, cy = 110;
     const bs = 22; // base square size
     const gap = 32; // distance from center to each base
 
@@ -771,9 +771,9 @@ export default class PitchingScene extends Phaser.Scene {
     // Community cards (center row)
     const commY = 270;
     const commCount = state.community.length;
-    const commStartX = 640 - (commCount - 1) * 45;
+    const commStartX = 640 - (commCount - 1) * 55;
     state.community.forEach((card, i) => {
-      const x = commStartX + i * 90;
+      const x = commStartX + i * 110;
       const faceDown = state.faceDownIndices.includes(i);
       const locked = state.lockedIndices.includes(i);
       this._renderCardOnBoard(x, commY, card, !faceDown, locked, 'community');
@@ -782,29 +782,29 @@ export default class PitchingScene extends Phaser.Scene {
     // Pitcher hole cards (below community)
     const holeY = 450;
     const holeStartX = 600;
-    this._boardElements.push(this.add.text(holeStartX - 55, holeY, 'YOU', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    this._boardElements.push(this.add.text(holeStartX - 65, holeY, 'YOU', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setOrigin(1, 0.5).setDepth(5));
     state.pitcherHole.forEach((card, i) => {
-      const x = holeStartX + i * 70;
+      const x = holeStartX + i * 95;
       this._renderCardOnBoard(x, holeY, card, true, false, 'pitcher');
     });
 
     // Batter hole cards (above community)
     const batterY = 130;
-    this._boardElements.push(this.add.text(holeStartX - 55, batterY, 'OPP', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+    this._boardElements.push(this.add.text(holeStartX - 65, batterY, 'OPP', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
     }).setOrigin(1, 0.5).setDepth(5));
     state.batterHole.forEach((card, i) => {
-      const x = holeStartX + i * 70;
+      const x = holeStartX + i * 95;
       const revealed = state.revealedBatterCards.includes(i);
       this._renderCardOnBoard(x, batterY, card, revealed, false, 'batter');
     });
   }
 
   _renderCardOnBoard(x, y, card, faceUp, locked, owner) {
-    const CARD_BW = 58;
-    const CARD_BH = 80;
+    const CARD_BW = 80;
+    const CARD_BH = 110;
     const ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
     const ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
 
