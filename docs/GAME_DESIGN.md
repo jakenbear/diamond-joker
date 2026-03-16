@@ -425,6 +425,18 @@ These trigger automatically based on game state:
 - **Chance:** max(0, (5 - pitcherControl) × 1.5%)
 - **Result:** Batter awarded 1st base
 
+### Productive Groundout
+- **When:** Groundout + runner on 2nd or 3rd + outs < 2 (and no DP/FC triggered)
+- **Chance:** 40% + speed × 3%
+- **Result:** Each runner on 2nd/3rd advances one base (runner on 3rd scores)
+
+### Home Run Descriptions
+Flavor text based on runners scoring:
+- **0 runners:** "Solo Homer!"
+- **1 runner:** "2-Run Homer!"
+- **2 runners:** "3-Run Homer!"
+- **3 runners (bases loaded):** "GRAND SLAM!"
+
 ---
 
 ## Shop System

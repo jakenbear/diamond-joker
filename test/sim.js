@@ -4038,6 +4038,69 @@ group('25l. ShowdownEngine — start() accepts outs and inning');
 }
 
 // ═══════════════════════════════════════════════════════
+// 26. Home Run Descriptions
+// ═══════════════════════════════════════════════════════
+group('26. Home Run flavor descriptions');
+{
+  const bs = new BaseballState();
+  const r1 = bs.resolveOutcome('Home Run');
+  assert(r1.description.includes('Solo Homer'), `Solo HR description (got: ${r1.description})`);
+}
+{
+  const bs = new BaseballState();
+  bs.bases = [true, null, null];
+  const r = bs.resolveOutcome('Home Run');
+  assert(r.description.includes('2-Run Homer'), `2-Run HR description (got: ${r.description})`);
+  assert(r.runsScored === 2, '2-Run HR scores 2');
+}
+{
+  const bs = new BaseballState();
+  bs.bases = [true, true, null];
+  const r = bs.resolveOutcome('Home Run');
+  assert(r.description.includes('3-Run Homer'), `3-Run HR description (got: ${r.description})`);
+  assert(r.runsScored === 3, '3-Run HR scores 3');
+}
+{
+  const bs = new BaseballState();
+  bs.bases = [true, true, true];
+  const r = bs.resolveOutcome('Home Run');
+  assert(r.description.includes('GRAND SLAM'), `Grand Slam description (got: ${r.description})`);
+  assert(r.runsScored === 4, 'Grand Slam scores 4');
+}
+
+// ═══════════════════════════════════════════════════════
+// 27. Productive Groundout
+// ═══════════════════════════════════════════════════════
+group('27. Productive groundout');
+{
+  // Productive groundout check triggers with runner on 2nd/3rd, <2 outs
+  let triggered = 0;
+  for (let i = 0; i < 200; i++) {
+    const result = SituationalEngine.check('Groundout', { bases: [null, true, null], outs: 1, inning: 1 }, 5);
+    if (result.productiveOut) triggered++;
+  }
+  assert(triggered > 50 && triggered < 150, `Productive out triggers ~55% of time (got ${triggered}/200)`);
+}
+{
+  // Should NOT trigger with 2 outs
+  let triggered = 0;
+  for (let i = 0; i < 100; i++) {
+    const result = SituationalEngine.check('Groundout', { bases: [null, true, null], outs: 2, inning: 1 }, 5);
+    if (result.productiveOut) triggered++;
+  }
+  assert(triggered === 0, `Productive out never triggers with 2 outs (got ${triggered})`);
+}
+{
+  // Should NOT trigger on flyout
+  let triggered = 0;
+  for (let i = 0; i < 100; i++) {
+    const result = SituationalEngine.check('Flyout', { bases: [null, true, null], outs: 0, inning: 1 }, 5);
+    if (result.productiveOut) triggered++;
+  }
+  assert(triggered === 0, `Productive out never triggers on flyout (got ${triggered})`);
+}
+
+// ═══════════════════════════════════════════════════════
 
 console.log('\n' + '═'.repeat(50));
 console.log(`\x1b[1m  RESULTS: \x1b[32m${passed} passed\x1b[0m, \x1b[${failed > 0 ? '31' : '32'}m${failed} failed\x1b[0m`);

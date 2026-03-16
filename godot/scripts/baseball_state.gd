@@ -183,9 +183,19 @@ func resolve_outcome(outcome: String, hand_score: int = 0, batter = null) -> Dic
 		else:
 			opponent_score += runs_scored
 
-		description = "%s!" % outcome
-		if runs_scored > 0:
-			description += " %d run%s scored!" % [runs_scored, "s" if runs_scored > 1 else ""]
+		if outcome == "Home Run":
+			if runs_scored == 4:
+				description = "GRAND SLAM! 4 runs scored!"
+			elif runs_scored == 3:
+				description = "3-Run Homer! 3 runs scored!"
+			elif runs_scored == 2:
+				description = "2-Run Homer! 2 runs scored!"
+			else:
+				description = "Solo Homer!"
+		else:
+			description = "%s!" % outcome
+			if runs_scored > 0:
+				description += " %d run%s scored!" % [runs_scored, "s" if runs_scored > 1 else ""]
 
 		if _check_walk_off():
 			state = State.GAME_OVER

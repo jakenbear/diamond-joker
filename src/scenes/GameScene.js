@@ -2061,6 +2061,23 @@ export default class GameScene extends Phaser.Scene {
       sacrificeFlyRun = this.baseball.processSacrificeFly();
     }
 
+    // Productive groundout: advance runners on 2nd/3rd before the out is recorded
+    let productiveRuns = 0;
+    if (situational.productiveOut) {
+      // Advance runner on 3rd (scores) then runner on 2nd (to 3rd)
+      if (this.baseball.bases[2]) {
+        this.baseball.bases[2] = null;
+        this.baseball.playerScore++;
+        this.baseball._currentInningPlayerRuns++;
+        productiveRuns++;
+      }
+      if (this.baseball.bases[1]) {
+        const runner = this.baseball.bases[1];
+        this.baseball.bases[1] = null;
+        this.baseball.bases[2] = runner;
+      }
+    }
+
     const isOut = ['Strikeout', 'Groundout', 'Flyout', 'Double Play', "Fielder's Choice"].includes(handResult.outcome);
 
     // ── Phase 0: Show pitcher pre-trait activation if any ──
@@ -2210,6 +2227,7 @@ export default class GameScene extends Phaser.Scene {
       if (this.batterSprite) this.batterSprite.setVisible(false);
 
       let desc = outcome.description;
+      if (productiveRuns > 0) desc += ` Productive out — ${productiveRuns} run${productiveRuns > 1 ? 's' : ''} scores!`;
       if (sacrificeFlyRun > 0) desc += ` Sac fly scores a run!`;
       if (extraBase.advanced) {
         desc += extraBase.scored > 0 ? ' Speed! Extra run!' : ' Speed! Runner advances!';
@@ -2226,15 +2244,28 @@ export default class GameScene extends Phaser.Scene {
       } else {
         logCount = `${count.balls}-${count.strikes}`;
       }
+
+      // HR flavor for log
+      let logOutcome = handResult.outcome;
+      if (handResult.outcome === 'Home Run') {
+        const hrRuns = outcome.runsScored;
+        if (hrRuns === 4) logOutcome = 'GRAND SLAM';
+        else if (hrRuns === 3) logOutcome = '3-Run HR';
+        else if (hrRuns === 2) logOutcome = '2-Run HR';
+        else logOutcome = 'Solo HR';
+      }
+
       if (situational.transformed) {
         this._addGameLog(`${logBatter}: ${logHand}>${situational.outcome} ${logCount}`, situational.type === 'error' ? '#ffab40' : '#ff8a80');
+      } else if (isOut && productiveRuns > 0) {
+        this._addGameLog(`${logBatter}: ${logHand}>Productive Out +${productiveRuns}R ${logCount}`, '#ffab40');
       } else if (isOut && sacrificeFlyRun > 0) {
         this._addGameLog(`${logBatter}: ${logHand}>Sac Fly +${sacrificeFlyRun}R ${logCount}`, '#ffab40');
       } else if (isOut) {
         this._addGameLog(`${logBatter}: ${logHand}>${handResult.outcome} ${logCount}`, '#ff8a80');
       } else {
         const runNote = outcome.runsScored > 0 ? ` +${outcome.runsScored}R` : '';
-        this._addGameLog(`${logBatter}: ${logHand}>${handResult.outcome}${runNote} ${logCount}`, '#69f0ae');
+        this._addGameLog(`${logBatter}: ${logHand}>${logOutcome}${runNote} ${logCount}`, '#69f0ae');
       }
 
       // Show outcome text
@@ -2271,7 +2302,7 @@ export default class GameScene extends Phaser.Scene {
         this._updateBases(this.baseball.getStatus().bases);
 
         // Run scored chime after runners visually move
-        const runsForSound = (outcome.runsScored || 0) + sacrificeFlyRun + extraBase.scored;
+        const runsForSound = (outcome.runsScored || 0) + sacrificeFlyRun + productiveRuns + extraBase.scored;
         if (runsForSound > 0) SoundManager.runScored();
       });
 
@@ -2295,7 +2326,7 @@ export default class GameScene extends Phaser.Scene {
       const totalCascadeDelay = RUNNER_DELAY + cascadeDelay;
 
       // Score popup for runs (after cascade)
-      const totalRuns = outcome.runsScored + sacrificeFlyRun + extraBase.scored;
+      const totalRuns = outcome.runsScored + sacrificeFlyRun + productiveRuns + extraBase.scored;
       this.time.delayedCall(totalCascadeDelay, () => {
         if (totalRuns > 0) {
           const popupColor = totalRuns >= 4 ? '#ff6e40' : totalRuns >= 2 ? '#ffd600' : '#69f0ae';

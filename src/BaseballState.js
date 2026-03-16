@@ -187,9 +187,16 @@ export default class BaseballState {
         this.opponentScore += runsScored;
       }
 
-      description = `${outcome}!`;
-      if (runsScored > 0) {
-        description += ` ${runsScored} run${runsScored > 1 ? 's' : ''} scored!`;
+      if (outcome === 'Home Run') {
+        if (runsScored === 4) description = 'GRAND SLAM! 4 runs scored!';
+        else if (runsScored === 3) description = '3-Run Homer! 3 runs scored!';
+        else if (runsScored === 2) description = '2-Run Homer! 2 runs scored!';
+        else description = 'Solo Homer!';
+      } else {
+        description = `${outcome}!`;
+        if (runsScored > 0) {
+          description += ` ${runsScored} run${runsScored > 1 ? 's' : ''} scored!`;
+        }
       }
 
       // Walk-off check: bottom of 9th (or later), player is ahead

@@ -41,6 +41,14 @@ export default class SituationalEngine {
       if (d3kResult) return d3kResult;
     }
 
+    // Productive groundout: runner on 2nd/3rd advances, batter still out
+    if (outcome === 'Groundout' && gameState.outs < 2 && (gameState.bases[1] || gameState.bases[2])) {
+      const productiveChance = 0.40 + (batterSpeed || 5) * 0.03;
+      if (Math.random() < productiveChance) {
+        return { outcome, transformed: false, type: null, description: null, productiveOut: true };
+      }
+    }
+
     return { outcome, transformed: false, type: null, description: null };
   }
 

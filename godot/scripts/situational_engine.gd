@@ -33,6 +33,12 @@ static func check(outcome: String, game_state: Dictionary, batter_speed: int, er
 		if not d3k_result.is_empty():
 			return d3k_result
 
+	# Productive groundout: runner on 2nd/3rd advances, batter still out
+	if outcome == "Groundout" and outs_val < 2 and (bases[1] or bases[2]):
+		var productive_chance: float = 0.40 + batter_speed * 0.03
+		if randf() < productive_chance:
+			return {"outcome": outcome, "transformed": false, "type": "", "description": "", "productive_out": true}
+
 	return {"outcome": outcome, "transformed": false, "type": "", "description": ""}
 
 
