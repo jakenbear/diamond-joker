@@ -687,9 +687,9 @@ export default class GameScene extends Phaser.Scene {
     const hasSprite = this.textures.exists(runnerKey);
 
     for (let i = 0; i < count; i++) {
-      // Stack to the left of home plate with slight spread
-      const targetX = homeX - 45 - i * 18;
-      const targetY = homeY - 8 + (i % 2 === 0 ? -4 : 4);
+      // Horizontal line to the left of home plate
+      const targetX = homeX - 45 - i * 22;
+      const targetY = homeY - 8;
 
       // Spawn at home plate, slide into celebration position
       const sprite = hasSprite
@@ -706,15 +706,15 @@ export default class GameScene extends Phaser.Scene {
         delay: i * 150,
         ease: 'Back.easeOut',
         onComplete: () => {
-          // Wiggle dance loop
+          // Little hops — each runner offset so they bounce out of sync
           this.tweens.add({
             targets: sprite,
-            angle: { from: -12, to: 12 },
-            y: targetY - 5,
-            duration: 200,
+            y: targetY - 14,
+            duration: 180,
+            delay: i * 60,
             yoyo: true,
-            repeat: 4,
-            ease: 'Sine.easeInOut',
+            repeat: 5,
+            ease: 'Quad.easeOut',
             onComplete: () => {
               // Fade out after celebration
               this.tweens.add({
