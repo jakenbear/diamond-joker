@@ -25,7 +25,7 @@ const OUT_MIN := 0.05
 const OUT_MAX := 0.95
 
 # Pitcher Reads (degradation per repeat)
-const PAIR_DEGRADATION := 0.25
+const PAIR_DEGRADATION := 0.10
 const TWO_PAIR_DEGRADATION := 0.12
 const TRIPS_DEGRADATION := 0.15
 const STRAIGHT_DEGRADATION := 0.20

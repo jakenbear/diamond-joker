@@ -26,7 +26,7 @@ const BALANCE = {
   outMax: 0.95,
 
   // ── Pitcher Reads (degradation per repeat) ─────
-  pairDegradation: 0.25,       // per pair/two-pair played this inning
+  pairDegradation: 0.10,       // per pair played this inning
   twoPairDegradation: 0.12,
   tripsDegradation: 0.15,
   straightDegradation: 0.20,
