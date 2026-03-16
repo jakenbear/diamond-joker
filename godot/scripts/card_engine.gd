@@ -255,6 +255,7 @@ static func _get_pair_rank(freq: Dictionary) -> int:
 static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int, strike_count: int = 0, game_state: Dictionary = {}) -> Dictionary:
 	var bs = game_state.get("baseball_state", null)
 	var pairs_played: int = bs.pairs_played_this_inning if bs else 0
+	var two_pairs_played: int = bs.two_pairs_played_this_inning if bs else 0
 	var trips_played: int = bs.trips_played_this_inning if bs else 0
 	var straights_played: int = bs.straights_played_this_inning if bs else 0
 	var flushes_played: int = bs.flushes_played_this_inning if bs else 0
@@ -270,10 +271,9 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 			bs.pairs_played_this_inning += 1
 	elif hand_idx == 7:
 		# Two Pair
-		var pair_penalty: float = pairs_played * Balance.TWO_PAIR_DEGRADATION
-		out_chance = Balance.TWO_PAIR_OUT_BASE + pair_penalty
+		out_chance = Balance.TWO_PAIR_OUT_BASE + two_pairs_played * Balance.TWO_PAIR_DEGRADATION
 		if bs:
-			bs.pairs_played_this_inning += 1
+			bs.two_pairs_played_this_inning += 1
 	elif hand_idx == 6:
 		# Three of a Kind
 		out_chance = Balance.TRIPS_OUT_BASE + trips_played * Balance.TRIPS_DEGRADATION
@@ -331,6 +331,7 @@ static func get_success_chance(hand_name: String, pair_rank: int = 0, strike_cou
 
 	var bs: Dictionary = game_state.get("baseball_state", {})
 	var pairs_played: int = bs.get("pairs_played_this_inning", 0)
+	var two_pairs_played: int = bs.get("two_pairs_played_this_inning", 0)
 	var trips_played: int = bs.get("trips_played_this_inning", 0)
 	var straights_played: int = bs.get("straights_played_this_inning", 0)
 	var flushes_played: int = bs.get("flushes_played_this_inning", 0)
@@ -341,7 +342,7 @@ static func get_success_chance(hand_name: String, pair_rank: int = 0, strike_cou
 		var pair_penalty: float = pairs_played * Balance.PAIR_DEGRADATION
 		out_chance = Balance.PAIR_OUT_BASE - (pair_rank - 2) * Balance.PAIR_OUT_RANK_SCALE + two_strike_penalty + pair_penalty
 	elif hand_idx == 7:
-		out_chance = Balance.TWO_PAIR_OUT_BASE + pairs_played * Balance.TWO_PAIR_DEGRADATION
+		out_chance = Balance.TWO_PAIR_OUT_BASE + two_pairs_played * Balance.TWO_PAIR_DEGRADATION
 	elif hand_idx == 6:
 		out_chance = Balance.TRIPS_OUT_BASE + trips_played * Balance.TRIPS_DEGRADATION
 	elif hand_idx == 5:

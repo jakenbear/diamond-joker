@@ -1330,6 +1330,7 @@ export default class GameScene extends Phaser.Scene {
     // Preview with snapshot so we don't increment the real counter
     const previewState = { baseballState: {
       pairsPlayedThisInning: this.baseball.pairsPlayedThisInning,
+      twoPairsPlayedThisInning: this.baseball.twoPairsPlayedThisInning,
       tripsPlayedThisInning: this.baseball.tripsPlayedThisInning,
       straightsPlayedThisInning: this.baseball.straightsPlayedThisInning,
       flushesPlayedThisInning: this.baseball.flushesPlayedThisInning,

@@ -255,6 +255,7 @@ function simulateGame() {
     bs.outs = 0;
     bs.bases = [null, null, null];
     bs.pairsPlayedThisInning = 0;
+    bs.twoPairsPlayedThisInning = 0;
     bs.tripsPlayedThisInning = 0;
     bs.straightsPlayedThisInning = 0;
     bs.flushesPlayedThisInning = 0;

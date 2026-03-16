@@ -284,6 +284,7 @@ export default class CardEngine {
   static _applyRankQuality(entry, pairRank, handIdx, strikeCount = 0, gameState = null) {
     const bs = gameState?.baseballState;
     const pairsPlayed = bs?.pairsPlayedThisInning || 0;
+    const twoPairsPlayed = bs?.twoPairsPlayedThisInning || 0;
     const tripsPlayed = bs?.tripsPlayedThisInning || 0;
     const straightsPlayed = bs?.straightsPlayedThisInning || 0;
     const flushesPlayed = bs?.flushesPlayedThisInning || 0;
@@ -298,9 +299,8 @@ export default class CardEngine {
       if (bs) bs.pairsPlayedThisInning++;
     } else if (handIdx === 7) {
       // Two Pair
-      const pairPenalty = pairsPlayed * BALANCE.twoPairDegradation;
-      outChance = BALANCE.twoPairOutBase + pairPenalty;
-      if (bs) bs.pairsPlayedThisInning++;
+      outChance = BALANCE.twoPairOutBase + twoPairsPlayed * BALANCE.twoPairDegradation;
+      if (bs) bs.twoPairsPlayedThisInning++;
     } else if (handIdx === 6) {
       // Three of a Kind
       outChance = BALANCE.tripsOutBase + tripsPlayed * BALANCE.tripsDegradation;
@@ -362,6 +362,7 @@ export default class CardEngine {
 
     const bs = gameState?.baseballState;
     const pairsPlayed = bs?.pairsPlayedThisInning || 0;
+    const twoPairsPlayed = bs?.twoPairsPlayedThisInning || 0;
     const tripsPlayed = bs?.tripsPlayedThisInning || 0;
     const straightsPlayed = bs?.straightsPlayedThisInning || 0;
     const flushesPlayed = bs?.flushesPlayedThisInning || 0;
@@ -372,7 +373,7 @@ export default class CardEngine {
       const pairPenalty = pairsPlayed * BALANCE.pairDegradation;
       outChance = BALANCE.pairOutBase - (pairRank - 2) * BALANCE.pairOutRankScale + twoStrikePenalty + pairPenalty;
     } else if (handIdx === 7) {
-      outChance = BALANCE.twoPairOutBase + pairsPlayed * BALANCE.twoPairDegradation;
+      outChance = BALANCE.twoPairOutBase + twoPairsPlayed * BALANCE.twoPairDegradation;
     } else if (handIdx === 6) {
       outChance = BALANCE.tripsOutBase + tripsPlayed * BALANCE.tripsDegradation;
     } else if (handIdx === 5) {

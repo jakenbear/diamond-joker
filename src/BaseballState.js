@@ -44,6 +44,7 @@ export default class BaseballState {
     this._currentInningPlayerRuns = 0;
     this._atBatsThisInning = 0;  // Track at-bats for first_batter_of_inning
     this.pairsPlayedThisInning = 0;
+    this.twoPairsPlayedThisInning = 0;
     this.tripsPlayedThisInning = 0;
     this.straightsPlayedThisInning = 0;
     this.flushesPlayedThisInning = 0;
@@ -367,6 +368,7 @@ export default class BaseballState {
       this.inning++;
       this._atBatsThisInning = 0;
       this.pairsPlayedThisInning = 0;
+      this.twoPairsPlayedThisInning = 0;
       this.tripsPlayedThisInning = 0;
       this.straightsPlayedThisInning = 0;
       this.flushesPlayedThisInning = 0;
