@@ -1327,15 +1327,17 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Preview with snapshot so we don't increment the real counter
-    const previewState = { baseballState: {
+    // Snapshot counters so we don't mutate real state
+    const counters = {
       pairsPlayedThisInning: this.baseball.pairsPlayedThisInning,
       twoPairsPlayedThisInning: this.baseball.twoPairsPlayedThisInning,
       tripsPlayedThisInning: this.baseball.tripsPlayedThisInning,
       straightsPlayedThisInning: this.baseball.straightsPlayedThisInning,
       flushesPlayedThisInning: this.baseball.flushesPlayedThisInning,
-    } };
-    const result = CardEngine.evaluateHand(cards, null, null, previewState);
+    };
+    // evaluateHand mutates the snapshot — use a copy so getSuccessChance reads clean counters
+    const evalState = { baseballState: { ...counters } };
+    const result = CardEngine.evaluateHand(cards, null, null, evalState);
     const n = cards.length;
 
     // Resolve the true hand name (Groundout/Flyout → original hand)
@@ -1343,8 +1345,8 @@ export default class GameScene extends Phaser.Scene {
     const pairRank = result.pairRank || 0;
     const isHighCard = trueHand === 'High Card' || trueHand === 'Strikeout';
 
-    // Get success percentage from balance system
-    const successPct = isHighCard ? 0 : CardEngine.getSuccessChance(trueHand, pairRank, 0, previewState);
+    // Fresh snapshot for success chance (evaluateHand already incremented evalState)
+    const successPct = isHighCard ? 0 : CardEngine.getSuccessChance(trueHand, pairRank, 0, { baseballState: { ...counters } });
 
     let preview = '';
     let color = '#ffd600';
