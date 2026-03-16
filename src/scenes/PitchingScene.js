@@ -113,7 +113,7 @@ export default class PitchingScene extends Phaser.Scene {
 
   _createBaseDiamond() {
     // Prominent diamond — right of center, shifted left and down
-    const cx = 880, cy = 110;
+    const cx = 880, cy = 140;
     const bs = 22; // base square size
     const gap = 32; // distance from center to each base
 
@@ -769,7 +769,7 @@ export default class PitchingScene extends Phaser.Scene {
     const state = this.showdownEngine.getState();
 
     // Community cards (center row)
-    const commY = 270;
+    const commY = 290;
     const commCount = state.community.length;
     const commStartX = 640 - (commCount - 1) * 55;
     state.community.forEach((card, i) => {
@@ -780,7 +780,7 @@ export default class PitchingScene extends Phaser.Scene {
     });
 
     // Pitcher hole cards (below community)
-    const holeY = 450;
+    const holeY = 470;
     const holeStartX = 600;
     this._boardElements.push(this.add.text(holeStartX - 65, holeY, 'YOU', {
       fontSize: '13px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
