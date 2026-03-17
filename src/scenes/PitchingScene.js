@@ -219,16 +219,16 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Result Display ──────────────────────────────────────
 
   _createResultDisplay() {
-    // Pinned left, near the staff box
-    this.resultText = this.add.text(15, 440, '', {
-      fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
-      align: 'left', wordWrap: { width: 210 },
-    }).setOrigin(0, 0).setDepth(10);
+    // Centered between community and hole cards
+    this.resultText = this.add.text(640, 390, '', {
+      fontSize: '18px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      align: 'center', wordWrap: { width: 500 },
+    }).setOrigin(0.5).setDepth(10);
 
-    this.handNameText = this.add.text(15, 470, '', {
-      fontSize: '11px', fontFamily: 'monospace', color: '#81c784',
-      align: 'left', wordWrap: { width: 210 },
-    }).setOrigin(0, 0).setDepth(10);
+    this.handNameText = this.add.text(640, 415, '', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
+      align: 'center', wordWrap: { width: 500 },
+    }).setOrigin(0.5).setDepth(10);
   }
 
   // ── Staff Card Stack (bottom-left, replaces game log) ──
@@ -1096,10 +1096,10 @@ export default class PitchingScene extends Phaser.Scene {
       if (basesGained >= 4) text += ' (all score)';
     }
     const color = result.isOut ? '#999999' : '#ff8a80';
-    const LOG_START_Y = 590;
+    const LOG_START_Y = 500;
     const LOG_LINE_H = 20;
-    const MAX_VISIBLE = 3;
-    const LOG_X = 280;
+    const MAX_VISIBLE = 5;
+    const LOG_X = BATTER_PANEL_X - PANEL_W / 2;
     if (ps.logIndex >= MAX_VISIBLE) {
       const oldest = ps.logElements.shift();
       this.tweens.add({ targets: oldest, alpha: 0, duration: 150, onComplete: () => oldest.destroy() });
