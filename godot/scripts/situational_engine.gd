@@ -6,10 +6,10 @@ extends RefCounted
 # Also provides Wild Pitch and HBP checks.
 
 
-static func check(outcome: String, game_state: Dictionary, batter_speed: int) -> Dictionary:
+static func check(outcome: String, game_state: Dictionary, batter_speed: int, error_mult: float = 1.0) -> Dictionary:
 	# Error check on all outs
 	if outcome == "Groundout" or outcome == "Flyout":
-		var error_result: Dictionary = _check_error(outcome, game_state)
+		var error_result: Dictionary = _check_error(outcome, game_state, error_mult)
 		if not error_result.is_empty():
 			return error_result
 
@@ -32,6 +32,12 @@ static func check(outcome: String, game_state: Dictionary, batter_speed: int) ->
 		var d3k_result: Dictionary = _check_dropped_third_strike(batter_speed)
 		if not d3k_result.is_empty():
 			return d3k_result
+
+	# Productive groundout: runner on 2nd/3rd advances, batter still out
+	if outcome == "Groundout" and outs_val < 2 and (bases[1] or bases[2]):
+		var productive_chance: float = 0.40 + batter_speed * 0.03
+		if randf() < productive_chance:
+			return {"outcome": outcome, "transformed": false, "type": "", "description": "", "productive_out": true}
 
 	return {"outcome": outcome, "transformed": false, "type": "", "description": ""}
 
@@ -93,10 +99,10 @@ static func _check_fielders_choice(_game_state: Dictionary) -> Dictionary:
 	return {}
 
 
-static func _check_error(outcome: String, game_state: Dictionary) -> Dictionary:
+static func _check_error(outcome: String, game_state: Dictionary, error_mult: float = 1.0) -> Dictionary:
 	var base_chance: float = 0.04
 	var late_inning_bonus: float = maxf(0.0, (game_state.get("inning", 1) - 6) * 0.01)
-	var error_chance: float = base_chance + late_inning_bonus
+	var error_chance: float = (base_chance + late_inning_bonus) * error_mult
 	if randf() < error_chance:
 		return {
 			"outcome": "Error",

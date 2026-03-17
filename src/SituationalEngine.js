@@ -17,10 +17,10 @@ export default class SituationalEngine {
    * @param {number} batterSpeed - Current batter's speed stat (1-10)
    * @returns {{ outcome: string, transformed: boolean, type: string|null, description: string|null }}
    */
-  static check(outcome, gameState, batterSpeed) {
+  static check(outcome, gameState, batterSpeed, errorMult = 1) {
     // Error check applies to all outs (groundouts + flyouts)
     if (outcome === 'Groundout' || outcome === 'Flyout') {
-      const errorResult = SituationalEngine._checkError(outcome, gameState);
+      const errorResult = SituationalEngine._checkError(outcome, gameState, errorMult);
       if (errorResult) return errorResult;
     }
 
@@ -39,6 +39,14 @@ export default class SituationalEngine {
     if (outcome === 'Strikeout' && !gameState.bases[0]) {
       const d3kResult = SituationalEngine._checkDroppedThirdStrike(batterSpeed);
       if (d3kResult) return d3kResult;
+    }
+
+    // Productive groundout: runner on 2nd/3rd advances, batter still out
+    if (outcome === 'Groundout' && gameState.outs < 2 && (gameState.bases[1] || gameState.bases[2])) {
+      const productiveChance = 0.40 + (batterSpeed || 5) * 0.03;
+      if (Math.random() < productiveChance) {
+        return { outcome, transformed: false, type: null, description: null, productiveOut: true };
+      }
     }
 
     return { outcome, transformed: false, type: null, description: null };
@@ -135,10 +143,10 @@ export default class SituationalEngine {
    * Error: 4% base chance on groundouts/flyouts, +1% per inning past 6th.
    * Out becomes a single.
    */
-  static _checkError(outcome, gameState) {
+  static _checkError(outcome, gameState, errorMult = 1) {
     const baseChance = 0.04;
     const lateInningBonus = Math.max(0, (gameState.inning - 6) * 0.01);
-    const errorChance = baseChance + lateInningBonus;
+    const errorChance = (baseChance + lateInningBonus) * errorMult;
     if (Math.random() < errorChance) {
       return {
         outcome: 'Error',

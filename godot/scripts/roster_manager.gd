@@ -5,11 +5,14 @@ extends RefCounted
 # Manages your team (batting) and opponent team (their batters face your pitcher).
 
 const MAX_TRAITS_PER_PLAYER: int = 2
+const MAX_BONUS_PLAYERS: int = 3
 const MAX_PITCHER_TRAITS: int = 2
 
 var team: Dictionary
 var roster: Array[Dictionary] = []
 var current_batter_index: int = 0
+var bonus_player_count: int = 0
+var benched_players: Array[Dictionary] = []
 
 # Your pitcher (pitches against opponent batters)
 var my_pitcher: Dictionary = {}
@@ -91,7 +94,7 @@ func swap_pitcher(index: int) -> Dictionary:
 	return my_pitcher
 
 
-func sim_single_at_bat(inning: int, pitch_type: String, bases: Array) -> Dictionary:
+func sim_single_at_bat(inning: int, pitch_type: String, bases: Array, staff_mods: Dictionary = {}) -> Dictionary:
 	var p: Dictionary = my_pitcher
 	var fatigue: float = _get_pitcher_fatigue(p, inning)
 	var pitch: Dictionary = PitchTypes.TYPES.get(pitch_type, PitchTypes.TYPES["fastball"])
@@ -106,7 +109,8 @@ func sim_single_at_bat(inning: int, pitch_type: String, bases: Array) -> Diction
 		opponent_batter_index = (opponent_batter_index + 1) % 9
 		return {"outcome": "Walk (IBB)", "is_out": false, "bases_gained": 1, "batter": batter, "walked": true, "scored": scored}
 
-	var result: Dictionary = _sim_at_bat_with_pitch(p, batter, fatigue, pitch)
+	var hit_reduction: float = staff_mods.get("hit_reduction", 0.0)
+	var result: Dictionary = _sim_at_bat_with_pitch(p, batter, fatigue, pitch, hit_reduction)
 
 	# Breaking ball walk risk
 	if pitch_type == "breaking":
@@ -124,14 +128,14 @@ func sim_single_at_bat(inning: int, pitch_type: String, bases: Array) -> Diction
 	return {"outcome": result["outcome"], "is_out": result["is_out"], "bases_gained": result["bases_gained"], "batter": batter, "walked": false, "scored": scored}
 
 
-func _sim_at_bat_with_pitch(p: Dictionary, batter: Dictionary, fatigue: float, pitch: Dictionary) -> Dictionary:
+func _sim_at_bat_with_pitch(p: Dictionary, batter: Dictionary, fatigue: float, pitch: Dictionary, hit_reduction: float = 0.0) -> Dictionary:
 	var effective_fatigue: float = fatigue * (0.5 + my_pitcher_stamina * 0.5)
 	var pitch_strength: float = (p.get("velocity", 5) * 0.6 + p.get("control", 5) * 0.4) * effective_fatigue
 	var bat_strength: float = batter.get("contact", 5) * 0.6 + batter.get("power", 5) * 0.4
 
 	var matchup: float = bat_strength - pitch_strength
 	var base_hit_chance: float = clampf(0.28 + matchup * 0.025, 0.12, 0.50)
-	var hit_chance: float = clampf(base_hit_chance + pitch.get("hit_chance_mod", 0.0), 0.05, 0.50)
+	var hit_chance: float = clampf(base_hit_chance + pitch.get("hit_chance_mod", 0.0) - hit_reduction, 0.05, 0.50)
 
 	var roll: float = randf()
 	if roll > hit_chance:
@@ -179,16 +183,53 @@ func equip_trait(player_index: int, trait_card: Dictionary) -> bool:
 	if player_index < 0 or player_index >= roster.size():
 		return false
 	var player: Dictionary = roster[player_index]
-	if player["traits"].size() >= MAX_TRAITS_PER_PLAYER:
+	var cap: int = 3 if player.get("is_bonus", false) else MAX_TRAITS_PER_PLAYER
+	if player["traits"].size() >= cap:
 		return false
 	player["traits"].append(trait_card)
 	return true
 
 
+func add_bonus_player(bonus_player: Dictionary, replace_index: int) -> bool:
+	if bonus_player_count >= MAX_BONUS_PLAYERS:
+		return false
+	if replace_index < 0 or replace_index >= roster.size():
+		return false
+
+	var benched: Dictionary = roster[replace_index].duplicate()
+	benched_players.append(benched)
+
+	var bp: Dictionary = bonus_player.duplicate()
+	bp["is_bonus"] = true
+	bp["traits"] = []
+	bp["lineup_index"] = replace_index
+
+	# Auto-equip innate trait
+	if bp.has("innate_trait_id"):
+		for t in BatterTraits.TRAITS:
+			if t["id"] == bp["innate_trait_id"]:
+				var innate: Dictionary = t.duplicate()
+				innate["is_innate"] = true
+				bp["traits"].append(innate)
+				break
+
+	roster[replace_index] = bp
+	bonus_player_count += 1
+	return true
+
+
+func get_active_lineup_effects() -> Array[Dictionary]:
+	var effects: Array[Dictionary] = []
+	for p in roster:
+		if p.get("is_bonus", false) and p.has("lineup_effect"):
+			effects.append(p["lineup_effect"])
+	return effects
+
+
 func apply_batter_modifiers(eval_result: Dictionary, game_state: Dictionary) -> Dictionary:
 	var batter: Dictionary = get_current_batter()
 	var result: Dictionary = eval_result.duplicate()
-	var bonuses: Dictionary = {"power_chips": 0, "contact_mult": 0.0, "contact_save": false}
+	var bonuses: Dictionary = {"power_peanuts": 0, "contact_mult": 0.0, "contact_save": false}
 
 	# Contact save: rescue a pair that became a Groundout
 	if result.get("was_groundout", false) and result.get("original_hand", "") == "Pair":
@@ -196,7 +237,7 @@ func apply_batter_modifiers(eval_result: Dictionary, game_state: Dictionary) -> 
 		if randf() < save_chance:
 			result["outcome"] = "Single"
 			result["hand_name"] = "Pair"
-			result["chips"] = 1
+			result["peanuts"] = 1
 			result["mult"] = 1.5
 			result["score"] = 2
 			result["was_groundout"] = false
@@ -213,14 +254,14 @@ func apply_batter_modifiers(eval_result: Dictionary, game_state: Dictionary) -> 
 		return {"result": result, "bonuses": bonuses}
 
 	var power_bonus: int = maxi(0, batter.get("power", 5) - 5)
-	bonuses["power_chips"] = power_bonus
-	result["chips"] = result.get("chips", 0) + power_bonus
+	bonuses["power_peanuts"] = power_bonus
+	result["peanuts"] = result.get("peanuts", 0) + power_bonus
 
 	var contact_bonus: float = batter.get("contact", 5) / 10.0
 	bonuses["contact_mult"] = contact_bonus
 	result["mult"] = snappedf(result.get("mult", 1.0) + contact_bonus, 0.1)
 
-	result["score"] = roundi(result["chips"] * result["mult"])
+	result["score"] = roundi(result["peanuts"] * result["mult"])
 	result["extra_base_chance"] = batter.get("speed", 5) * 0.05
 
 	return {"result": result, "bonuses": bonuses}
@@ -234,12 +275,12 @@ func apply_pitcher_modifiers(eval_result: Dictionary, game_state: Dictionary) ->
 
 	if result["outcome"] == "Single" or result["outcome"] == "Double":
 		var vel_penalty: int = maxi(0, int(p.get("velocity", 5) * fatigue) - 6)
-		result["chips"] = maxi(0, result.get("chips", 0) - int(vel_penalty / 2))
+		result["peanuts"] = maxi(0, result.get("peanuts", 0) - int(vel_penalty / 2))
 
 	var control_penalty: float = (p.get("control", 5) * fatigue) * 0.05
 	result["mult"] = snappedf(maxf(1.0, result.get("mult", 1.0) - control_penalty), 0.1)
 
-	result["score"] = roundi(result["chips"] * result["mult"])
+	result["score"] = roundi(result["peanuts"] * result["mult"])
 	return result
 
 

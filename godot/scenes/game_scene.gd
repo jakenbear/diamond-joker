@@ -193,7 +193,8 @@ func _update_ui() -> void:
 			card_panels[i].visible = false
 
 	# Discard counter
-	discard_count_label.text = "Discards: %d" % GameManager.card_engine.discards_remaining
+	# Count display (TODO: wire CountManager when Godot scenes are built out)
+	discard_count_label.text = "Count: 0-0"
 
 	# Preview selected hand
 	if not selected_indices.is_empty():
@@ -233,7 +234,7 @@ func _update_ui() -> void:
 
 	# Button states
 	play_button.disabled = selected_indices.is_empty()
-	discard_button.disabled = GameManager.card_engine.discards_remaining <= 0 or selected_indices.is_empty()
+	discard_button.disabled = selected_indices.is_empty()  # TODO: wire CountManager.is_strikeout()/is_walk()
 
 
 func _on_card_toggled(index: int) -> void:

@@ -33,10 +33,10 @@ static func check_condition(cond: Dictionary, eval_result: Dictionary, game_stat
 			return eval_result.get("hand_name", "") == cond["value"]
 		"hand_in":
 			return cond.get("values", []).has(eval_result.get("hand_name", ""))
-		"chips_lte":
-			return eval_result.get("chips", 0) <= cond["value"]
-		"chips_gte":
-			return eval_result.get("chips", 0) >= cond["value"]
+		"peanuts_lte":
+			return eval_result.get("peanuts", 0) <= cond["value"]
+		"peanuts_gte":
+			return eval_result.get("peanuts", 0) >= cond["value"]
 		"losing_by":
 			return game_state.get("opponent_score", 0) - game_state.get("player_score", 0) >= cond["value"]
 		"first_batter_of_inning":
@@ -228,10 +228,10 @@ static func apply_post(result: Dictionary, effect: Dictionary, game_state: Dicti
 	match effect.get("type", ""):
 		"add_mult":
 			return _post_add_mult(result, effect, game_state)
-		"add_chips":
-			return _post_add_chips(result, effect, game_state)
-		"per_runner_chips":
-			return _post_per_runner_chips(result, effect, game_state)
+		"add_peanuts":
+			return _post_add_peanuts(result, effect, game_state)
+		"per_runner_peanuts":
+			return _post_per_runner_peanuts(result, effect, game_state)
 		"upgrade_outcome":
 			return _post_upgrade_outcome(result, effect, game_state)
 		"prevent_outcome":
@@ -258,15 +258,15 @@ static func _post_add_mult(result: Dictionary, effect: Dictionary, game_state: D
 	return r
 
 
-static func _post_add_chips(result: Dictionary, effect: Dictionary, game_state: Dictionary) -> Dictionary:
+static func _post_add_peanuts(result: Dictionary, effect: Dictionary, game_state: Dictionary) -> Dictionary:
 	if not check_condition(effect.get("condition", {}), result, game_state):
 		return result
 	var r: Dictionary = result.duplicate()
-	r["chips"] = maxi(0, r.get("chips", 0) + effect.get("value", 0))
+	r["peanuts"] = maxi(0, r.get("peanuts", 0) + effect.get("value", 0))
 	return r
 
 
-static func _post_per_runner_chips(result: Dictionary, effect: Dictionary, game_state: Dictionary) -> Dictionary:
+static func _post_per_runner_peanuts(result: Dictionary, effect: Dictionary, game_state: Dictionary) -> Dictionary:
 	var bases: Array = game_state.get("bases", [null, null, null])
 	var runners: int = 0
 	for b in bases:
@@ -275,7 +275,7 @@ static func _post_per_runner_chips(result: Dictionary, effect: Dictionary, game_
 	if runners == 0:
 		return result
 	var r: Dictionary = result.duplicate()
-	r["chips"] = r.get("chips", 0) + runners * effect.get("value", 0)
+	r["peanuts"] = r.get("peanuts", 0) + runners * effect.get("value", 0)
 	return r
 
 
@@ -287,7 +287,7 @@ static func _post_upgrade_outcome(result: Dictionary, effect: Dictionary, game_s
 	var r: Dictionary = result.duplicate()
 	r["outcome"] = effect.get("to", result["outcome"])
 	r["hand_name"] = effect.get("new_hand_name", result.get("hand_name", ""))
-	r["chips"] = r.get("chips", 0) + effect.get("add_chips", 0)
+	r["peanuts"] = r.get("peanuts", 0) + effect.get("add_peanuts", 0)
 	r["mult"] = r.get("mult", 1.0) + effect.get("add_mult", 0.0)
 	return r
 
@@ -300,8 +300,8 @@ static func _post_prevent_outcome(result: Dictionary, effect: Dictionary, game_s
 	var r: Dictionary = result.duplicate()
 	r["outcome"] = effect.get("to_outcome", result["outcome"])
 	r["hand_name"] = effect.get("to_hand", result.get("hand_name", ""))
-	if effect.has("chips"):
-		r["chips"] = effect["chips"]
+	if effect.has("peanuts"):
+		r["peanuts"] = effect["peanuts"]
 	if effect.has("mult"):
 		r["mult"] = effect["mult"]
 	return r
@@ -321,7 +321,7 @@ static func _post_force_groundout(result: Dictionary, effect: Dictionary, game_s
 	var r: Dictionary = result.duplicate()
 	r["outcome"] = "Groundout"
 	r["hand_name"] = effect.get("new_hand_name", "Groundout")
-	r["chips"] = 0
+	r["peanuts"] = 0
 	r["mult"] = 1.0
 	r["was_groundout"] = true
 	return r
@@ -335,7 +335,7 @@ static func _post_convert_high_card(result: Dictionary, effect: Dictionary, game
 	var r: Dictionary = result.duplicate()
 	r["outcome"] = "Single"
 	r["hand_name"] = effect.get("new_hand_name", "Bunt Single")
-	r["chips"] = effect.get("chips", 1)
+	r["peanuts"] = effect.get("peanuts", 1)
 	r["mult"] = effect.get("mult", 1.0)
 	return r
 
