@@ -2990,6 +2990,9 @@ export default class GameScene extends Phaser.Scene {
     this.inputLocked = true;
     this._setButtonsEnabled(false, false);
     this._setSortButtonsVisible(false);
+    // Hide instruction/deck text during transition
+    if (this.discardInfo) this.discardInfo.setAlpha(0);
+    if (this.deckInfo) this.deckInfo.setAlpha(0);
     // Hide diamond sprites during transition
     if (this.batterSprite) this.batterSprite.setVisible(false);
     if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(false);
@@ -3035,6 +3038,9 @@ export default class GameScene extends Phaser.Scene {
 
   _showInningTransition() {
     this._setSortButtonsVisible(false);
+    // Hide instruction/deck text during transition
+    if (this.discardInfo) this.discardInfo.setAlpha(0);
+    if (this.deckInfo) this.deckInfo.setAlpha(0);
     // Hide diamond sprites during transition
     if (this.batterSprite) this.batterSprite.setVisible(false);
     if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(false);

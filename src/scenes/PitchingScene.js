@@ -1096,10 +1096,10 @@ export default class PitchingScene extends Phaser.Scene {
       if (basesGained >= 4) text += ' (all score)';
     }
     const color = result.isOut ? '#999999' : '#ff8a80';
-    const LOG_START_Y = 525;
+    const LOG_START_Y = 590;
     const LOG_LINE_H = 20;
     const MAX_VISIBLE = 3;
-    const LOG_X = 15;
+    const LOG_X = 280;
     if (ps.logIndex >= MAX_VISIBLE) {
       const oldest = ps.logElements.shift();
       this.tweens.add({ targets: oldest, alpha: 0, duration: 150, onComplete: () => oldest.destroy() });
