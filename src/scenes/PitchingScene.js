@@ -219,14 +219,14 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Result Display ──────────────────────────────────────
 
   _createResultDisplay() {
-    // Centered between community and hole cards
-    this.resultText = this.add.text(640, 390, '', {
-      fontSize: '18px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    // Between community cards and hole cards
+    this.resultText = this.add.text(640, 380, '', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: 500 },
     }).setOrigin(0.5).setDepth(10);
 
-    this.handNameText = this.add.text(640, 415, '', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
+    this.handNameText = this.add.text(640, 400, '', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#81c784',
       align: 'center', wordWrap: { width: 500 },
     }).setOrigin(0.5).setDepth(10);
   }
@@ -743,24 +743,25 @@ export default class PitchingScene extends Phaser.Scene {
 
     const state = this.showdownEngine.getState();
 
-    // Pitcher hole cards (bottom)
-    const holeY = 450;
-    const holeStartX = 600;
-    this._boardElements.push(this.add.text(holeStartX - 55, holeY, 'YOU', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    // Pitcher hole cards (bottom) — same spacing as _renderShowdownBoard
+    const holeY = 480;
+    const holeStartX = 580;
+    const holeSpacing = 120;
+    this._boardElements.push(this.add.text(holeStartX - 75, holeY, 'YOU', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setOrigin(1, 0.5).setDepth(5));
     state.pitcherHole.forEach((card, i) => {
-      const x = holeStartX + i * 70;
+      const x = holeStartX + i * holeSpacing;
       this._renderCardOnBoard(x, holeY, card, true, false, 'pitcher');
     });
 
-    // Batter hole cards (top — face-down)
-    const batterY = 130;
-    this._boardElements.push(this.add.text(holeStartX - 55, batterY, 'OPP', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+    // Batter hole cards (top — face-down) — same spacing
+    const batterY = 120;
+    this._boardElements.push(this.add.text(holeStartX - 75, batterY, 'OPP', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
     }).setOrigin(1, 0.5).setDepth(5));
     state.batterHole.forEach((card, i) => {
-      const x = holeStartX + i * 70;
+      const x = holeStartX + i * holeSpacing;
       this._renderCardOnBoard(x, batterY, card, false, false, 'batter');
     });
   }
