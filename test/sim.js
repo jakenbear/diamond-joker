@@ -18,6 +18,9 @@ import BONUS_PLAYERS from '../data/bonus_players.js';
 import SYNERGIES from '../data/synergies.js';
 import SynergyEngine from '../src/SynergyEngine.js';
 
+// Baseline gameState with discardCount=1 (no bonus/penalty) for out-rate tests
+const BASELINE_STATE = { discardCount: 1 };
+
 // ── Test Harness ────────────────────────────────────────
 
 let passed = 0;
@@ -77,9 +80,10 @@ group('1a. Hand Evaluation');
 }
 {
   const fh = makeCards([[9,'H'],[9,'D'],[9,'C'],[4,'S'],[4,'H']]);
-  const r = CardEngine.evaluateHand(fh);
-  assert(r.handName === 'Full House', 'Full House detected');
-  assert(r.peanuts === 3 && r.mult === 2.5, 'Full House peanuts/mult');
+  const r = CardEngine.evaluateHand(fh, null, null, BASELINE_STATE);
+  const fhName = r.originalHand || r.handName;
+  assert(fhName === 'Full House', 'Full House detected');
+  assert(r.peanuts === 3 && r.mult === 2.5 || r.originalHand === 'Full House', 'Full House peanuts/mult');
 }
 {
   // Flush/Straight have 10% out chance — check detection via originalHand fallback
@@ -200,7 +204,7 @@ group('1b. Rank Quality (statistical, N=1000)');
   const N = 1000;
   for (let i = 0; i < N; i++) {
     const cards = makeCards([[8,'H'],[8,'D'],[3,'C'],[5,'S'],[11,'H']]);
-    const r = CardEngine.evaluateHand(cards);
+    const r = CardEngine.evaluateHand(cards, null, null, BASELINE_STATE);
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const rate = outs / N;
@@ -212,7 +216,7 @@ group('1b. Rank Quality (statistical, N=1000)');
   const N = 1000;
   for (let i = 0; i < N; i++) {
     const cards = makeCards([[14,'H'],[14,'D'],[3,'C'],[5,'S'],[7,'H']]);
-    const r = CardEngine.evaluateHand(cards);
+    const r = CardEngine.evaluateHand(cards, null, null, BASELINE_STATE);
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const rate = outs / N;
@@ -224,7 +228,7 @@ group('1b. Rank Quality (statistical, N=1000)');
   const N = 1000;
   for (let i = 0; i < N; i++) {
     const cards = makeCards([[3,'H'],[3,'D'],[4,'C'],[4,'S'],[11,'H']]);
-    const r = CardEngine.evaluateHand(cards);
+    const r = CardEngine.evaluateHand(cards, null, null, BASELINE_STATE);
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const rate = outs / N;
@@ -236,7 +240,7 @@ group('1b. Rank Quality (statistical, N=1000)');
   const N = 1000;
   for (let i = 0; i < N; i++) {
     const cards = makeCards([[4,'H'],[4,'D'],[4,'C'],[9,'S'],[11,'H']]);
-    const r = CardEngine.evaluateHand(cards);
+    const r = CardEngine.evaluateHand(cards, null, null, BASELINE_STATE);
     if (r.handName === 'Flyout') flyouts++;
   }
   const rate = flyouts / N;
@@ -2198,7 +2202,7 @@ console.log('\n── Pitcher Adjusts: escalating out chance ──');
   const trials = 1000;
   for (let i = 0; i < trials; i++) {
     bs.pairsPlayedThisInning = 3; // reset before each eval since it increments
-    const r = CardEngine.evaluateHand(aceCards, null, null, { baseballState: bs });
+    const r = CardEngine.evaluateHand(aceCards, null, null, { baseballState: bs, discardCount: 1 });
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const outRate = outs / trials;
@@ -2231,7 +2235,7 @@ console.log('\n── Universal Pitcher Reads: Straights/Flushes/Trips degrade �
   const trials = 2000;
   for (let i = 0; i < trials; i++) {
     bs.straightsPlayedThisInning = 2;
-    const r = CardEngine.evaluateHand(straightCards, null, null, { baseballState: bs });
+    const r = CardEngine.evaluateHand(straightCards, null, null, { baseballState: bs, discardCount: 1 });
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const outRate = outs / trials;
@@ -2250,7 +2254,7 @@ console.log('\n── Universal Pitcher Reads: Straights/Flushes/Trips degrade �
   const trials = 2000;
   for (let i = 0; i < trials; i++) {
     bs.flushesPlayedThisInning = 2;
-    const r = CardEngine.evaluateHand(flushCards, null, null, { baseballState: bs });
+    const r = CardEngine.evaluateHand(flushCards, null, null, { baseballState: bs, discardCount: 1 });
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const outRate = outs / trials;
@@ -2266,7 +2270,7 @@ console.log('\n── Universal Pitcher Reads: Straights/Flushes/Trips degrade �
   const trials = 2000;
   for (let i = 0; i < trials; i++) {
     bs.tripsPlayedThisInning = 2;
-    const r = CardEngine.evaluateHand(tripCards, null, null, { baseballState: bs });
+    const r = CardEngine.evaluateHand(tripCards, null, null, { baseballState: bs, discardCount: 1 });
     if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
   }
   const outRate = outs / trials;
@@ -2294,6 +2298,46 @@ console.log('\n── Universal Pitcher Reads: Straights/Flushes/Trips degrade �
   ];
   CardEngine.evaluateHand(straightCards, null, null, { baseballState: bs });
   assert(bs.straightsPlayedThisInning === 1, 'straightsPlayedThisInning incremented after straight');
+}
+
+console.log('\n── Discard scaling ──');
+
+{
+  // 0 discards (first-pitch swing): Pair of Aces should have -10% out bonus
+  // Base: 0.95 - 12*0.03 = 0.59, with bonus: 0.49
+  const aceCards = [{ rank: 14, suit: 'H' }, { rank: 14, suit: 'D' }];
+  let outs = 0;
+  const N = 2000;
+  for (let i = 0; i < N; i++) {
+    const r = CardEngine.evaluateHand(aceCards, null, null, { discardCount: 0 });
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
+  }
+  const rate = outs / N;
+  assertClose(rate, 0.39, 0.59, `0-discard Aces out rate ~49%: ${(rate*100).toFixed(1)}%`);
+}
+{
+  // 1 discard (baseline): no modifier, same as base rate
+  const aceCards = [{ rank: 14, suit: 'H' }, { rank: 14, suit: 'D' }];
+  let outs = 0;
+  const N = 2000;
+  for (let i = 0; i < N; i++) {
+    const r = CardEngine.evaluateHand(aceCards, null, null, { discardCount: 1 });
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
+  }
+  const rate = outs / N;
+  assertClose(rate, 0.49, 0.69, `1-discard Aces out rate ~59%: ${(rate*100).toFixed(1)}%`);
+}
+{
+  // 3 discards: +5% + 3% = +8% penalty → 0.59 + 0.08 = 0.67
+  const aceCards = [{ rank: 14, suit: 'H' }, { rank: 14, suit: 'D' }];
+  let outs = 0;
+  const N = 2000;
+  for (let i = 0; i < N; i++) {
+    const r = CardEngine.evaluateHand(aceCards, null, null, { discardCount: 3 });
+    if (r.handName === 'Groundout' || r.handName === 'Flyout') outs++;
+  }
+  const rate = outs / N;
+  assertClose(rate, 0.57, 0.77, `3-discard Aces out rate ~67%: ${(rate*100).toFixed(1)}%`);
 }
 
 console.log('\n── Contact rescue nerf ──');

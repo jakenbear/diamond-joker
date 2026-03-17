@@ -1401,7 +1401,7 @@ export default class GameScene extends Phaser.Scene {
     const isHighCard = trueHand === 'High Card' || trueHand === 'Strikeout';
 
     // Fresh snapshot for success chance (evaluateHand already incremented evalState)
-    const successPct = isHighCard ? 0 : CardEngine.getSuccessChance(trueHand, pairRank, 0, { baseballState: { ...counters } });
+    const successPct = isHighCard ? 0 : CardEngine.getSuccessChance(trueHand, pairRank, 0, { baseballState: { ...counters }, discardCount: this.discardCount || 0 });
 
     let preview = '';
     let color = '#ffd600';
@@ -1421,10 +1421,10 @@ export default class GameScene extends Phaser.Scene {
       preview = `${desc} \u2192 ${result.outcome}`;
       color = '#ff6e40';
     } else {
-      // Hands with out chance — show percentage
+      // Hands with out chance — color-coded, no percentage
       const desc = result.playedDescription || trueHand;
       const outcome = HAND_TABLE.find(h => h.handName === trueHand)?.outcome || result.outcome;
-      preview = `${desc} \u2192 ${outcome}  (${successPct}%)`;
+      preview = `${desc} \u2192 ${outcome}`;
 
       // Color by success chance
       if (successPct >= 70) color = '#69f0ae';      // green — safe
@@ -1902,6 +1902,7 @@ export default class GameScene extends Phaser.Scene {
     const pitcher = this.rosterManager.getCurrentPitcher();
     const gameState = this.baseball.getStatus();
     gameState.baseballState = this.baseball;
+    gameState.discardCount = this.discardCount || 0;
 
     // Sac Bunt: 1 card played + runners on base + < 2 outs
     if (selectedArr.length === 1 && gameState.bases.some(b => b) && gameState.outs < 2) {

@@ -293,6 +293,13 @@ static func _apply_rank_quality(entry: Dictionary, pair_rank: int, hand_idx: int
 		# Full House
 		out_chance = Balance.FULL_HOUSE_OUT_BASE
 
+	# Discard scaling: reward first-pitch swings, punish fishing
+	var discard_count: int = game_state.get("discard_count", 0)
+	if discard_count == 0:
+		out_chance -= Balance.DISCARD_BONUS_0
+	elif discard_count >= 2:
+		out_chance += Balance.DISCARD_PENALTY_2 + maxf(0, discard_count - 2) * Balance.DISCARD_PENALTY_3_PLUS
+
 	out_chance = minf(Balance.OUT_MAX, maxf(Balance.OUT_MIN, out_chance))
 
 	if randf() < out_chance:
@@ -353,6 +360,13 @@ static func get_success_chance(hand_name: String, pair_rank: int = 0, strike_cou
 		out_chance = Balance.FULL_HOUSE_OUT_BASE
 	else:
 		return 0
+
+	# Discard scaling
+	var discard_count: int = game_state.get("discard_count", 0)
+	if discard_count == 0:
+		out_chance -= Balance.DISCARD_BONUS_0
+	elif discard_count >= 2:
+		out_chance += Balance.DISCARD_PENALTY_2 + maxf(0, discard_count - 2) * Balance.DISCARD_PENALTY_3_PLUS
 
 	out_chance = clampf(out_chance, Balance.OUT_MIN, Balance.OUT_MAX)
 	return roundi((1.0 - out_chance) * 100)

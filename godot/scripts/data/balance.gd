@@ -31,6 +31,11 @@ const TRIPS_DEGRADATION := 0.15
 const STRAIGHT_DEGRADATION := 0.20
 const FLUSH_DEGRADATION := 0.20
 
+# Discard Scaling
+const DISCARD_BONUS_0 := 0.10
+const DISCARD_PENALTY_2 := 0.05
+const DISCARD_PENALTY_3_PLUS := 0.03
+
 # Contact Rescue
 const CONTACT_RESCUE_SCALE := 0.04
 

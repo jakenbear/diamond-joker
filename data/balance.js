@@ -32,6 +32,11 @@ const BALANCE = {
   straightDegradation: 0.20,
   flushDegradation: 0.20,
 
+  // ── Discard Scaling ────────────────────────────
+  discardBonus0: 0.10,           // -10% out chance on 0 discards (first-pitch swing)
+  discardPenalty2: 0.05,         // +5% out chance on 2 discards
+  discardPenalty3Plus: 0.03,     // +3% per discard beyond 2
+
   // ── Contact Rescue ─────────────────────────────
   contactRescueScale: 0.04,    // batter.contact * this = save chance
 

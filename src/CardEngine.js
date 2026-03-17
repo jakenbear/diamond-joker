@@ -318,6 +318,11 @@ export default class CardEngine {
       outChance = BALANCE.fullHouseOutBase;
     }
 
+    // Discard scaling: reward first-pitch swings, punish fishing
+    const discardCount = gameState?.discardCount || 0;
+    if (discardCount === 0) outChance -= BALANCE.discardBonus0;
+    else if (discardCount >= 2) outChance += BALANCE.discardPenalty2 + Math.max(0, discardCount - 2) * BALANCE.discardPenalty3Plus;
+
     outChance = Math.min(BALANCE.outMax, Math.max(BALANCE.outMin, outChance));
 
     if (Math.random() < outChance) {
@@ -385,6 +390,11 @@ export default class CardEngine {
     } else {
       return 0; // High Card = strikeout
     }
+
+    // Discard scaling: reward first-pitch swings, punish fishing
+    const discardCount = gameState?.discardCount || 0;
+    if (discardCount === 0) outChance -= BALANCE.discardBonus0;
+    else if (discardCount >= 2) outChance += BALANCE.discardPenalty2 + Math.max(0, discardCount - 2) * BALANCE.discardPenalty3Plus;
 
     outChance = Math.min(BALANCE.outMax, Math.max(BALANCE.outMin, outChance));
     return Math.round((1 - outChance) * 100);

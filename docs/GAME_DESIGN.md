@@ -560,10 +560,28 @@ Key parameters to tune:
 | Lever | Current Value | Effect |
 |-------|--------------|--------|
 | Hand size | 7 | More cards = more hand options |
-| Discards | 2 | Discard depth for hand improvement |
+| Discards | unlimited (count-limited) | Discard depth for hand improvement |
 | Pair out base | 95% - rank×3% | How risky pairs feel |
-| Pitcher adjusts | +25%/pair, +20%/straight/flush, +15%/trips | Universal hand degradation |
+| Pitcher adjusts | +10%/pair, +20%/straight/flush, +15%/trips | Universal hand degradation |
+| **Discard scaling** | 0 disc: -10%, 2: +5%, 3+: +3%/extra | Rewards first-pitch swings, punishes fishing |
 | Contact rescue | contact × 4% | Pair safety net |
 | Shop buy limits | 1/2/3 | Trait accumulation rate |
 | Fatigue rate | 8% per inning past threshold | Late-game pitcher decay |
 | Error base | 4% | Comeback potential |
+
+### Discard Scaling
+
+Each discard used in an at-bat adjusts the out chance for the final hand played:
+
+| Discards Used | Out Chance Modifier | Feel |
+|---|---|---|
+| 0 (first pitch) | -10% | Reward for swinging at what you're dealt |
+| 1 | 0% | Normal play |
+| 2 | +5% | Pitcher is reading you |
+| 3 | +8% | Fishing hard |
+| 4 | +11% | Very risky |
+| 5+ | +3% per extra | Diminishing returns on building a hand |
+
+Hand preview uses color-coded text (green/gold/orange/red) instead of raw percentages. Traits and contact rescue are hidden — the player sees the base risk, their build rewards them invisibly.
+
+All tuning values live in `data/balance.js` (single source of truth).
