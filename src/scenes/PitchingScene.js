@@ -140,10 +140,12 @@ export default class PitchingScene extends Phaser.Scene {
       this.add.rectangle(cx - gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 3rd
     ];
 
-    // Runner name text below the diamond
-    this._baseBugRunnerText = this.add.text(cx, cy + gap + 16, '', {
-      fontSize: '11px', fontFamily: 'monospace', color: '#ffd600',
-    }).setOrigin(0.5, 0).setDepth(9);
+    // Runner name texts below home plate (vertical list: 1B / 2B / 3B)
+    this._baseBugRunnerTexts = [
+      this.add.text(cx, cy + gap + 14, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0).setDepth(9),
+      this.add.text(cx, cy + gap + 27, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0).setDepth(9),
+      this.add.text(cx, cy + gap + 40, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0).setDepth(9),
+    ];
 
     // Keep these for _advanceOppRunners / _handleIBB compatibility
     this.basePositions = [
@@ -170,16 +172,16 @@ export default class PitchingScene extends Phaser.Scene {
       this.runners[i] = occupied ? bases[i] : null;
     }
 
-    // Show runner names below diamond
-    const names = [];
+    // Show runner names below diamond (vertical list)
     const labels = ['1B', '2B', '3B'];
     for (let i = 0; i < 3; i++) {
       if (bases[i] && typeof bases[i] === 'object' && bases[i].name) {
         const last = bases[i].name.split(' ').pop();
-        names.push(`${labels[i]}: ${last}`);
+        this._baseBugRunnerTexts[i].setText(`${labels[i]}: ${last}`);
+      } else {
+        this._baseBugRunnerTexts[i].setText('');
       }
     }
-    this._baseBugRunnerText.setText(names.join('  '));
   }
 
   _showStrikeoutK() {
@@ -772,40 +774,41 @@ export default class PitchingScene extends Phaser.Scene {
     // Community cards (center row)
     const commY = 290;
     const commCount = state.community.length;
-    const commStartX = 640 - (commCount - 1) * 55;
+    const commStartX = 640 - (commCount - 1) * 65;
     state.community.forEach((card, i) => {
-      const x = commStartX + i * 110;
+      const x = commStartX + i * 130;
       const faceDown = state.faceDownIndices.includes(i);
       const locked = state.lockedIndices.includes(i);
       this._renderCardOnBoard(x, commY, card, !faceDown, locked, 'community');
     });
 
     // Pitcher hole cards (below community)
-    const holeY = 470;
-    const holeStartX = 600;
-    this._boardElements.push(this.add.text(holeStartX - 65, holeY, 'YOU', {
+    const holeY = 480;
+    const holeStartX = 580;
+    const holeSpacing = 120;
+    this._boardElements.push(this.add.text(holeStartX - 75, holeY, 'YOU', {
       fontSize: '13px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
     }).setOrigin(1, 0.5).setDepth(5));
     state.pitcherHole.forEach((card, i) => {
-      const x = holeStartX + i * 95;
+      const x = holeStartX + i * holeSpacing;
       this._renderCardOnBoard(x, holeY, card, true, false, 'pitcher');
     });
 
     // Batter hole cards (above community)
-    const batterY = 130;
-    this._boardElements.push(this.add.text(holeStartX - 65, batterY, 'OPP', {
+    const batterY = 120;
+    this._boardElements.push(this.add.text(holeStartX - 75, batterY, 'OPP', {
       fontSize: '13px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
     }).setOrigin(1, 0.5).setDepth(5));
     state.batterHole.forEach((card, i) => {
-      const x = holeStartX + i * 95;
+      const x = holeStartX + i * holeSpacing;
       const revealed = state.revealedBatterCards.includes(i);
       this._renderCardOnBoard(x, batterY, card, revealed, false, 'batter');
     });
   }
 
   _renderCardOnBoard(x, y, card, faceUp, locked, owner) {
-    const CARD_BW = 80;
-    const CARD_BH = 110;
+    const CARD_BW = 96;
+    const CARD_BH = 126;
     const ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
     const ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
 
@@ -1096,7 +1099,7 @@ export default class PitchingScene extends Phaser.Scene {
     const LOG_START_Y = 525;
     const LOG_LINE_H = 20;
     const MAX_VISIBLE = 3;
-    const LOG_X = 350;
+    const LOG_X = 15;
     if (ps.logIndex >= MAX_VISIBLE) {
       const oldest = ps.logElements.shift();
       this.tweens.add({ targets: oldest, alpha: 0, duration: 150, onComplete: () => oldest.destroy() });
