@@ -165,7 +165,22 @@ func resolve_outcome(outcome: String, hand_score: int = 0, batter = null) -> Dic
 			description = "Fielder's Choice - Out %d" % outs
 		else:
 			outs += 1
-			description = "%s - Out %d" % [outcome, outs]
+			if outcome == "Groundout" and bases[0]:
+				var force_runs := _advance_forced()
+				if force_runs > 0:
+					if half == "top":
+						player_score += force_runs
+					else:
+						opponent_score += force_runs
+					_current_inning_player_runs += force_runs
+					runs_scored += force_runs
+				description = "Groundout - Out %d" % outs
+				if force_runs > 0:
+					description += ", %d run%s scored!" % [force_runs, "s" if force_runs > 1 else ""]
+				else:
+					description += ", runners advance"
+			else:
+				description = "%s - Out %d" % [outcome, outs]
 
 		if outs >= 3:
 			bases = [null, null, null]
@@ -289,6 +304,24 @@ func _advance_runners(bases_to_move: int, batter = null, is_walk: bool = false) 
 	if bases_to_move >= 1 and bases_to_move <= 3:
 		bases[bases_to_move - 1] = batter if batter else true
 
+	return runs
+
+
+func _advance_forced() -> int:
+	var runs := 0
+	var force_up_to := -1
+	for i in range(3):
+		if bases[i]:
+			force_up_to = i
+		else:
+			break
+	for i in range(force_up_to, -1, -1):
+		var runner = bases[i]
+		bases[i] = null
+		if i + 1 >= 3:
+			runs += 1
+		else:
+			bases[i + 1] = runner
 	return runs
 
 

@@ -166,7 +166,19 @@ export default class BaseballState {
         description = `Fielder's Choice - Out ${this.outs}`;
       } else {
         this.outs++;
-        description = `${outcome} - Out ${this.outs}`;
+        // Force play: groundout with runner on 1st forces all runners to advance
+        if (outcome === 'Groundout' && this.bases[0]) {
+          const forceRuns = this._advanceForced();
+          if (forceRuns > 0) {
+            if (this.half === 'top') this.playerScore += forceRuns;
+            else this.opponentScore += forceRuns;
+            this._currentInningPlayerRuns += forceRuns;
+            runsScored += forceRuns;
+          }
+          description = `Groundout - Out ${this.outs}` + (forceRuns > 0 ? `, ${forceRuns} run${forceRuns > 1 ? 's' : ''} scored!` : ', runners advance');
+        } else {
+          description = `${outcome} - Out ${this.outs}`;
+        }
       }
 
       if (this.outs >= 3) {
@@ -321,6 +333,32 @@ export default class BaseballState {
       this.bases[basesToMove - 1] = batter || true;
     }
 
+    return runs;
+  }
+
+  /**
+   * Force play on groundout: advance all runners in a continuous chain
+   * from 1st base. Batter is OUT, so 1st base becomes empty.
+   * Returns runs scored (e.g. bases loaded groundout scores from 3rd).
+   */
+  _advanceForced() {
+    let runs = 0;
+    // Find how far the force chain extends from 1st
+    let forceUpTo = -1;
+    for (let i = 0; i < 3; i++) {
+      if (this.bases[i]) forceUpTo = i;
+      else break;
+    }
+    // Advance forced runners from highest to lowest
+    for (let i = forceUpTo; i >= 0; i--) {
+      const runner = this.bases[i];
+      this.bases[i] = null;
+      if (i + 1 >= 3) {
+        runs++;
+      } else {
+        this.bases[i + 1] = runner;
+      }
+    }
     return runs;
   }
 

@@ -425,6 +425,10 @@ These trigger automatically based on game state:
 - **Chance:** max(0, (5 - pitcherControl) × 1.5%)
 - **Result:** Batter awarded 1st base
 
+### Force Play on Groundout
+- **When:** Groundout + runner on 1st (when DP and FC don't trigger)
+- **Result:** All forced runners advance one base (batter is out at 1st). Bases loaded groundout can score a run from 3rd.
+
 ### Productive Groundout
 - **When:** Groundout + runner on 2nd or 3rd + outs < 2 (and no DP/FC triggered)
 - **Chance:** 40% + speed × 3%
