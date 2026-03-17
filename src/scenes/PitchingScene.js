@@ -34,8 +34,12 @@ export default class PitchingScene extends Phaser.Scene {
   }
 
   create() {
-    // Background - match GameScene's config background
-    this.add.rectangle(640, 360, 1280, 720, 0x1b5e20);
+    // Stadium background (shared texture from GameScene preload)
+    if (this.textures.exists('stadium_bg')) {
+      this.add.image(640, 360, 'stadium_bg').setScale(4).setDepth(-1);
+    } else {
+      this.add.rectangle(640, 360, 1280, 720, 0x1b5e20);
+    }
 
     // Clean up on exit
     this.events.once('shutdown', () => {
