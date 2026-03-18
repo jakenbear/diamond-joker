@@ -86,15 +86,21 @@ func deal_river() -> void:
 static func best_hand(hole: Array[Dictionary], comm: Array[Dictionary]) -> Dictionary:
 	var all_cards := hole + comm
 	if all_cards.size() < 5:
-		return {"score": 0, "hand_name": "High Card"}
+		# Not enough cards — evaluate what we have
+		return CardEngine.evaluate_hand(all_cards)
 	var best: Dictionary = {}
 	var best_score := -1
 	var combos := _combinations(all_cards, 5)
 	for combo in combos:
-		var result := _evaluate_simple(combo)
+		var result := CardEngine.evaluate_hand(combo)
 		if result["score"] > best_score:
 			best = result
 			best_score = result["score"]
+	if not best.is_empty() and best_score == 0:
+		var high_card := 0
+		for c in all_cards:
+			high_card = maxi(high_card, c["rank"])
+		best["_high_card"] = high_card
 	return best
 
 
@@ -112,65 +118,6 @@ static func _combo_helper(arr: Array, k: int, start: int, current: Array, result
 		current.append(arr[i])
 		_combo_helper(arr, k, i + 1, current, results)
 		current.pop_back()
-
-
-static func _evaluate_simple(cards: Array[Dictionary]) -> Dictionary:
-	var ranks: Array[int] = []
-	var suits: Array[String] = []
-	for c in cards:
-		ranks.append(c["rank"])
-		suits.append(c["suit"])
-	ranks.sort()
-
-	var freq := {}
-	for r in ranks:
-		freq[r] = freq.get(r, 0) + 1
-	var counts: Array[int] = []
-	for v in freq.values():
-		counts.append(v)
-	counts.sort()
-	counts.reverse()
-
-	var is_flush := cards.size() == 5 and suits.all(func(s): return s == suits[0])
-	var is_straight := cards.size() == 5 and _is_straight(ranks)
-
-	var score := 0
-	var hand_name := "High Card"
-
-	if is_flush and is_straight:
-		if ranks[0] == 10 and ranks[4] == 14:
-			score = 300; hand_name = "Royal Flush"
-		else:
-			score = 200; hand_name = "Straight Flush"
-	elif counts[0] == 4:
-		score = 120; hand_name = "Four of a Kind"
-	elif counts[0] == 3 and counts.size() > 1 and counts[1] == 2:
-		score = 50; hand_name = "Full House"
-	elif is_flush:
-		score = 40; hand_name = "Flush"
-	elif is_straight:
-		score = 30; hand_name = "Straight"
-	elif counts[0] == 3:
-		score = 20; hand_name = "Three of a Kind"
-	elif counts[0] == 2 and counts.size() > 1 and counts[1] == 2:
-		score = 10; hand_name = "Two Pair"
-	elif counts[0] == 2:
-		score = 5; hand_name = "Pair"
-
-	score += ranks[ranks.size() - 1]
-
-	return {"score": score, "hand_name": hand_name}
-
-
-static func _is_straight(sorted: Array[int]) -> bool:
-	if sorted.size() != 5:
-		return false
-	for i in range(1, sorted.size()):
-		if sorted[i] != sorted[i - 1] + 1:
-			if sorted[4] == 14 and sorted[0] == 2 and sorted[1] == 3 and sorted[2] == 4 and sorted[3] == 5:
-				return true
-			return false
-	return true
 
 
 # Trait Bonuses
