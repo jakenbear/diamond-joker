@@ -1531,22 +1531,20 @@ export default class GameScene extends Phaser.Scene {
         preview = 'High Card — Strikeout';
         color = '#ff8a80';
       }
-    } else if (successPct >= 100) {
-      // Guaranteed hands (Four of a Kind+)
-      const desc = result.playedDescription || trueHand;
-      preview = `${desc} \u2192 ${result.outcome}`;
-      color = '#ff6e40';
     } else {
-      // Hands with out chance — color-coded, no percentage
-      const desc = result.playedDescription || trueHand;
-      const outcome = HAND_TABLE.find(h => h.handName === trueHand)?.outcome || result.outcome;
+      // Always show best possible outcome from HAND_TABLE, not the rolled result
+      const entry = HAND_TABLE.find(h => h.handName === trueHand);
+      const outcome = entry?.outcome || result.outcome;
+      const desc = result.playedDescription && !result.wasGroundout
+        ? result.playedDescription
+        : trueHand;
       preview = `${desc} \u2192 ${outcome}`;
 
-      // Color by success chance
-      if (successPct >= 70) color = '#69f0ae';      // green — safe
-      else if (successPct >= 40) color = '#ffd600';  // gold — risky
-      else if (successPct >= 20) color = '#ff8a65';  // orange — dangerous
-      else color = '#ff5252';                         // red — near-certain out
+      if (successPct >= 100) color = '#ff6e40';
+      else if (successPct >= 70) color = '#69f0ae';      // green — safe
+      else if (successPct >= 40) color = '#ffd600';       // gold — risky
+      else if (successPct >= 20) color = '#ff8a65';       // orange — dangerous
+      else color = '#ff5252';                              // red — near-certain out
     }
 
     this.handPreviewText.setText(preview);
