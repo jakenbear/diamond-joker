@@ -727,15 +727,12 @@ export default class PitchingScene extends Phaser.Scene {
   }
 
   _dealShowdownTurn() {
-    // Un-hide face-down cards from breaking ball at new stage
-    this.showdownEngine.faceDownIndices = [];
     this.showdownEngine.dealTurn();
     this._renderShowdownBoard();
     this._showPitchAbilities('turn');
   }
 
   _dealShowdownRiver() {
-    this.showdownEngine.faceDownIndices = [];
     this.showdownEngine.dealRiver();
     this._renderShowdownBoard();
     this._showPitchAbilities('river');
