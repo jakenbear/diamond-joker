@@ -6,8 +6,22 @@ export default class TitleScene extends Phaser.Scene {
     super({ key: 'TitleScene' });
   }
 
+  preload() {
+    if (!this.textures.exists('stadium_bg')) {
+      this.load.image('stadium_bg', 'assets/stadium_bg.png');
+    }
+  }
+
   create() {
-    this.add.rectangle(640, 360, 1280, 720, 0x0d3311);
+    // Stadium background
+    if (this.textures.exists('stadium_bg')) {
+      this.add.image(640, 360, 'stadium_bg').setScale(4).setDepth(-2);
+      this.textures.get('stadium_bg').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      // Dark overlay for readability
+      this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.5).setDepth(-1);
+    } else {
+      this.add.rectangle(640, 360, 1280, 720, 0x0d3311);
+    }
 
     // Diamond shape decoration
     const diamond = this.add.graphics();

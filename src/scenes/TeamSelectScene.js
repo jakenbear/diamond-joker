@@ -16,6 +16,9 @@ export default class TeamSelectScene extends Phaser.Scene {
   }
 
   preload() {
+    if (!this.textures.exists('stadium_bg')) {
+      this.load.image('stadium_bg', 'assets/stadium_bg.png');
+    }
     TEAMS.forEach(t => {
       const key = LOGO_KEYS[t.id];
       if (key && !this.textures.exists(key)) {
@@ -103,7 +106,8 @@ export default class TeamSelectScene extends Phaser.Scene {
     });
     this.elements.push(colLabels);
 
-    this.add.rectangle(350, 128, 660, 1, 0x444444);
+    const colDivider = this.add.rectangle(350, 128, 660, 1, 0x444444);
+    this.elements.push(colDivider);
 
     team.batters.forEach((b, i) => {
       const rowY = 145 + i * 34;
@@ -237,8 +241,8 @@ export default class TeamSelectScene extends Phaser.Scene {
 
     const yLogoKey = LOGO_KEYS[yourTeam.id];
     const yLogo = yLogoKey && this.textures.exists(yLogoKey)
-      ? this.add.image(320, 192, yLogoKey).setOrigin(0.5).setDisplaySize(90, 90)
-      : this.add.text(320, 192, yourTeam.logo, { fontSize: '64px' }).setOrigin(0.5);
+      ? this.add.image(320, 170, yLogoKey).setOrigin(0.5).setDisplaySize(80, 80).setDepth(1)
+      : this.add.text(320, 170, yourTeam.logo, { fontSize: '64px' }).setOrigin(0.5);
     this.elements.push(yLogo);
     const yourName = this.add.text(320, 252, yourTeam.name.toUpperCase(), {
       fontSize: '32px', fontFamily: 'monospace', color: yourTeam.color, fontStyle: 'bold',
@@ -276,8 +280,8 @@ export default class TeamSelectScene extends Phaser.Scene {
 
     const oLogoKey = LOGO_KEYS[oppTeam.id];
     const oLogo = oLogoKey && this.textures.exists(oLogoKey)
-      ? this.add.image(960, 192, oLogoKey).setOrigin(0.5).setDisplaySize(90, 90)
-      : this.add.text(960, 192, oppTeam.logo, { fontSize: '64px' }).setOrigin(0.5);
+      ? this.add.image(960, 170, oLogoKey).setOrigin(0.5).setDisplaySize(80, 80).setDepth(1)
+      : this.add.text(960, 170, oppTeam.logo, { fontSize: '64px' }).setOrigin(0.5);
     this.elements.push(oLogo);
     const oppName = this.add.text(960, 252, oppTeam.name.toUpperCase(), {
       fontSize: '32px', fontFamily: 'monospace', color: oppTeam.color, fontStyle: 'bold',
