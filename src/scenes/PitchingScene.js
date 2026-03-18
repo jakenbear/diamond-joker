@@ -106,9 +106,10 @@ export default class PitchingScene extends Phaser.Scene {
     this.youIndicator.setX(scoreLeft + measured.width / 2);
     measured.destroy();
 
+    const liveOuts = this._pitchState ? this._pitchState.outs : s.outs;
     const outDots = [];
     for (let i = 0; i < 3; i++) {
-      outDots.push(i < s.outs ? '\u25cf' : '\u25cb');
+      outDots.push(i < liveOuts ? '\u25cf' : '\u25cb');
     }
     this.outsText.setText(`Outs: ${outDots.join(' ')}`);
   }
@@ -1124,6 +1125,7 @@ export default class PitchingScene extends Phaser.Scene {
     ps.logIndex++;
     this.tweens.add({ targets: logLine, alpha: 1, y: logY, duration: 200 });
 
+    this._updateScoreboard();
     this._updateBases(ps.bases);
     this.rosterManager.opponentBatterIndex = (this.rosterManager.opponentBatterIndex + 1) % 9;
 
