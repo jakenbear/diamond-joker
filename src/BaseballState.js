@@ -185,7 +185,7 @@ export default class BaseballState {
         this.bases = [null, null, null];
         this.outs = 0;
         this.state = 'SWITCH_SIDE';
-        description += ' - Side retired!';
+        // Side retired shown via inning transition, not in description
       } else {
         this.state = 'BATTING';
       }

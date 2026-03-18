@@ -116,10 +116,10 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Base Diamond (scorebug mini-diamond) ────────────────
 
   _createBaseDiamond() {
-    // Prominent diamond — right of center, shifted left and down
-    const cx = 880, cy = 140;
-    const bs = 22; // base square size
-    const gap = 32; // distance from center to each base
+    // Diamond — right of hole cards row
+    const cx = 900, cy = 430;
+    const bs = 18; // base square size
+    const gap = 26; // distance from center to each base
 
     // Diamond background panel
     this.add.rectangle(cx, cy, gap * 2 + bs + 20, gap * 2 + bs + 20, 0x0a1f0d, 0.6)
@@ -224,12 +224,12 @@ export default class PitchingScene extends Phaser.Scene {
 
   _createResultDisplay() {
     // Centered between OPP and YOU card rows
-    this.resultText = this.add.text(640, 300, '', {
+    this.resultText = this.add.text(640, 385, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: 500 },
     }).setOrigin(0.5).setDepth(10);
 
-    this.handNameText = this.add.text(640, 322, '', {
+    this.handNameText = this.add.text(640, 405, '', {
       fontSize: '11px', fontFamily: 'monospace', color: '#81c784',
       align: 'center', wordWrap: { width: 500 },
     }).setOrigin(0.5).setDepth(10);
@@ -648,6 +648,7 @@ export default class PitchingScene extends Phaser.Scene {
     // Drain a base stamina cost per at-bat
     this.rosterManager.myPitcherStamina = Math.max(0, this.rosterManager.myPitcherStamina - 0.03);
 
+    this.resultText.setY(300);  // center between OPP (170) and YOU (430)
     this.resultText.setText(`Showdown vs ${batter.name}`);
     this.resultText.setColor('#ffe082');
     this.handNameText.setText('');
@@ -865,10 +866,12 @@ export default class PitchingScene extends Phaser.Scene {
       twoseam: 0xc62828, knuckle: 0x00838f, screwball: 0x7b1fa2, palmball: 0x2e7d32,
     };
 
+    this.resultText.setY(385);  // between community (290) and hole (480)
     this.resultText.setText(`${stage.toUpperCase()} — Pick a pitch ability`);
     this.resultText.setColor('#ffe082');
 
     const stageNum = { flop: 1, turn: 2, river: 3 }[stage];
+    this.handNameText.setY(405);
     this.handNameText.setText(`Stage ${stageNum}/3`);
     this.handNameText.setColor('#81c784');
 
