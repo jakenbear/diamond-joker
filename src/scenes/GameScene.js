@@ -3495,86 +3495,69 @@ export default class GameScene extends Phaser.Scene {
       label.setAlpha(1);
     });
 
-    // Spin the ball — start fast, decelerate over ~2.5s
-    let spinSpeed = 720; // degrees per second
+    // Spin the lines with pure physics — no blending, no course correction.
+    // The outcome is baked into the total rotation so they naturally land right.
     let spinTimer = null;
     const SPIN_START = 300;
-    const SPIN_END = 2800;    // ball stops spinning
-    const REVEAL_TIME = 3000; // show check/X
+    const SPIN_END = 2800;
+    const REVEAL_TIME = 3000;
     const FADEOUT_TIME = 3500;
+    const SPIN_DUR = SPIN_END - SPIN_START; // 2500ms of deceleration
 
-    // Rig final angles: success = both at 0° (one fat green line), fail = near-miss then drift
-    const s2NearMiss = isOut ? 5 : 0;
-    const s2Final = isOut ? 25 + Math.random() * 40 : 0;
+    // Pre-calculate total rotation for each line.
+    // Both use cubic ease-out: angle(t) = totalRot * (1 - (1-t)^3)
+    // s1 spins CW, s2 spins CCW. Line symmetry = 180°, so we only care about final % 180.
+    // Pick base rotations (~4-6 full spins) then adjust so final angle lands where we want.
+    const baseSpins = 5; // ~5 full rotations feels right for 2.5s
+    const s1Target = 0; // always land horizontal
+    const s2Target = isOut ? (25 + Math.random() * 40) : 0; // fail: 25-65° offset
+
+    // Snap total rotation to hit the target angle (mod 180)
+    const snapToTarget = (startAngle, target, spins) => {
+      const raw = spins * 360;
+      const remainder = (startAngle + raw) % 180;
+      return raw + (target - remainder);
+    };
+    const s1TotalRot = snapToTarget(s1Angle, s1Target, baseSpins);
+    const s2TotalRot = snapToTarget(s2Angle, s2Target, baseSpins + 0.7); // slightly more spins for s2
 
     this.time.delayedCall(SPIN_START, () => {
       if (skipped) return;
 
-      // Continuous rotation via timer
-      const interval = 16; // ~60fps
+      const interval = 16;
       let lastTickTime = 0;
-      let tickInterval = 80; // ms between beeps — starts fast
+      let tickInterval = 80;
       const startPitch = 900;
       const endPitch = 400;
+
       spinTimer = this.time.addEvent({
         delay: interval,
         loop: true,
         callback: () => {
           if (skipped) return;
           const elapsed = this.time.now - spinStartTime;
-          const progress = Math.min(1, elapsed / (SPIN_END - SPIN_START));
+          const t = Math.min(1, elapsed / SPIN_DUR);
 
-          // Ease-out deceleration: fast → slow
-          const eased = 1 - Math.pow(1 - progress, 3);
-          const currentSpeed = spinSpeed * (1 - eased * 0.97);
+          // Cubic ease-out: fast start, natural deceleration
+          const eased = 1 - Math.pow(1 - t, 3);
 
-          const angleDelta = currentSpeed * (interval / 1000);
+          // Absolute positions from easing curve — no direction changes possible
+          const s1Pos = s1Angle + s1TotalRot * eased;
+          const s2Pos = s2Angle - s2TotalRot * eased; // opposite direction
 
-          // Ball rotates normally
-          ball.setAngle(ball.angle + angleDelta);
+          stitch1.setAngle(s1Pos);
+          stitch2.setAngle(s2Pos);
+          ball.setAngle(s1Pos * 0.5); // ball rotates gently
 
-          // Lines spin in opposite directions
-          s1Angle += angleDelta;
-          s2Angle -= angleDelta;
-
-          // In the last 30%, blend both toward their rigged final angles
-          if (progress > 0.7) {
-            const blend = (progress - 0.7) / 0.3; // 0→1 over last 30%
-            const norm = (a) => ((a % 180) + 180) % 180;
-
-            // s1 always blends to 0° (horizontal)
-            const s1Curr = norm(s1Angle);
-            stitch1.setAngle(s1Curr * (1 - blend * blend));
-
-            // s2: on fail, approach near-miss then drift away. On success, converge to 0°
-            const s2Curr = norm(s2Angle);
-            if (isOut && blend < 0.5) {
-              const nearBlend = (blend / 0.5) * (blend / 0.5);
-              stitch2.setAngle(s2Curr + (s2NearMiss - s2Curr) * nearBlend);
-            } else if (isOut) {
-              const driftBlend = (blend - 0.5) / 0.5;
-              stitch2.setAngle(s2NearMiss + (s2Final - s2NearMiss) * driftBlend);
-            } else {
-              stitch2.setAngle(s2Curr * (1 - blend * blend));
-            }
-          } else {
-            stitch1.setAngle(s1Angle);
-            stitch2.setAngle(s2Angle);
-          }
-
-          // Casino tick beeps — decelerate with the spin
-          tickInterval = 80 + eased * 420; // 80ms → 500ms gaps
+          // Casino tick beeps — use speed (derivative) for timing
+          const speed = 3 * Math.pow(1 - t, 2); // derivative of ease-out
+          tickInterval = 60 + (1 - speed) * 500;
           if (elapsed - lastTickTime >= tickInterval) {
             lastTickTime = elapsed;
-            const pitch = startPitch - eased * (startPitch - endPitch);
+            const pitch = startPitch - (1 - speed) * (startPitch - endPitch);
             SoundManager.spinTick(pitch);
           }
 
-          // Wobble increases as it slows
-          if (progress > 0.7) {
-            const wobble = (progress - 0.7) * 8;
-            ball.setScale(1 + Math.sin(elapsed * 0.02) * wobble * 0.03);
-          }
         },
       });
       var spinStartTime = this.time.now;
