@@ -873,64 +873,164 @@ export default class PitchingScene extends Phaser.Scene {
     this.handNameText.setText(`Stage ${stageNum}/3`);
     this.handNameText.setColor('#81c784');
 
-    const btnY = 640;
-    const btnW = 165;
-    const btnH = 75;
-    const spacing = btnW + 10;
-    const totalW = repertoire.length * spacing + 90; // +90 for skip button
-    const startX = 640 - totalW / 2 + btnW / 2;
+    // Card-style pitch buttons (landscape playing cards)
+    const btnY = 650;
+    const cardW = 140;
+    const cardH = 90;
+    const spacing = cardW + 8;
+    const allPitchKeys = Object.keys(PITCH_TYPES);
+    const wildPool = allPitchKeys.filter(k => !repertoire.includes(k) && !used.includes(k));
+    const hasWild = wildPool.length > 0;
+    const totalSlots = repertoire.length + (hasWild ? 1 : 0);
+    const totalW = totalSlots * spacing + 80; // +80 for skip
+    const startX = 640 - totalW / 2 + cardW / 2;
 
-    repertoire.forEach((key, i) => {
-      const x = startX + i * spacing;
-      const isUsed = used.includes(key);
+    const hoverLift = 6;
+
+    // Helper to create a standard pitch card
+    const makePitchCard = (x, key, isUsed) => {
       const pitch = PITCH_TYPES[key];
-      const color = isUsed ? 0x333333 : (pitchColors[key] || 0x555555);
+      const accentColor = isUsed ? 0x444444 : (pitchColors[key] || 0x555555);
+      const baseY = btnY;
 
-      const bg = this.add.rectangle(x, btnY, btnW, btnH, color, isUsed ? 0.4 : 0.9)
-        .setStrokeStyle(2, isUsed ? 0x444444 : 0xffffff).setDepth(5);
+      const cardBg = this.add.rectangle(x, baseY, cardW, cardH,
+        isUsed ? 0x222222 : 0xfaf3e0, isUsed ? 0.5 : 1)
+        .setStrokeStyle(2, isUsed ? 0x444444 : 0x8b7d5e).setDepth(5);
 
-      const nameText = this.add.text(x, btnY - 22, pitch.name, {
-        fontSize: '14px', fontFamily: 'monospace',
+      const stripe = this.add.rectangle(x, baseY - cardH / 2 + 8, cardW - 6, 14, accentColor, isUsed ? 0.4 : 0.9)
+        .setDepth(6);
+
+      const nameText = this.add.text(x, baseY - cardH / 2 + 8, pitch.name, {
+        fontSize: '12px', fontFamily: 'monospace',
         color: isUsed ? '#666666' : '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(7);
+
+      const effectText = this.add.text(x, baseY + 4, this._showdownEffectDesc(key), {
+        fontSize: '10px', fontFamily: 'monospace',
+        color: isUsed ? '#555555' : '#3e2723',
+        align: 'center', wordWrap: { width: cardW - 16 }, lineSpacing: 1,
       }).setOrigin(0.5).setDepth(6);
 
-      const effectText = this.add.text(x, btnY + 5, this._showdownEffectDesc(key), {
-        fontSize: '10px', fontFamily: 'monospace',
-        color: isUsed ? '#555555' : '#dddddd',
-        align: 'center', wordWrap: { width: btnW - 14 },
+      const statusText = this.add.text(x, baseY + cardH / 2 - 12, isUsed ? 'USED' : 'READY', {
+        fontSize: '9px', fontFamily: 'monospace',
+        color: isUsed ? '#ff5252' : '#2e7d32', fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(6);
 
-      const statusText = this.add.text(x, btnY + 30, isUsed ? 'USED' : 'READY', {
-        fontSize: '10px', fontFamily: 'monospace',
-        color: isUsed ? '#ff5252' : '#69f0ae', fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(6);
+      const elements = [cardBg, stripe, nameText, effectText, statusText];
+      elements.forEach(el => { el._baseY = el.y; });
 
       if (!isUsed) {
-        bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => {
-          bg.setStrokeStyle(3, 0xffd600);
-          this.tweens.add({ targets: [bg, nameText, effectText, statusText], y: '-=5', duration: 80 });
+        cardBg.setInteractive({ useHandCursor: true });
+        cardBg.on('pointerover', () => {
+          cardBg.setStrokeStyle(3, 0xffd600);
+          elements.forEach(el => {
+            this.tweens.killTweensOf(el);
+            this.tweens.add({ targets: el, y: el._baseY - hoverLift, duration: 80 });
+          });
         });
-        bg.on('pointerout', () => {
-          bg.setStrokeStyle(2, 0xffffff);
-          this.tweens.add({ targets: [bg, nameText, effectText, statusText], y: '+=5', duration: 80 });
+        cardBg.on('pointerout', () => {
+          cardBg.setStrokeStyle(2, 0x8b7d5e);
+          elements.forEach(el => {
+            this.tweens.killTweensOf(el);
+            this.tweens.add({ targets: el, y: el._baseY, duration: 80 });
+          });
         });
-        bg.on('pointerdown', () => this._onShowdownPitchSelected(key, stage));
+        cardBg.on('pointerdown', () => this._onShowdownPitchSelected(key, stage));
       }
 
-      this._pitchButtons.push(bg, nameText, effectText, statusText);
+      this._pitchButtons.push(...elements);
+    };
+
+    // Repertoire cards
+    repertoire.forEach((key, i) => {
+      makePitchCard(startX + i * spacing, key, used.includes(key));
     });
 
-    // "Skip" button — don't use a pitch this stage
-    const skipX = startX + repertoire.length * spacing;
-    const skipBg = this.add.rectangle(skipX, btnY, 85, btnH, 0x555555, 0.7)
-      .setStrokeStyle(2, 0x777777).setDepth(5)
+    // Wild card — one random pitch drawn each stage, usable once per at-bat
+    const wildUsed = used.includes('_wild');
+    if (hasWild || wildUsed) {
+      const wx = startX + repertoire.length * spacing;
+      const baseY = btnY;
+      const rolledKey = !wildUsed && wildPool.length > 0
+        ? wildPool[Math.floor(Math.random() * wildPool.length)] : null;
+      const rolledPitch = rolledKey ? PITCH_TYPES[rolledKey] : null;
+
+      const cardBg = this.add.rectangle(wx, baseY, cardW, cardH,
+        wildUsed ? 0x222222 : 0x2a1a3a, wildUsed ? 0.5 : 1)
+        .setStrokeStyle(2, wildUsed ? 0x444444 : 0xffd600).setDepth(5);
+      const stripe = this.add.rectangle(wx, baseY - cardH / 2 + 8, cardW - 6, 14,
+        wildUsed ? 0x444444 : (pitchColors[rolledKey] || 0xffd600),
+        wildUsed ? 0.4 : 0.9).setDepth(6);
+      const nameText = this.add.text(wx, baseY - cardH / 2 + 8,
+        wildUsed ? 'WILD' : rolledPitch.name, {
+        fontSize: '12px', fontFamily: 'monospace',
+        color: wildUsed ? '#666666' : '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(7);
+      const effectText = this.add.text(wx, baseY + 4,
+        wildUsed ? '' : this._showdownEffectDesc(rolledKey), {
+        fontSize: '10px', fontFamily: 'monospace',
+        color: wildUsed ? '#555555' : '#e0c0ff',
+        align: 'center', wordWrap: { width: cardW - 16 }, lineSpacing: 1,
+      }).setOrigin(0.5).setDepth(6);
+      const statusText = this.add.text(wx, baseY + cardH / 2 - 12,
+        wildUsed ? 'USED' : 'WILD', {
+        fontSize: '9px', fontFamily: 'monospace',
+        color: wildUsed ? '#ff5252' : '#ffd600', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(6);
+
+      const elements = [cardBg, stripe, nameText, effectText, statusText];
+      elements.forEach(el => { el._baseY = el.y; });
+
+      if (!wildUsed && rolledKey) {
+        cardBg.setInteractive({ useHandCursor: true });
+        cardBg.on('pointerover', () => {
+          cardBg.setStrokeStyle(3, 0xffffff);
+          elements.forEach(el => {
+            this.tweens.killTweensOf(el);
+            this.tweens.add({ targets: el, y: el._baseY - hoverLift, duration: 80 });
+          });
+        });
+        cardBg.on('pointerout', () => {
+          cardBg.setStrokeStyle(2, 0xffd600);
+          elements.forEach(el => {
+            this.tweens.killTweensOf(el);
+            this.tweens.add({ targets: el, y: el._baseY, duration: 80 });
+          });
+        });
+        cardBg.on('pointerdown', () => {
+          // Mark wild as used for this at-bat
+          this.showdownEngine.pitchesUsed.push('_wild');
+          this._onShowdownPitchSelected(rolledKey, stage);
+        });
+      }
+
+      this._pitchButtons.push(...elements);
+    }
+
+    // "Skip" card
+    const skipX = startX + totalSlots * spacing;
+    const skipBg = this.add.rectangle(skipX, btnY, 80, cardH, 0x3a3a3a, 0.8)
+      .setStrokeStyle(2, 0x666666).setDepth(5)
       .setInteractive({ useHandCursor: true });
     const skipTxt = this.add.text(skipX, btnY, 'SKIP', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#aaaaaa', fontStyle: 'bold',
+      fontSize: '13px', fontFamily: 'monospace', color: '#999999', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(6);
-    skipBg.on('pointerover', () => skipBg.setStrokeStyle(3, 0xffd600));
-    skipBg.on('pointerout', () => skipBg.setStrokeStyle(2, 0x777777));
+    skipBg._baseY = skipBg.y;
+    skipTxt._baseY = skipTxt.y;
+    skipBg.on('pointerover', () => {
+      skipBg.setStrokeStyle(3, 0xffd600);
+      [skipBg, skipTxt].forEach(el => {
+        this.tweens.killTweensOf(el);
+        this.tweens.add({ targets: el, y: el._baseY - hoverLift, duration: 80 });
+      });
+    });
+    skipBg.on('pointerout', () => {
+      skipBg.setStrokeStyle(2, 0x666666);
+      [skipBg, skipTxt].forEach(el => {
+        this.tweens.killTweensOf(el);
+        this.tweens.add({ targets: el, y: el._baseY, duration: 80 });
+      });
+    });
     skipBg.on('pointerdown', () => this._advanceShowdownStage(stage, null));
     this._pitchButtons.push(skipBg, skipTxt);
   }
