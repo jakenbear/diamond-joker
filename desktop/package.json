@@ -1,0 +1,17 @@
+{
+  "name": "aces-loaded",
+  "version": "0.1.0",
+  "main": "index.html",
+  "window": {
+    "title": "Aces Loaded!",
+    "width": 1280,
+    "height": 720,
+    "min_width": 960,
+    "min_height": 540,
+    "icon": "assets/icon.png",
+    "toolbar": false,
+    "frame": true,
+    "resizable": true
+  },
+  "chromium-args": "--disable-raf-throttling"
+}

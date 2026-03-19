@@ -255,6 +255,23 @@ export default class GameScene extends Phaser.Scene {
     const innHalf = s.half === 'top' ? '\u25b2' : '\u25bc';
     this.inningOutsText.setText(`INN ${s.inning} ${innHalf}   Outs: ${outDots.join(' ')}`);
 
+    // Out counter red flash when outs increase
+    if (s.outs > (this._prevOuts ?? 0)) {
+      this.tweens.killTweensOf(this.inningOutsText);
+      this.inningOutsText.setScale(1);
+      const origColor = this.inningOutsText.style.color;
+      this.inningOutsText.setColor('#ff5252');
+      this.tweens.add({
+        targets: this.inningOutsText,
+        scaleX: 1.15, scaleY: 1.15,
+        duration: 100,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onComplete: () => this.inningOutsText.setColor(origColor),
+      });
+    }
+    this._prevOuts = s.outs;
+
     // Line 2 right: B + S count
     const count = this.countManager.getCount();
     const ballDots = [];
@@ -484,6 +501,20 @@ export default class GameScene extends Phaser.Scene {
       align: 'center', wordWrap: { width: w - 10 },
     }).setOrigin(0.5).setDepth(3);
 
+    // Balatro-style wiggle — gentle sine-wave rotation
+    const wiggleDelay = Math.random() * 2000; // desync cards
+    [bg, name, desc].forEach(el => {
+      this.tweens.add({
+        targets: el,
+        angle: { from: -1.5, to: 1.5 },
+        duration: 2000,
+        delay: wiggleDelay,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    });
+
     return [bg, name, desc];
   }
 
@@ -632,6 +663,18 @@ export default class GameScene extends Phaser.Scene {
           duration: 500,
           delay: stagger,
           ease: 'Quad.easeInOut',
+          onComplete: () => {
+            // Pulse glow on occupied base runner
+            this.tweens.add({
+              targets: runner,
+              scaleX: runner.scaleX * 1.12,
+              scaleY: runner.scaleY * 1.12,
+              duration: 600,
+              yoyo: true,
+              repeat: -1,
+              ease: 'Sine.easeInOut',
+            });
+          },
         });
       } else if (!occupied && wasOccupied) {
         // Runner left — animate to next base or home
@@ -661,6 +704,16 @@ export default class GameScene extends Phaser.Scene {
             ? this.add.image(destX, destY, runnerKey).setScale(2.5).setDepth(3)
             : this.add.circle(destX, destY, 10, 0xffd600).setDepth(3);
           this.runners[i] = runner;
+          // Pulse glow
+          this.tweens.add({
+            targets: runner,
+            scaleX: runner.scaleX * 1.12,
+            scaleY: runner.scaleY * 1.12,
+            duration: 600,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+          });
         }
       } else {
         // No runner, clean up
@@ -1993,6 +2046,18 @@ export default class GameScene extends Phaser.Scene {
       this.dealOrder = this.cardEngine.hand.map((_, i) => i);
       this._renderHand();
       this._updateInfoText();
+      // Deck counter shrink pulse
+      if (this.deckInfo) {
+        this.tweens.killTweensOf(this.deckInfo);
+        this.deckInfo.setScale(1);
+        this.tweens.add({
+          targets: this.deckInfo,
+          scaleX: 0.7, scaleY: 0.7,
+          duration: 80,
+          yoyo: true,
+          ease: 'Quad.easeOut',
+        });
+      }
       this._setButtonsEnabled(true, this._canDiscard());
       this.inputLocked = false;
     });
@@ -2440,8 +2505,12 @@ export default class GameScene extends Phaser.Scene {
         if (handResult.outcome === 'Home Run') { SoundManager.homeRun(); this._flashLightStands(); }
         else SoundManager.extraBaseHit();
       } else if (isOut) {
-        if (handResult.outcome === 'Strikeout') SoundManager.strikeout();
-        else SoundManager.out();
+        if (handResult.outcome === 'Strikeout') {
+          SoundManager.strikeout();
+          this.cameras.main.shake(200, 0.003);
+        } else {
+          SoundManager.out();
+        }
       } else {
         SoundManager.hit();
       }
@@ -2460,6 +2529,16 @@ export default class GameScene extends Phaser.Scene {
         if (runsForSound > 0) {
           SoundManager.runScored();
           this._celebrateRuns(runsForSound);
+          // Score text punch
+          this.tweens.killTweensOf(this.scoreText);
+          this.scoreText.setScale(1);
+          this.tweens.add({
+            targets: this.scoreText,
+            scaleX: 1.2, scaleY: 1.2,
+            duration: 100,
+            yoyo: true,
+            ease: 'Quad.easeOut',
+          });
         }
       });
 
@@ -2686,6 +2765,16 @@ export default class GameScene extends Phaser.Scene {
       onUpdate: () => {
         this.peanutBalanceText.setText(`Peanuts: ${Math.round(obj.val)}`);
       },
+    });
+    // Bounce pop on change
+    this.tweens.killTweensOf(this.peanutBalanceText);
+    this.peanutBalanceText.setScale(1);
+    this.tweens.add({
+      targets: this.peanutBalanceText,
+      scaleX: 1.3, scaleY: 1.3,
+      duration: 120,
+      yoyo: true,
+      ease: 'Quad.easeOut',
     });
   }
 
@@ -3081,6 +3170,18 @@ export default class GameScene extends Phaser.Scene {
     return null;
   }
 
+  /** Horizontal white flash bar that sweeps across during inning transitions */
+  _flashWipeBar() {
+    const bar = this.add.rectangle(-1280, 360, 1280, 8, 0xffffff, 0.9).setDepth(20);
+    this.tweens.add({
+      targets: bar,
+      x: { from: -640, to: 1920 },
+      duration: 350,
+      ease: 'Quad.easeIn',
+      onComplete: () => bar.destroy(),
+    });
+  }
+
   _showMidInningTransition() {
     this.inputLocked = true;
     this._setButtonsEnabled(false, false);
@@ -3091,6 +3192,8 @@ export default class GameScene extends Phaser.Scene {
     // Hide diamond sprites during transition
     if (this.batterSprite) this.batterSprite.setVisible(false);
     if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(false);
+    // Flash wipe bar
+    this._flashWipeBar();
     const s = this.baseball.getStatus();
     const elements = [];
 
@@ -3139,6 +3242,8 @@ export default class GameScene extends Phaser.Scene {
     // Hide diamond sprites during transition
     if (this.batterSprite) this.batterSprite.setVisible(false);
     if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(false);
+    // Flash wipe bar
+    this._flashWipeBar();
     const s = this.baseball.getStatus();
     const elements = [];
 
