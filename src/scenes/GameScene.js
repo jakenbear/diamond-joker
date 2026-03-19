@@ -3461,13 +3461,17 @@ export default class GameScene extends Phaser.Scene {
       .setStrokeStyle(3, 0x444466).setAlpha(0);
     container.add(box);
 
-    // ── Baseball (circle + stitch lines) ──
+    // ── Baseball (circle) ──
     const ball = this.add.circle(boxX, boxY, 55, 0xfafafa).setAlpha(0);
-    // Red stitching — two arcs approximated as curved lines
-    const stitch1 = this.add.rectangle(boxX - 16, boxY, 32, 4, 0xcc3333)
-      .setAngle(20).setAlpha(0);
-    const stitch2 = this.add.rectangle(boxX + 16, boxY, 32, 4, 0xcc3333)
-      .setAngle(-20).setAlpha(0);
+    // Stitch lines — spin independently so they can converge on success
+    const stitch1 = this.add.rectangle(boxX, boxY, 40, 4, 0xcc3333)
+      .setAlpha(0);
+    const stitch2 = this.add.rectangle(boxX, boxY, 40, 4, 0xcc3333)
+      .setAlpha(0);
+    // stitch1 starts at top-left orbit, stitch2 at bottom-right
+    let s1Angle = 0;   // current orbit angle (degrees)
+    let s2Angle = 180; // opposite side
+    const orbitR = 22;  // orbit radius from center
     const ballGroup = [ball, stitch1, stitch2];
     container.add(ballGroup);
 
@@ -3523,7 +3527,22 @@ export default class GameScene extends Phaser.Scene {
           const currentSpeed = spinSpeed * (1 - eased * 0.97);
 
           const angleDelta = currentSpeed * (interval / 1000);
-          ballGroup.forEach(b => b.setAngle(b.angle + angleDelta));
+
+          // Ball spins normally
+          ball.setAngle(ball.angle + angleDelta);
+
+          // Stitches orbit in opposite directions, converging as speed drops
+          s1Angle += angleDelta;       // clockwise
+          s2Angle -= angleDelta;       // counter-clockwise
+
+          // As progress increases, shrink orbit radius toward 0 (converge to center)
+          const liveR = orbitR * (1 - eased);
+          const rad1 = s1Angle * Math.PI / 180;
+          const rad2 = s2Angle * Math.PI / 180;
+          stitch1.setPosition(boxX + Math.cos(rad1) * liveR, boxY + Math.sin(rad1) * liveR);
+          stitch1.setAngle(s1Angle);
+          stitch2.setPosition(boxX + Math.cos(rad2) * liveR, boxY + Math.sin(rad2) * liveR);
+          stitch2.setAngle(s2Angle);
 
           // Casino tick beeps — decelerate with the spin
           tickInterval = 80 + eased * 420; // 80ms → 500ms gaps
@@ -3556,30 +3575,39 @@ export default class GameScene extends Phaser.Scene {
       if (skipped) return;
 
       if (isOut) {
-        // Red X + fail buzzer
+        // Red X + fail buzzer — stitches scatter apart
         SoundManager.spinFail();
         box.setStrokeStyle(4, 0xff3333);
         iconText.setText('\u2716');
         iconText.setColor('#ff3333');
         ball.setFillStyle(0xff6666);
+        stitch1.setFillStyle(0xff3333);
+        stitch2.setFillStyle(0xff3333);
         this.tweens.add({
-          targets: [box, ...ballGroup, iconText],
+          targets: stitch1, x: boxX - 60, angle: stitch1.angle + 90,
+          alpha: 0, duration: 300, ease: 'Quad.easeIn',
+        });
+        this.tweens.add({
+          targets: stitch2, x: boxX + 60, angle: stitch2.angle - 90,
+          alpha: 0, duration: 300, ease: 'Quad.easeIn',
+        });
+        this.tweens.add({
+          targets: [box, ball, iconText],
           x: '+=5', duration: 40, yoyo: true, repeat: 3,
         });
       } else {
-        // Green check + success ching
+        // Green check + success ching — stitches snap to center and turn green
         SoundManager.spinSuccess();
         box.setStrokeStyle(4, 0x69f0ae);
         iconText.setText('\u2714');
         iconText.setColor('#69f0ae');
         ball.setFillStyle(0xffffff);
-        // Stitches meet in middle and turn green
         this.tweens.add({
-          targets: stitch1, x: boxX, angle: 0, duration: 200, ease: 'Quad.easeOut',
+          targets: stitch1, x: boxX, y: boxY, angle: 0, duration: 200, ease: 'Back.easeOut',
           onComplete: () => stitch1.setFillStyle(0x69f0ae),
         });
         this.tweens.add({
-          targets: stitch2, x: boxX, angle: 0, duration: 200, ease: 'Quad.easeOut',
+          targets: stitch2, x: boxX, y: boxY, angle: 0, duration: 200, ease: 'Back.easeOut',
           onComplete: () => stitch2.setFillStyle(0x69f0ae),
         });
         // Scale pop
