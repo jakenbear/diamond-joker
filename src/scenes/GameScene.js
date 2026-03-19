@@ -3463,10 +3463,10 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Baseball (circle + two stitch lines, one per half) ──
     const ball = this.add.circle(boxX, boxY, 55, 0xfafafa).setAlpha(0);
-    const s1CX = boxX - 22; // left half center
-    const s2CX = boxX + 22; // right half center
-    const stitch1 = this.add.rectangle(s1CX, boxY, 28, 4, 0xcc3333).setAlpha(0);
-    const stitch2 = this.add.rectangle(s2CX, boxY, 28, 4, 0xcc3333).setAlpha(0);
+    const s1CX = boxX - 24; // left half center
+    const s2CX = boxX + 24; // right half center
+    const stitch1 = this.add.rectangle(s1CX, boxY, 40, 6, 0xcc3333).setAlpha(0);
+    const stitch2 = this.add.rectangle(s2CX, boxY, 40, 6, 0xcc3333).setAlpha(0);
     // Each spins around its own center — win = both land horizontal (0°)
     let s1Angle = 0;
     let s2Angle = 90; // start offset from s1
@@ -3503,13 +3503,13 @@ export default class GameScene extends Phaser.Scene {
     const REVEAL_TIME = 3000; // show check/X
     const FADEOUT_TIME = 3500;
 
-    // Rig final stitch angles: success = both at 0° (horizontal), fail = visibly offset
-    // Each stitch does many full spins, but the FINAL angle is what matters.
-    // We blend toward the target angle in the last 30% of the deceleration.
-    const s1Final = 0;                               // always lands horizontal
-    const s2Final = isOut ? 35 + Math.random() * 50 : 0; // fail: 35-85° offset, success: 0° (aligned)
+    // Rig final stitch angles: success = both at 0° (horizontal), fail = near-miss then drift
+    const s1Final = 0; // always lands horizontal
+    // On fail: s2 gets close to 0° (tease!) then drifts to a visible offset
+    const s2NearMiss = isOut ? 5 : 0;                     // how close it gets before drifting
+    const s2Final = isOut ? 30 + Math.random() * 40 : 0;  // final resting angle on fail
     const s1SpeedMult = 1.0;
-    const s2SpeedMult = 1.12; // slightly different spin rate for visual variety
+    const s2SpeedMult = 1.12;
 
     this.time.delayedCall(SPIN_START, () => {
       if (skipped) return;
@@ -3544,14 +3544,29 @@ export default class GameScene extends Phaser.Scene {
           // In the last 30%, blend toward the rigged final angles
           if (progress > 0.7) {
             const blend = (progress - 0.7) / 0.3; // 0→1 over last 30%
-            const easeBlend = blend * blend; // ease-in for natural deceleration feel
-            // Normalize current angles to find nearest equivalent of target
             const norm = (a) => ((a % 180) + 180) % 180;
             const s1Curr = norm(s1Angle);
             const s2Curr = norm(s2Angle);
-            // Lerp the displayed angle toward target
-            stitch1.setAngle(s1Curr + (s1Final - s1Curr) * easeBlend);
-            stitch2.setAngle(s2Curr + (s2Final - s2Curr) * easeBlend);
+
+            // s1 always blends smoothly to 0°
+            const s1Blend = blend * blend;
+            stitch1.setAngle(s1Curr + (s1Final - s1Curr) * s1Blend);
+
+            // s2: on fail, blend toward near-miss (0-50%), then drift to final (50-100%)
+            // On success, just blend straight to 0°
+            let s2Target;
+            if (isOut && blend < 0.5) {
+              // First half: approach near-miss (almost aligned — tease!)
+              const nearBlend = (blend / 0.5) * (blend / 0.5);
+              s2Target = s2Curr + (s2NearMiss - s2Curr) * nearBlend;
+            } else if (isOut) {
+              // Second half: drift away from near-miss to final offset
+              const driftBlend = ((blend - 0.5) / 0.5);
+              s2Target = s2NearMiss + (s2Final - s2NearMiss) * driftBlend;
+            } else {
+              s2Target = s2Curr + (s2Final - s2Curr) * (blend * blend);
+            }
+            stitch2.setAngle(s2Target);
           } else {
             stitch1.setAngle(s1Angle);
             stitch2.setAngle(s2Angle);
