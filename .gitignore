@@ -4,3 +4,7 @@ dist/
 node_modules/
 desktop/build/
 desktop/dist/
+cache/
+Cleaning
+Copying
+Packaging
