@@ -1438,13 +1438,15 @@ export default class PitchingScene extends Phaser.Scene {
     this.time.delayedCall(350, () => ps.logElements.forEach(el => el.destroy()));
 
     // Switch side with accumulated runs
-    this.baseball.switchSide(ps.runs);
-    this._addGameLog(`--- End of half: ${ps.runs} run${ps.runs !== 1 ? 's' : ''} ---`, '#4caf50');
+    const runsThisHalf = ps.runs;
+    this.baseball.switchSide(runsThisHalf);
+    ps.runs = 0; // Reset so scoreboard doesn't double-count
+    this._addGameLog(`--- End of half: ${runsThisHalf} run${runsThisHalf !== 1 ? 's' : ''} ---`, '#4caf50');
 
     // Show summary
-    const summary = ps.runs === 0
+    const summary = runsThisHalf === 0
       ? `${ps.myPitcher.name} shuts them down!`
-      : `${ps.oppLabel} score${ps.runs === 1 ? 's' : ''} ${ps.runs} run${ps.runs !== 1 ? 's' : ''}`;
+      : `${ps.oppLabel} score${runsThisHalf === 1 ? 's' : ''} ${runsThisHalf} run${runsThisHalf !== 1 ? 's' : ''}`;
     this.resultText.setText(summary);
     this.resultText.setColor(ps.runs > 0 ? '#ff8a80' : '#69f0ae');
     this.handNameText.setText('');
