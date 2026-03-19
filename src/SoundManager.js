@@ -120,6 +120,23 @@ const SoundManager = {
     setTimeout(() => tone(550, 0.15, 'sine', 0.05), 120);
     setTimeout(() => tone(440, 0.2, 'sine', 0.04), 240);
   },
+
+  /** Casino spin tick — single beep at given pitch */
+  spinTick(freq = 800) {
+    tone(freq, 0.04, 'square', 0.06);
+  },
+
+  /** Success ching — bright rising two-tone */
+  spinSuccess() {
+    tone(880, 0.12, 'sine', 0.08);
+    setTimeout(() => tone(1320, 0.2, 'sine', 0.09), 100);
+  },
+
+  /** Fail buzzer — low descending two-tone */
+  spinFail() {
+    tone(300, 0.15, 'sawtooth', 0.06);
+    setTimeout(() => tone(200, 0.25, 'sawtooth', 0.05), 120);
+  },
 };
 
 export default SoundManager;

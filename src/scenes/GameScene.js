@@ -3505,6 +3505,10 @@ export default class GameScene extends Phaser.Scene {
 
       // Continuous rotation via timer
       const interval = 16; // ~60fps
+      let lastTickTime = 0;
+      let tickInterval = 80; // ms between beeps — starts fast
+      const startPitch = 900;
+      const endPitch = 400;
       spinTimer = this.time.addEvent({
         delay: interval,
         loop: true,
@@ -3515,10 +3519,18 @@ export default class GameScene extends Phaser.Scene {
 
           // Ease-out deceleration: fast → slow
           const eased = 1 - Math.pow(1 - progress, 3);
-          const currentSpeed = spinSpeed * (1 - eased * 0.97); // slows to ~3% of original
+          const currentSpeed = spinSpeed * (1 - eased * 0.97);
 
           const angleDelta = currentSpeed * (interval / 1000);
           ballGroup.forEach(b => b.setAngle(b.angle + angleDelta));
+
+          // Casino tick beeps — decelerate with the spin
+          tickInterval = 80 + eased * 420; // 80ms → 500ms gaps
+          if (elapsed - lastTickTime >= tickInterval) {
+            lastTickTime = elapsed;
+            const pitch = startPitch - eased * (startPitch - endPitch);
+            SoundManager.spinTick(pitch);
+          }
 
           // Wobble increases as it slows
           if (progress > 0.7) {
@@ -3543,19 +3555,19 @@ export default class GameScene extends Phaser.Scene {
       if (skipped) return;
 
       if (isOut) {
-        // Red X
+        // Red X + fail buzzer
+        SoundManager.spinFail();
         box.setStrokeStyle(4, 0xff3333);
         iconText.setText('\u2716');
         iconText.setColor('#ff3333');
-        // Ball turns red-ish
         ball.setFillStyle(0xff6666);
-        // Shake the box
         this.tweens.add({
           targets: [box, ...ballGroup, iconText],
           x: '+=5', duration: 40, yoyo: true, repeat: 3,
         });
       } else {
-        // Green check
+        // Green check + success ching
+        SoundManager.spinSuccess();
         box.setStrokeStyle(4, 0x69f0ae);
         iconText.setText('\u2714');
         iconText.setColor('#69f0ae');
