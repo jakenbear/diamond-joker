@@ -3854,7 +3854,8 @@ group('25e. ShowdownEngine — All pitch effects');
 
   testPitch('twoseam', null, (r, sd) => {
     assert(r.success === true, 'Two-seam succeeds');
-    assert(typeof r.newSuit === 'string', 'Two-seam reports new suit');
+    assert(r.swappedCommunity !== undefined, 'Two-seam reports swapped community card');
+    assert(r.swappedBatter !== undefined, 'Two-seam reports swapped batter card');
   });
 
   testPitch('knuckle', null, (r, sd) => {
@@ -3869,7 +3870,8 @@ group('25e. ShowdownEngine — All pitch effects');
 
   testPitch('palmball', null, (r, sd) => {
     assert(r.success === true, 'Palmball succeeds');
-    assert(sd.hiddenNextCard === true, 'Palmball hides next card');
+    assert(r.plantedCard !== undefined, 'Palmball plants a card from pitcher deck');
+    assert(sd.plantedCard !== null, 'Palmball sets planted card for next deal');
   });
 
   testPitch('breaking', null, (r, sd) => {

@@ -23,6 +23,7 @@ var pitches_used: Array[String] = []
 var locked_indices: Array[int] = []
 var face_down_indices: Array[int] = []
 var hidden_next_card: bool = false
+var planted_card: Variant = null
 var _revealed_batter_cards: Array[int] = []
 var stamina_drained: float = 0.0
 var pitcher_traits: Array = []
@@ -60,24 +61,33 @@ func start(batter_stats: Dictionary = {}, p_outs: int = 0, p_inning: int = 1) ->
 	locked_indices = []
 	face_down_indices = []
 	hidden_next_card = false
+	planted_card = null
 	_revealed_batter_cards = []
 	stamina_drained = 0.0
 	pitcher_traits = pitcher.get("traits", [])
 
 
+func _deal_one() -> Dictionary:
+	if planted_card != null:
+		var card: Dictionary = planted_card
+		planted_card = null
+		return card
+	return pitcher_deck.pop_back()
+
+
 func deal_flop() -> void:
 	for i in 3:
-		community.append(pitcher_deck.pop_back())
+		community.append(_deal_one())
 	stage = "flop"
 
 
 func deal_turn() -> void:
-	community.append(pitcher_deck.pop_back())
+	community.append(_deal_one())
 	stage = "turn"
 
 
 func deal_river() -> void:
-	community.append(pitcher_deck.pop_back())
+	community.append(_deal_one())
 	stage = "river"
 
 
@@ -209,7 +219,7 @@ func apply_pitch(pitch_key: String, options: Dictionary = {}) -> Dictionary:
 		return {"success": false, "reason": "Already used this pitch"}
 
 	# Control-based misfire for targeted effects
-	var targeted := ["slider", "cutter", "splitter", "twoseam", "knuckle", "breaking"]
+	var targeted := ["slider", "cutter", "splitter", "twoseam", "breaking"]
 	if targeted.has(pitch_key) and options.has("target_index"):
 		var misfire_chance := maxf(0, (6 - pitcher.get("control", 5)) * 0.08)
 		if randf() < misfire_chance and community.size() > 1:
@@ -318,29 +328,23 @@ func _effect_twoseam(opts: Dictionary) -> Dictionary:
 	var target: int = opts.get("target_index", 0)
 	if target < 0 or target >= community.size():
 		return {"success": false, "reason": "Invalid target"}
-	var other_suits: Array[String] = []
-	for i in community.size():
-		if i != target: other_suits.append(community[i]["suit"])
-	var freq := {}
-	for s in other_suits:
-		freq[s] = freq.get(s, 0) + 1
-	var best_suit: String = community[target]["suit"]
-	var best_count := 0
-	for s in freq:
-		if freq[s] > best_count:
-			best_count = freq[s]
-			best_suit = s
-	var old_suit: String = community[target]["suit"]
-	community[target]["suit"] = best_suit
-	return {"success": true, "old_suit": old_suit, "new_suit": best_suit}
+	# Swap a community card with a random batter hole card
+	var batter_idx := randi() % batter_hole.size()
+	var comm_card := community[target].duplicate()
+	var bat_card := batter_hole[batter_idx].duplicate()
+	community[target] = bat_card
+	batter_hole[batter_idx] = comm_card
+	return {"success": true, "swapped_community": comm_card, "swapped_batter": bat_card, "batter_idx": batter_idx}
 
 
-func _effect_knuckle(opts: Dictionary) -> Dictionary:
-	var target: int = opts.get("target_index", 0)
-	if target < 0 or target >= community.size():
-		return {"success": false, "reason": "Invalid target"}
-	community[target] = {"rank": 2 + randi() % 13, "suit": SUITS[randi() % 4]}
-	return {"success": true}
+func _effect_knuckle(_opts: Dictionary) -> Dictionary:
+	if community.size() == 0:
+		return {"success": false, "reason": "No community cards"}
+	# Randomize ALL community card ranks (keep suits)
+	var before: Array = community.duplicate(true)
+	for c in community:
+		c["rank"] = 2 + randi() % 13
+	return {"success": true, "before": before, "after": community.duplicate(true)}
 
 
 func _effect_screwball() -> Dictionary:
@@ -351,8 +355,16 @@ func _effect_screwball() -> Dictionary:
 
 
 func _effect_palmball() -> Dictionary:
-	hidden_next_card = true
-	return {"success": true}
+	if pitcher_deck.size() == 0:
+		return {"success": false, "reason": "Deck empty"}
+	# Deal next community card from pitcher's best card
+	var sorted := pitcher_deck.duplicate()
+	sorted.sort_custom(func(a, b): return a["rank"] > b["rank"])
+	var card: Dictionary = sorted[0]
+	var idx := pitcher_deck.find(card)
+	pitcher_deck.remove_at(idx)
+	planted_card = card
+	return {"success": true, "planted_card": card.duplicate()}
 
 
 func _effect_breaking(opts: Dictionary) -> Dictionary:

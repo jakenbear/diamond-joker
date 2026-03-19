@@ -535,10 +535,10 @@ Each pitch in the pitcher's 4-pitch repertoire is a **board manipulation ability
 | Curveball | Downgrade batter's best card -2 rank (control check) |
 | Sinker | All community cards -1 rank |
 | Splitter | Destroy a community card |
-| Two-Seam | Shift a card's suit to match majority |
-| Knuckleball | Randomize a community card |
+| Two-Seam | Swap a community card with a random batter hole card |
+| Knuckleball | Randomize ALL community card ranks (keeps suits) |
 | Screwball | Replace a batter hole card |
-| Palmball | Hide next community card from batter |
+| Palmball | Plant best card from pitcher deck as next community card |
 
 ### Resolution
 Best 5-card hand from each side (2 hole + 5 community). Winner determined by hand score:

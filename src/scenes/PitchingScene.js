@@ -945,10 +945,10 @@ export default class PitchingScene extends Phaser.Scene {
       curveball: 'Downgrade batter\nbest card -2',
       sinker: 'All community\ncards -1 rank',
       splitter: 'Destroy a\ncommunity card',
-      twoseam: 'Shift a card\nsuit to match',
-      knuckle: 'Randomize a\ncommunity card',
+      twoseam: 'Swap board card\nwith batter hole',
+      knuckle: 'Randomize ALL\ncommunity ranks',
       screwball: 'Replace a batter\nhole card',
-      palmball: 'Hide next\ncommunity card',
+      palmball: 'Plant best card\nfrom your deck',
     };
     return descs[key] || '';
   }
@@ -960,7 +960,7 @@ export default class PitchingScene extends Phaser.Scene {
     // For targeted effects, auto-pick a reasonable target
     const state = this.showdownEngine.getState();
     const opts = {};
-    if (['slider', 'cutter', 'splitter', 'twoseam', 'knuckle', 'breaking'].includes(pitchKey)) {
+    if (['slider', 'cutter', 'splitter', 'twoseam', 'breaking'].includes(pitchKey)) {
       // Target the community card that would help the batter most
       // Simple heuristic: highest rank unlocked card
       let bestIdx = 0, bestRank = -1;
@@ -1005,10 +1005,10 @@ export default class PitchingScene extends Phaser.Scene {
       case 'curveball': return result.downgraded ? 'Batter card downgraded!' : 'Misfired!';
       case 'sinker': return 'All community ranks -1';
       case 'splitter': return 'Card destroyed!';
-      case 'twoseam': return `Suit shifted: ${result.oldSuit} → ${result.newSuit}`;
-      case 'knuckle': return 'Card randomized!';
+      case 'twoseam': return `Swapped board ↔ batter hole`;
+      case 'knuckle': return 'All ranks scrambled!';
       case 'screwball': return 'Batter card replaced!';
-      case 'palmball': return 'Next card hidden';
+      case 'palmball': return `Planted ${this._rankName(result.plantedCard.rank)}${result.plantedCard.suit}`;
       case 'breaking': return 'Card flipped face-down';
       default: return '';
     }
