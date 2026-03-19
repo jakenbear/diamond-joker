@@ -3526,9 +3526,9 @@ export default class GameScene extends Phaser.Scene {
 
       const interval = 16;
       let lastTickTime = 0;
-      let tickInterval = 80;
-      const startPitch = 900;
-      const endPitch = 400;
+      let tickInterval = 140;
+      const startPitch = 600;
+      const endPitch = 300;
 
       spinTimer = this.time.addEvent({
         delay: interval,
@@ -3551,7 +3551,7 @@ export default class GameScene extends Phaser.Scene {
 
           // Casino tick beeps — use speed (derivative) for timing
           const speed = 3 * Math.pow(1 - t, 2); // derivative of ease-out
-          tickInterval = 60 + (1 - speed) * 500;
+          tickInterval = 120 + (1 - speed) * 500;
           if (elapsed - lastTickTime >= tickInterval) {
             lastTickTime = elapsed;
             const pitch = startPitch - (1 - speed) * (startPitch - endPitch);
