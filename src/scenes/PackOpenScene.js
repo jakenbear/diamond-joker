@@ -319,8 +319,9 @@ export default class PackOpenScene extends Phaser.Scene {
 
     this.rosterManager.addBonusPlayer(bonus, replaceIndex);
 
-    // Confirmation flash
-    const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.85).setDepth(20);
+    // Confirmation flash — interactive overlay blocks clicks to roster behind
+    const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.85)
+      .setDepth(20).setInteractive();
     const text = this.add.text(640, 320,
       `${player.name} benched!\n${bonus.name} joins the lineup!`, {
         fontSize: '26px', fontFamily: 'monospace', color: '#69f0ae',

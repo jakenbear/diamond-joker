@@ -27,6 +27,7 @@ export default class ShopScene extends Phaser.Scene {
     this.gameLogEntries = data.gameLogEntries || [];
     this.purchasesMade = data.purchasesMade || 0;
     this.activeTab = data.activeTab || 'traits';
+    this.showShowdowns = data.showShowdowns || false;
   }
 
   create() {
@@ -591,6 +592,7 @@ export default class ShopScene extends Phaser.Scene {
       baseball: this.baseball,
       cardEngine: this.cardEngine,
       gameLogEntries: this.gameLogEntries,
+      showShowdowns: this.showShowdowns,
       fromShop: true,
     });
   }

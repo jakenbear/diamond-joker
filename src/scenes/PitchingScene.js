@@ -31,6 +31,7 @@ export default class PitchingScene extends Phaser.Scene {
     this.traitManager = data.traitManager;
     this.cardEngine = data.cardEngine;
     this.gameLogEntries = data.gameLogEntries || [];
+    this.showShowdowns = data.showShowdowns || false;
   }
 
   create() {
@@ -445,7 +446,7 @@ export default class PitchingScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x2e7d32);
 
     const team = this.rosterManager.getTeam();
-    const headerLabel = team ? `${team.logo} PITCHING` : 'PITCHING';
+    const headerLabel = team ? `${team.nickname} PITCHING` : 'PITCHING';
     this.add.text(x, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
@@ -498,7 +499,7 @@ export default class PitchingScene extends Phaser.Scene {
 
     this.myPitcherNameText.setText(pitcher.name);
     const team = this.rosterManager.getTeam();
-    const teamLabel = team ? `${team.logo} ${team.nickname}` : 'Starter';
+    const teamLabel = team ? team.nickname : 'Starter';
     this.myPitcherRoleText.setText(teamLabel);
     this.myPitcherVelText.setText(`VEL  ${this._statBar(pitcher.velocity)}`);
     this.myPitcherCtlText.setText(`CTL  ${this._statBar(pitcher.control)}`);
@@ -525,7 +526,7 @@ export default class PitchingScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x8b0000);
 
     const oppTeam = this.rosterManager.getOpponentTeam();
-    const headerLabel = oppTeam ? `${oppTeam.logo} AT BAT` : 'AT BAT';
+    const headerLabel = oppTeam ? `${oppTeam.nickname} AT BAT` : 'AT BAT';
     this.add.text(x - 30, 95, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
@@ -1481,6 +1482,7 @@ export default class PitchingScene extends Phaser.Scene {
       traitManager: this.traitManager,
       cardEngine: this.cardEngine,
       gameLogEntries: this.gameLogEntries,
+      showShowdowns: this.showShowdowns,
     });
   }
 
@@ -1491,6 +1493,7 @@ export default class PitchingScene extends Phaser.Scene {
       baseball: this.baseball,
       cardEngine: this.cardEngine,
       gameLogEntries: this.gameLogEntries,
+      showShowdowns: this.showShowdowns,
     });
   }
 

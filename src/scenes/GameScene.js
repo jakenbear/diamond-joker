@@ -161,6 +161,9 @@ export default class GameScene extends Phaser.Scene {
       this.gameLogEntries = [];
     }
 
+    // Showdowns toggle — persists through shop/pitching transitions
+    this.showShowdowns = this._initData.showShowdowns || false;
+
     this.selectedIndices = new Set();
     this.cardSprites = [];
     this.inputLocked = false;
@@ -299,7 +302,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Team + "AT BAT" header
     const team = this.rosterManager.getTeam();
-    const headerLabel = team ? `${team.logo} AT BAT` : 'AT BAT';
+    const headerLabel = team ? `${team.nickname} AT BAT` : 'AT BAT';
     this.add.text(BATTER_X, PANEL_TOP + 12, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
@@ -453,7 +456,7 @@ export default class GameScene extends Phaser.Scene {
     const pitcher = this.rosterManager.getCurrentPitcher();
 
     this.pitcherNameText.setText(pitcher.name);
-    const teamLabel = pitcher.teamLogo ? `${pitcher.teamLogo} ${pitcher.teamName}` : '';
+    const teamLabel = pitcher.teamName || '';
     this.pitcherTeamText.setText(teamLabel);
     this.pitcherVelText.setText(`VEL  ${this._statBar(pitcher.velocity)}`);
     this.pitcherCtlText.setText(`CTL  ${this._statBar(pitcher.control)}`);
@@ -1572,7 +1575,7 @@ export default class GameScene extends Phaser.Scene {
     // evaluateHand mutates the snapshot — use a copy so getSuccessChance reads clean counters
     const evalState = { baseballState: { ...counters } };
     // Apply batter traits to preview so abilities like ace_wild_straight are reflected
-    const batter = this.rosterManager.currentBatter();
+    const batter = this.rosterManager.getCurrentBatter();
     const batterPreMod = batter?.traits ? TraitManager.buildPreModifier(batter.traits) : null;
     const result = CardEngine.evaluateHand(cards, batterPreMod, null, evalState);
     const n = cards.length;
@@ -2319,13 +2322,19 @@ export default class GameScene extends Phaser.Scene {
     this.scorePreviewText.setAlpha(0);
 
     // ── Pitch Resolution Animation (cinematic overlay) ──
-    this._playPitchResolution(handResult, isOut, () => {
+    const showResult = () => {
       this._showPlayResult(handResult, isOut, batter, pitcher, count,
         pitcherPreMessage, pitcherPostMessage, batterPostMessage,
         batterBonuses, pitcherPostPenalty, staffBonuses, lineupBonuses,
         synergyBonuses, situational, situationalMessage, sacrificeFlyRun,
         productiveRuns, blackSheep, savedPairsPlayed, batterPostMod);
-    });
+    };
+
+    if (this.showShowdowns) {
+      this._playPitchResolution(handResult, isOut, showResult);
+    } else {
+      showResult();
+    }
 
     // Animate cards out during the overlay
     this.cardSprites.forEach((cs, i) => {
@@ -2445,10 +2454,11 @@ export default class GameScene extends Phaser.Scene {
       if (this.batterSprite) this.batterSprite.setVisible(false);
 
       let desc = outcome.description;
-      if (productiveRuns > 0) desc += ` Productive out — ${productiveRuns} run${productiveRuns > 1 ? 's' : ''} scores!`;
-      if (sacrificeFlyRun > 0) desc += ` Sac fly scores a run!`;
+      let descSub = '';
+      if (productiveRuns > 0) descSub += `Productive out — ${productiveRuns} run${productiveRuns > 1 ? 's' : ''} scores!`;
+      if (sacrificeFlyRun > 0) descSub += `${descSub ? ' ' : ''}Sac fly scores a run!`;
       if (extraBase.advanced) {
-        desc += extraBase.scored > 0 ? ' Speed! Extra run!' : ' Speed! Runner advances!';
+        descSub += `${descSub ? ' ' : ''}${extraBase.scored > 0 ? 'Speed! Extra run!' : 'Speed! Runner advances!'}`;
       }
 
       // Game log entry
@@ -2487,7 +2497,7 @@ export default class GameScene extends Phaser.Scene {
       }
 
       // Show outcome text
-      this._setResultText(desc, '', isOut ? '#ff8a80' : '#69f0ae');
+      this._setResultText(desc, descSub, isOut ? '#ff8a80' : '#69f0ae');
       this.tweens.add({
         targets: this.resultText,
         scale: { from: 0.5, to: 1 }, alpha: { from: 0, to: 1 },
@@ -3128,6 +3138,7 @@ export default class GameScene extends Phaser.Scene {
       baseball: this.baseball,
       cardEngine: this.cardEngine,
       gameLogEntries: this.gameLogEntries,
+      showShowdowns: this.showShowdowns,
     });
   }
 
@@ -3152,6 +3163,7 @@ export default class GameScene extends Phaser.Scene {
       traitManager: this.traitManager,
       cardEngine: this.cardEngine,
       gameLogEntries: this.gameLogEntries,
+      showShowdowns: this.showShowdowns,
     });
   }
 
@@ -3456,21 +3468,23 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Box ──
     const boxX = W / 2, boxY = H / 2 - 30;
-    const boxW = 240, boxH = 240;
+    const boxW = 190, boxH = 190;
     const box = this.add.rectangle(boxX, boxY, boxW, boxH, 0x1a1a2e, 0.95)
       .setStrokeStyle(3, 0x444466).setAlpha(0);
     container.add(box);
 
-    // ── Baseball (circle + two full-diameter lines spinning opposite) ──
+    // ── Baseball (circle + three full-diameter lines spinning) ──
     const ballR = 55;
     const ball = this.add.circle(boxX, boxY, ballR, 0xfafafa).setAlpha(0);
     const lineW = ballR * 2 - 10; // nearly full diameter
     const lineH = 7;
     const stitch1 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
     const stitch2 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
+    const stitch3 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
     let s1Angle = 0;
-    let s2Angle = 90; // start perpendicular
-    const ballGroup = [ball, stitch1, stitch2];
+    let s2Angle = 60;  // evenly spaced starts
+    let s3Angle = 120;
+    const ballGroup = [ball, stitch1, stitch2, stitch3];
     container.add(ballGroup);
 
     // ── Result icon (check or X) — hidden until reveal ──
@@ -3511,15 +3525,20 @@ export default class GameScene extends Phaser.Scene {
     const baseSpins = 5; // ~5 full rotations feels right for 2.5s
     const s1Target = 0; // always land horizontal
     const s2Target = isOut ? (25 + Math.random() * 40) : 0; // fail: 25-65° offset
+    const s3Target = isOut ? (-(15 + Math.random() * 35)) : 0; // fail: opposite offset
 
-    // Snap total rotation to hit the target angle (mod 180)
-    const snapToTarget = (startAngle, target, spins) => {
+    // Snap total rotation so final visual angle lands on target (mod 180).
+    // dir: +1 for CW, -1 for CCW (s2 spins opposite)
+    const snapToTarget = (startAngle, target, spins, dir = 1) => {
       const raw = spins * 360;
-      const remainder = (startAngle + raw) % 180;
-      return raw + (target - remainder);
+      // Final angle = startAngle + dir * raw, we want (finalAngle % 180) === target
+      const finalRaw = ((startAngle + dir * raw) % 180 + 180) % 180;
+      const correction = target - finalRaw;
+      return raw + dir * correction;
     };
-    const s1TotalRot = snapToTarget(s1Angle, s1Target, baseSpins);
-    const s2TotalRot = snapToTarget(s2Angle, s2Target, baseSpins + 0.7); // slightly more spins for s2
+    const s1TotalRot = snapToTarget(s1Angle, s1Target, baseSpins, 1);
+    const s2TotalRot = snapToTarget(s2Angle, s2Target, baseSpins + 0.7, -1);
+    const s3TotalRot = snapToTarget(s3Angle, s3Target, baseSpins + 1.3, 1);
 
     this.time.delayedCall(SPIN_START, () => {
       if (skipped) return;
@@ -3544,14 +3563,17 @@ export default class GameScene extends Phaser.Scene {
           // Absolute positions from easing curve — no direction changes possible
           const s1Pos = s1Angle + s1TotalRot * eased;
           const s2Pos = s2Angle - s2TotalRot * eased; // opposite direction
+          const s3Pos = s3Angle + s3TotalRot * eased;  // same dir as s1 but different speed
 
           stitch1.setAngle(s1Pos);
           stitch2.setAngle(s2Pos);
+          stitch3.setAngle(s3Pos);
           ball.setAngle(s1Pos * 0.5); // ball rotates gently
 
-          // Casino tick beeps — use speed (derivative) for timing
-          const speed = 3 * Math.pow(1 - t, 2); // derivative of ease-out
-          tickInterval = 120 + (1 - speed) * 500;
+          // Casino tick beeps — use normalized speed for timing
+          // Derivative of cubic ease-out is 3*(1-t)^2, range [0,3] → normalize to [0,1]
+          const speed = Math.pow(1 - t, 2); // 1 at start, 0 at end
+          tickInterval = 180 + (1 - speed) * 500;
           if (elapsed - lastTickTime >= tickInterval) {
             lastTickTime = elapsed;
             const pitch = startPitch - (1 - speed) * (startPitch - endPitch);
@@ -3584,6 +3606,7 @@ export default class GameScene extends Phaser.Scene {
         ball.setFillStyle(0xff6666);
         stitch1.setFillStyle(0xff3333);
         stitch2.setFillStyle(0xff3333);
+        stitch3.setFillStyle(0xff3333);
         this.tweens.add({
           targets: [box, ...ballGroup, iconText],
           x: '+=5', duration: 40, yoyo: true, repeat: 3,
@@ -3597,6 +3620,7 @@ export default class GameScene extends Phaser.Scene {
         ball.setFillStyle(0xffffff);
         stitch1.setFillStyle(0x69f0ae);
         stitch2.setFillStyle(0x69f0ae);
+        stitch3.setFillStyle(0x69f0ae);
         // Scale pop
         this.tweens.add({
           targets: [box, ...ballGroup],

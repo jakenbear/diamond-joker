@@ -159,6 +159,26 @@ export default class TraitDraftScene extends Phaser.Scene {
       if (!this.picks.every(p => p !== null)) return;
       this._startGame();
     });
+
+    // Showdowns toggle (right of confirm button)
+    this._showShowdowns = false;
+    const toggleX = 920;
+    const checkBox = this.add.rectangle(toggleX, 680, 24, 24, 0x1a2a3a)
+      .setStrokeStyle(2, 0x556677)
+      .setInteractive({ useHandCursor: true });
+    const checkMark = this.add.text(toggleX, 680, '', {
+      fontSize: '18px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    const toggleLabel = this.add.text(toggleX + 20, 680, 'Showdowns', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#888888',
+    }).setOrigin(0, 0.5);
+
+    checkBox.on('pointerdown', () => {
+      this._showShowdowns = !this._showShowdowns;
+      checkMark.setText(this._showShowdowns ? '\u2714' : '');
+      checkBox.setStrokeStyle(2, this._showShowdowns ? 0x69f0ae : 0x556677);
+      toggleLabel.setColor(this._showShowdowns ? '#69f0ae' : '#888888');
+    });
   }
 
   _startGame() {
@@ -174,6 +194,7 @@ export default class TraitDraftScene extends Phaser.Scene {
       opponentTeam: this.opponentTeam,
       deckId: this.deckId,
       innateTraits: pickedTraits,
+      showShowdowns: this._showShowdowns,
     });
   }
 }
