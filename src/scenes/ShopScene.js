@@ -362,7 +362,8 @@ export default class ShopScene extends Phaser.Scene {
     }
 
     // Confirmation flash
-    const confirmOverlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.8).setDepth(20);
+    const confirmOverlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.8)
+      .setDepth(20).setInteractive();
     const isCoach = item.category === 'coach';
     const verb = isCoach ? 'Hired' : 'Adopted';
     const confirmText = this.add.text(640, 340,
@@ -471,7 +472,8 @@ export default class ShopScene extends Phaser.Scene {
     this.traitManager.markOwned(trait.id);
     this.purchasesMade++;
 
-    const confirmOverlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.8).setDepth(20);
+    const confirmOverlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.8)
+      .setDepth(20).setInteractive();
     const confirmText = this.add.text(640, 340,
       `${player.name} equipped\n"${trait.name}"!`, {
         fontSize: '28px', fontFamily: 'monospace', color: '#69f0ae',
