@@ -3461,13 +3461,15 @@ export default class GameScene extends Phaser.Scene {
       .setStrokeStyle(3, 0x444466).setAlpha(0);
     container.add(box);
 
-    // ── Baseball (circle + two stitch lines) ──
+    // ── Baseball (circle + two stitch lines, one per half) ──
     const ball = this.add.circle(boxX, boxY, 55, 0xfafafa).setAlpha(0);
-    const stitch1 = this.add.rectangle(boxX, boxY - 14, 36, 4, 0xcc3333).setAlpha(0);
-    const stitch2 = this.add.rectangle(boxX, boxY + 14, 36, 4, 0xcc3333).setAlpha(0);
-    // Each stitch spins at a different speed — the drama is whether they align
+    const s1CX = boxX - 22; // left half center
+    const s2CX = boxX + 22; // right half center
+    const stitch1 = this.add.rectangle(s1CX, boxY, 28, 4, 0xcc3333).setAlpha(0);
+    const stitch2 = this.add.rectangle(s2CX, boxY, 28, 4, 0xcc3333).setAlpha(0);
+    // Each spins around its own center — win = both land horizontal (0°)
     let s1Angle = 0;
-    let s2Angle = 90; // start offset
+    let s2Angle = 90; // start offset from s1
     const ballGroup = [ball, stitch1, stitch2];
     container.add(ballGroup);
 
@@ -3501,11 +3503,13 @@ export default class GameScene extends Phaser.Scene {
     const REVEAL_TIME = 3000; // show check/X
     const FADEOUT_TIME = 3500;
 
-    // Rig stitch speeds: on success they end aligned, on fail they don't
-    // s1 spins at 1.0x, s2 at a slightly different rate
-    // Starting gap is 90°. We need s2 to close that gap (mod 180) on success.
+    // Rig final stitch angles: success = both at 0° (horizontal), fail = visibly offset
+    // Each stitch does many full spins, but the FINAL angle is what matters.
+    // We blend toward the target angle in the last 30% of the deceleration.
+    const s1Final = 0;                               // always lands horizontal
+    const s2Final = isOut ? 35 + Math.random() * 50 : 0; // fail: 35-85° offset, success: 0° (aligned)
     const s1SpeedMult = 1.0;
-    const s2SpeedMult = isOut ? 1.08 : 1.15; // 1.15 closes the 90° gap over the spin duration
+    const s2SpeedMult = 1.12; // slightly different spin rate for visual variety
 
     this.time.delayedCall(SPIN_START, () => {
       if (skipped) return;
@@ -3533,14 +3537,25 @@ export default class GameScene extends Phaser.Scene {
           // Ball rotates normally
           ball.setAngle(ball.angle + angleDelta);
 
-          // Stitches spin at different rates — s2 is slightly faster
-          // Pre-rigged: on success they converge, on fail they stay offset
-          const s1Delta = angleDelta * s1SpeedMult;
-          const s2Delta = angleDelta * s2SpeedMult;
-          s1Angle += s1Delta;
-          s2Angle += s2Delta;
-          stitch1.setAngle(s1Angle);
-          stitch2.setAngle(s2Angle);
+          // Stitches spin at different rates
+          s1Angle += angleDelta * s1SpeedMult;
+          s2Angle += angleDelta * s2SpeedMult;
+
+          // In the last 30%, blend toward the rigged final angles
+          if (progress > 0.7) {
+            const blend = (progress - 0.7) / 0.3; // 0→1 over last 30%
+            const easeBlend = blend * blend; // ease-in for natural deceleration feel
+            // Normalize current angles to find nearest equivalent of target
+            const norm = (a) => ((a % 180) + 180) % 180;
+            const s1Curr = norm(s1Angle);
+            const s2Curr = norm(s2Angle);
+            // Lerp the displayed angle toward target
+            stitch1.setAngle(s1Curr + (s1Final - s1Curr) * easeBlend);
+            stitch2.setAngle(s2Curr + (s2Final - s2Curr) * easeBlend);
+          } else {
+            stitch1.setAngle(s1Angle);
+            stitch2.setAngle(s2Angle);
+          }
 
           // Casino tick beeps — decelerate with the spin
           tickInterval = 80 + eased * 420; // 80ms → 500ms gaps
