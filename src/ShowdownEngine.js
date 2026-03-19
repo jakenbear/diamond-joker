@@ -53,6 +53,7 @@ export default class ShowdownEngine {
     this.lockedIndices = [];
     this.faceDownIndices = [];
     this.hiddenNextCard = false;
+    this.plantedCard = null;
     this._revealedBatterCards = [];
     this.staminaDrained = 0;
     this.pitcherTraits = pitcher.traits || [];
@@ -75,21 +76,32 @@ export default class ShowdownEngine {
     this.lockedIndices = [];
     this.faceDownIndices = [];
     this.hiddenNextCard = false;
+    this.plantedCard = null;
     this._revealedBatterCards = [];
   }
 
+  _dealOne() {
+    // If palmball planted a card, use it as the next community card
+    if (this.plantedCard) {
+      const card = this.plantedCard;
+      this.plantedCard = null;
+      return card;
+    }
+    return this.pitcherDeck.pop();
+  }
+
   dealFlop() {
-    for (let i = 0; i < 3; i++) this.community.push(this.pitcherDeck.pop());
+    for (let i = 0; i < 3; i++) this.community.push(this._dealOne());
     this.stage = 'flop';
   }
 
   dealTurn() {
-    this.community.push(this.pitcherDeck.pop());
+    this.community.push(this._dealOne());
     this.stage = 'turn';
   }
 
   dealRiver() {
-    this.community.push(this.pitcherDeck.pop());
+    this.community.push(this._dealOne());
     this.stage = 'river';
   }
 
@@ -266,7 +278,7 @@ export default class ShowdownEngine {
 
     // Control-based misfire for targeted effects:
     // Low control = chance to hit wrong target
-    const targeted = ['slider', 'cutter', 'splitter', 'twoseam', 'knuckle', 'breaking'];
+    const targeted = ['slider', 'cutter', 'splitter', 'twoseam', 'breaking'];
     if (targeted.includes(pitchKey) && options.targetIndex !== undefined) {
       const misfireChance = Math.max(0, (6 - this.pitcher.control) * 0.08);
       if (Math.random() < misfireChance && this.community.length > 1) {
@@ -367,25 +379,25 @@ export default class ShowdownEngine {
     if (targetIndex < 0 || targetIndex >= this.community.length) {
       return { success: false, reason: 'Invalid target' };
     }
-    const otherSuits = this.community.filter((_, i) => i !== targetIndex).map(c => c.suit);
-    const freq = {};
-    otherSuits.forEach(s => { freq[s] = (freq[s] || 0) + 1; });
-    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
-    const newSuit = sorted.length > 0 ? sorted[0][0] : this.community[targetIndex].suit;
-    const oldSuit = this.community[targetIndex].suit;
-    this.community[targetIndex].suit = newSuit;
-    return { success: true, oldSuit, newSuit };
+    // Swap a community card with a random batter hole card
+    const batterIdx = Math.floor(Math.random() * this.batterHole.length);
+    const communityCard = { ...this.community[targetIndex] };
+    const batterCard = { ...this.batterHole[batterIdx] };
+    this.community[targetIndex] = batterCard;
+    this.batterHole[batterIdx] = communityCard;
+    return { success: true, swappedCommunity: communityCard, swappedBatter: batterCard, batterIdx };
   }
 
-  _effectKnuckle({ targetIndex = 0 }) {
-    if (targetIndex < 0 || targetIndex >= this.community.length) {
-      return { success: false, reason: 'Invalid target' };
+  _effectKnuckle() {
+    if (this.community.length === 0) {
+      return { success: false, reason: 'No community cards' };
     }
-    this.community[targetIndex] = {
-      rank: 2 + Math.floor(Math.random() * 13),
-      suit: SUITS[Math.floor(Math.random() * 4)],
-    };
-    return { success: true };
+    // Randomize ALL community card ranks (keep suits)
+    const before = this.community.map(c => ({ ...c }));
+    for (const c of this.community) {
+      c.rank = 2 + Math.floor(Math.random() * 13);
+    }
+    return { success: true, before, after: this.community.map(c => ({ ...c })) };
   }
 
   _effectScrewball() {
@@ -399,8 +411,17 @@ export default class ShowdownEngine {
   }
 
   _effectPalmball() {
-    this.hiddenNextCard = true;
-    return { success: true };
+    // Deal next community card from pitcher's deck instead of random
+    if (this.pitcherDeck.length === 0) {
+      return { success: false, reason: 'Deck empty' };
+    }
+    // Sort deck descending and take the best card
+    const sorted = [...this.pitcherDeck].sort((a, b) => b.rank - a.rank);
+    const planted = sorted[0];
+    const deckIdx = this.pitcherDeck.indexOf(planted);
+    this.pitcherDeck.splice(deckIdx, 1);
+    this.plantedCard = planted;
+    return { success: true, plantedCard: { ...planted } };
   }
 
   _effectBreaking({ targetIndex = 0 }) {

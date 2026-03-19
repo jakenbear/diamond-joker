@@ -48,7 +48,7 @@ The opposing pitcher has 1-2 traits that work against you — with risk/reward t
 
 Pitcher trait activations show in the play-by-play so you always know what happened.
 
-## Running Locally
+## Running Locally (Browser)
 
 Serve the project with any HTTP server:
 
@@ -62,17 +62,77 @@ npx serve .
 
 Then open `http://localhost:8080` in your browser.
 
+## Running Tests
+
+```bash
+node test/sim.js
+```
+
+## Desktop Build (NW.js)
+
+The game can run as a standalone desktop app using [NW.js](https://nwjs.io). This is the path to packaging for Steam.
+
+### Quick Test
+
+```bash
+# Install NW.js
+brew install nwjs          # macOS
+# or download from https://nwjs.io/downloads/
+
+# Build and launch
+./scripts/build-desktop.sh --run
+```
+
+### Package for Distribution
+
+```bash
+# Install the packager
+npm install -g nw-builder
+
+# Build for a specific platform
+./scripts/package-desktop.sh win64     # Windows .exe
+./scripts/package-desktop.sh osx64     # macOS .app
+./scripts/package-desktop.sh linux64   # Linux
+./scripts/package-desktop.sh all       # All platforms
+```
+
+Output goes to `desktop/dist/`. Each platform folder contains a self-contained app — no install needed.
+
+### Steam Distribution
+
+1. Create your app on [Steamworks](https://partner.steamgames.com)
+2. Package for Windows: `./scripts/package-desktop.sh win64`
+3. Upload `desktop/dist/` contents as a depot via SteamPipe
+4. For Steam overlay/achievements, add `greenworks`:
+   ```bash
+   npm install greenworks
+   ```
+   Then init in a `<script>` tag before the game boots (requires your Steam App ID).
+
+### How It Works
+
+- `vendor/phaser.min.js` — Local Phaser 3.60 (no CDN needed offline)
+- `desktop/package.json` — NW.js manifest (window size, title, chrome settings)
+- `scripts/build-desktop.sh` — Assembles game files into `desktop/build/`
+- `scripts/package-desktop.sh` — Wraps with NW.js runtime for each platform
+
+The browser version still works identically — `index.html` loads local Phaser first, with a CDN fallback for GitHub Pages.
+
 ## Tech Stack
 
-- **Phaser 3.60.0** (loaded from CDN)
+- **Phaser 3.60.0** (local + CDN fallback)
+- **NW.js** for desktop/Steam builds
+- **Godot 4.6** for native version (parallel implementation)
 - Vanilla JavaScript (ES6 modules)
-- No build step, no dependencies
+- No bundler — just serve and play
 
 ## Project Structure
 
 ```
 diamond-joker/
-├── index.html              # Entry point
+├── index.html              # Entry point (browser + desktop)
+├── vendor/
+│   └── phaser.min.js       # Local Phaser 3.60
 ├── src/
 │   ├── main.js             # Phaser config + bootstrap
 │   ├── CardEngine.js       # Deck, hand evaluation, rank quality
@@ -80,7 +140,19 @@ diamond-joker/
 │   ├── RosterManager.js    # Player roster + pitcher management
 │   ├── TraitManager.js     # Batter + pitcher trait definitions
 │   └── scenes/
-│       ├── GameScene.js    # Main gameplay (batter/pitcher panels, cards, flow)
+│       ├── GameScene.js    # Main gameplay (cards, diamond, scoring)
+│       ├── PitchingScene.js # Pitching showdown (bottom half)
 │       ├── ShopScene.js    # Between-innings trait card shop
+│       ├── TeamSelectScene.js # Team + opponent selection
 │       └── GameOverScene.js # Results screen
+├── data/                   # Game data (teams, hands, traits, balance)
+├── test/                   # Tests (node test/sim.js)
+├── godot/                  # Godot 4.6 native version
+├── desktop/
+│   ├── package.json        # NW.js manifest
+│   ├── build/              # Assembled game (gitignored)
+│   └── dist/               # Packaged executables (gitignored)
+└── scripts/
+    ├── build-desktop.sh    # Assemble for NW.js
+    └── package-desktop.sh  # Package .exe/.app/.zip
 ```

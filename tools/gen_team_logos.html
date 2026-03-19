@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head><title>Team Logo Generator</title></head>
+<body style="background:#222;display:flex;flex-direction:column;align-items:center;padding:20px;gap:20px;">
+<h3 style="color:#fff;font-family:monospace;">Team Logos (64x64) — right-click each to Save As PNG</h3>
+<div style="display:flex;gap:40px;flex-wrap:wrap;justify-content:center;">
+
+<div style="text-align:center;">
+  <p style="color:#e53935;font-family:monospace;font-weight:bold;">Canada Mounties</p>
+  <canvas id="canada" width="64" height="64" style="image-rendering:pixelated;width:256px;height:256px;border:1px solid #555;"></canvas>
+</div>
+
+<div style="text-align:center;">
+  <p style="color:#1565c0;font-family:monospace;font-weight:bold;">USA Eagles</p>
+  <canvas id="usa" width="64" height="64" style="image-rendering:pixelated;width:256px;height:256px;border:1px solid #555;"></canvas>
+</div>
+
+<div style="text-align:center;">
+  <p style="color:#c62828;font-family:monospace;font-weight:bold;">Japan Dragons</p>
+  <canvas id="japan" width="64" height="64" style="image-rendering:pixelated;width:256px;height:256px;border:1px solid #555;"></canvas>
+</div>
+
+<div style="text-align:center;">
+  <p style="color:#2e7d32;font-family:monospace;font-weight:bold;">Mexico Diablos</p>
+  <canvas id="mexico" width="64" height="64" style="image-rendering:pixelated;width:256px;height:256px;border:1px solid #555;"></canvas>
+</div>
+
+</div>
+
+<script>
+// Helper: draw pixel
+function px(ctx, x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, 1, 1);
+}
+
+// Helper: draw filled circle
+function circle(ctx, cx, cy, r, color) {
+  ctx.fillStyle = color;
+  for (let y = -r; y <= r; y++) {
+    for (let x = -r; x <= r; x++) {
+      if (x*x + y*y <= r*r) ctx.fillRect(cx+x, cy+y, 1, 1);
+    }
+  }
+}
+
+// Helper: draw line
+function line(ctx, x0, y0, x1, y1, color) {
+  ctx.fillStyle = color;
+  const dx = Math.abs(x1-x0), dy = Math.abs(y1-y0);
+  const sx = x0<x1?1:-1, sy = y0<y1?1:-1;
+  let err = dx-dy;
+  while(true) {
+    ctx.fillRect(x0,y0,1,1);
+    if(x0===x1&&y0===y1) break;
+    const e2=2*err;
+    if(e2>-dy){err-=dy;x0+=sx;}
+    if(e2<dx){err+=dx;y0+=sy;}
+  }
+}
+
+// ── CANADA: Mountie Head ──
+{
+  const c = document.getElementById('canada');
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = '#1a0808';
+  ctx.fillRect(0, 0, 64, 64);
+
+  // Face (skin tone)
+  const skin = '#e8b88a';
+  const skinShadow = '#c9956a';
+  circle(ctx, 32, 38, 12, skin);
+  circle(ctx, 32, 39, 11, skinShadow);
+  circle(ctx, 32, 37, 11, skin);
+
+  // Chin/jaw
+  ctx.fillStyle = skinShadow;
+  ctx.fillRect(24, 46, 20, 4);
+  ctx.fillStyle = skin;
+  ctx.fillRect(25, 44, 18, 4);
+
+  // Neck
+  ctx.fillStyle = '#c9956a';
+  ctx.fillRect(28, 50, 8, 8);
+
+  // Red Mountie jacket collar
+  ctx.fillStyle = '#c62828';
+  ctx.fillRect(20, 54, 24, 10);
+  ctx.fillStyle = '#e53935';
+  ctx.fillRect(22, 55, 20, 8);
+  // Gold buttons
+  px(ctx, 30, 57, '#ffd600');
+  px(ctx, 30, 60, '#ffd600');
+  px(ctx, 34, 57, '#ffd600');
+  px(ctx, 34, 60, '#ffd600');
+
+  // ── Campaign hat (Stetson) ──
+  // Hat brim (wide, flat)
+  ctx.fillStyle = '#8d6e63';
+  ctx.fillRect(12, 28, 40, 4);
+  ctx.fillStyle = '#6d4c41';
+  ctx.fillRect(14, 29, 36, 2);
+  // Brim shadow on face
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.fillRect(20, 31, 24, 2);
+
+  // Hat crown (tall, peaked)
+  ctx.fillStyle = '#8d6e63';
+  // Main crown body
+  ctx.beginPath();
+  ctx.moveTo(20, 28);
+  ctx.lineTo(22, 10);
+  ctx.lineTo(32, 6);
+  ctx.lineTo(42, 10);
+  ctx.lineTo(44, 28);
+  ctx.closePath();
+  ctx.fill();
+
+  // Darker band around base of crown
+  ctx.fillStyle = '#5d4037';
+  ctx.fillRect(20, 25, 24, 3);
+
+  // Crown pinch/dent (darker center valley)
+  ctx.fillStyle = '#6d4c41';
+  ctx.beginPath();
+  ctx.moveTo(26, 10);
+  ctx.lineTo(32, 14);
+  ctx.lineTo(38, 10);
+  ctx.lineTo(38, 12);
+  ctx.lineTo(32, 16);
+  ctx.lineTo(26, 12);
+  ctx.closePath();
+  ctx.fill();
+
+  // Hat highlight
+  ctx.fillStyle = '#a1887f';
+  for (let y = 12; y < 24; y++) {
+    px(ctx, 24, y, '#a1887f');
+    px(ctx, 25, y, '#a1887f');
+  }
+
+  // Eyes
+  px(ctx, 27, 36, '#222222');
+  px(ctx, 28, 36, '#222222');
+  px(ctx, 36, 36, '#222222');
+  px(ctx, 37, 36, '#222222');
+  // Eyebrows
+  ctx.fillStyle = '#5d4037';
+  ctx.fillRect(26, 34, 4, 1);
+  ctx.fillRect(35, 34, 4, 1);
+
+  // Nose
+  px(ctx, 31, 40, skinShadow);
+  px(ctx, 32, 40, skinShadow);
+  px(ctx, 33, 40, skinShadow);
+
+  // Mouth (slight smile)
+  ctx.fillStyle = '#c0735a';
+  ctx.fillRect(29, 44, 6, 1);
+
+  // Ears
+  circle(ctx, 19, 38, 2, skin);
+  circle(ctx, 45, 38, 2, skin);
+}
+
+// ── USA: Eagle Head ──
+{
+  const c = document.getElementById('usa');
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = '#080d1a';
+  ctx.fillRect(0, 0, 64, 64);
+
+  // Eagle body/head — white head, brown body, yellow beak
+  // Head (white)
+  const head = '#e8e8e8';
+  const headDark = '#cccccc';
+  circle(ctx, 32, 28, 10, head);
+  circle(ctx, 33, 27, 9, headDark);
+  circle(ctx, 32, 28, 8, head);
+
+  // Eye
+  px(ctx, 28, 26, '#111111');
+  px(ctx, 29, 26, '#111111');
+  px(ctx, 28, 25, '#ffd600');
+
+  // Beak (yellow/orange)
+  const beak = '#ff8f00';
+  for (let x = 23; x <= 30; x++) {
+    px(ctx, x, 30, beak);
+    px(ctx, x, 31, beak);
+  }
+  for (let x = 20; x <= 27; x++) {
+    px(ctx, x, 32, '#e65100');
+  }
+  for (let x = 18; x <= 24; x++) {
+    px(ctx, x, 33, '#bf360c');
+  }
+  // Beak hook
+  px(ctx, 18, 34, '#bf360c');
+  px(ctx, 19, 34, '#bf360c');
+
+  // Brown body/neck
+  const brown = '#5d4037';
+  const brownLight = '#795548';
+  circle(ctx, 35, 40, 12, brown);
+  circle(ctx, 38, 38, 10, brownLight);
+  circle(ctx, 35, 40, 10, brown);
+
+  // Wing feathers
+  for (let y = 35; y < 55; y++) {
+    for (let x = 40; x < 58; x++) {
+      if (Math.random() < 0.7 && (x + y) % 3 !== 0) {
+        px(ctx, x, y, Math.random() < 0.5 ? '#3e2723' : '#4e342e');
+      }
+    }
+  }
+
+  // Feather detail on head
+  for (let i = 0; i < 8; i++) {
+    const fx = 36 + Math.floor(Math.random() * 8);
+    const fy = 18 + Math.floor(Math.random() * 5);
+    px(ctx, fx, fy, '#dddddd');
+  }
+}
+
+// ── JAPAN: Dragon ──
+{
+  const c = document.getElementById('japan');
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = '#0a0505';
+  ctx.fillRect(0, 0, 64, 64);
+
+  // Dragon head profile
+  const green = '#2e7d32';
+  const greenLight = '#43a047';
+  const greenDark = '#1b5e20';
+
+  // Head shape
+  circle(ctx, 30, 30, 14, green);
+  circle(ctx, 28, 28, 12, greenLight);
+  circle(ctx, 30, 30, 11, green);
+
+  // Snout
+  for (let x = 12; x <= 25; x++) {
+    for (let y = 28; y <= 36; y++) {
+      if (y < 29 + (x-12)*0.3 && y > 27) px(ctx, x, y, green);
+      if (y >= 29 + (x-12)*0.3 && y < 33) px(ctx, x, y, greenLight);
+      if (y >= 33 && y < 37 && x > 14) px(ctx, x, y, greenDark);
+    }
+  }
+  // Jaw
+  for (let x = 14; x <= 30; x++) {
+    px(ctx, x, 37, greenDark);
+    px(ctx, x, 38, greenDark);
+    if (x > 16) px(ctx, x, 39, green);
+  }
+
+  // Eye (fierce red)
+  px(ctx, 24, 26, '#ff1744');
+  px(ctx, 25, 26, '#ff1744');
+  px(ctx, 24, 25, '#ff5252');
+  px(ctx, 25, 25, '#d50000');
+  px(ctx, 23, 26, '#ffab40'); // glow
+
+  // Horns
+  for (let i = 0; i < 8; i++) {
+    px(ctx, 32 + i, 17 - i, '#8d6e63');
+    px(ctx, 33 + i, 17 - i, '#6d4c41');
+    px(ctx, 28 - i*0.5, 18 - i, '#8d6e63');
+    px(ctx, 29 - i*0.5, 18 - i, '#6d4c41');
+  }
+
+  // Scales texture
+  for (let i = 0; i < 30; i++) {
+    const sx = 22 + Math.floor(Math.random() * 20);
+    const sy = 22 + Math.floor(Math.random() * 18);
+    px(ctx, sx, sy, Math.random() < 0.5 ? '#1b5e20' : '#388e3c');
+  }
+
+  // Fire breath
+  const fireColors = ['#ff6d00', '#ff9100', '#ffab40', '#ffd600', '#ff3d00'];
+  for (let i = 0; i < 40; i++) {
+    const fx = 6 + Math.floor(Math.random() * 14);
+    const fy = 30 + Math.floor(Math.random() * 12) - 4;
+    px(ctx, fx, fy, fireColors[Math.floor(Math.random() * fireColors.length)]);
+  }
+
+  // Neck/body trailing off
+  for (let y = 38; y < 58; y++) {
+    const w = Math.max(2, 14 - (y - 38) * 0.6);
+    for (let x = 0; x < w; x++) {
+      px(ctx, 34 + x + (y-38)*0.5, y, Math.random() < 0.5 ? green : greenDark);
+    }
+  }
+}
+
+// ── MEXICO: Flame Skull (Diablo) ──
+{
+  const c = document.getElementById('mexico');
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = '#050a05';
+  ctx.fillRect(0, 0, 64, 64);
+
+  // Skull
+  const bone = '#e0d8c8';
+  const boneDark = '#bdb5a5';
+  circle(ctx, 32, 36, 12, bone);
+  circle(ctx, 32, 35, 11, boneDark);
+  circle(ctx, 32, 36, 10, bone);
+
+  // Jaw
+  for (let x = 25; x <= 39; x++) {
+    px(ctx, x, 46, bone);
+    px(ctx, x, 47, boneDark);
+    px(ctx, x, 48, boneDark);
+  }
+  // Teeth
+  for (let x = 27; x <= 37; x += 2) {
+    px(ctx, x, 45, '#ffffff');
+    px(ctx, x, 46, '#ffffff');
+  }
+
+  // Eye sockets (dark)
+  circle(ctx, 27, 34, 3, '#1a0a00');
+  circle(ctx, 37, 34, 3, '#1a0a00');
+  // Glowing eyes
+  px(ctx, 27, 34, '#ff3d00');
+  px(ctx, 28, 34, '#ff6d00');
+  px(ctx, 37, 34, '#ff3d00');
+  px(ctx, 36, 34, '#ff6d00');
+
+  // Nose
+  px(ctx, 31, 39, '#3e2723');
+  px(ctx, 32, 39, '#3e2723');
+  px(ctx, 31, 40, '#3e2723');
+  px(ctx, 33, 40, '#3e2723');
+
+  // Flames on top of skull
+  const fireColors = ['#ff3d00', '#ff6d00', '#ff9100', '#ffab40', '#ffd600', '#ffea00'];
+  for (let x = 20; x <= 44; x++) {
+    const baseY = 26 - Math.pow((x-32)/12, 2) * 4;
+    const height = 8 + Math.floor(Math.random() * 10);
+    for (let y = 0; y < height; y++) {
+      const fy = baseY - y;
+      if (fy >= 0 && fy < 64) {
+        const ci = Math.min(fireColors.length - 1, Math.floor(y / height * fireColors.length));
+        if (Math.random() < 0.8 - y * 0.04) {
+          px(ctx, x, fy, fireColors[ci]);
+        }
+      }
+    }
+  }
+  // Extra flame wisps
+  for (let i = 0; i < 20; i++) {
+    const fx = 22 + Math.floor(Math.random() * 20);
+    const fy = 5 + Math.floor(Math.random() * 12);
+    px(ctx, fx, fy, fireColors[Math.floor(Math.random() * fireColors.length)]);
+  }
+}
+</script>
+</body>
+</html>

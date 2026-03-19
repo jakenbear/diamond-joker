@@ -16,16 +16,36 @@ const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const CARD_ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
 const CARD_ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
 
+// ── Layout zones ─────────────────────────────────────
+// Jumbotron (scoreboard in the crowd)
+const JUMBOTRON_X = 640;
+const JUMBOTRON_Y = 100;
+const JUMBOTRON_W = 500;
+const JUMBOTRON_H = 120;
+
+// Diamond (on the field)
+const DIAMOND_CX = 640;
+const DIAMOND_CY = 370;
+const DIAMOND_R = 70;
+
+// Side panels
+const PANEL_W = 210;
+const BATTER_X = 115;
+const PITCHER_X = 1165;
+const PANEL_CY = 350;      // center Y of both panels
+const PANEL_H = 320;
+const PANEL_TOP = PANEL_CY - PANEL_H / 2;  // ~260
+
+// Card hand (bottom)
 const CARD_W = 96;
 const CARD_H = 126;
 const CARD_SPACING = 105;
-const HAND_Y = 570;
+const HAND_Y = 600;
 const HAND_START_X = 640 - 3 * CARD_SPACING;
+const BUTTON_Y = HAND_Y + CARD_H / 2 + 27;  // ~690, below cards
 
-// Panel constants
-const PANEL_W = 210;
-const BATTER_X = 115;   // center of left panel
-const PITCHER_X = 1165;  // center of right panel
+// Result / preview text (below jumbotron, above diamond)
+const PREVIEW_Y = JUMBOTRON_Y + JUMBOTRON_H / 2 + 15;  // ~215
 
 const RARITY_COLORS = {
   common:   '#81c784',
@@ -179,28 +199,32 @@ export default class GameScene extends Phaser.Scene {
   // ── Scoreboard ──────────────────────────────────────────
 
   _createScoreboard() {
-    this.add.rectangle(640, 25, 1280, 50, 0x0d3311).setDepth(0);
+    // Jumbotron — dark rectangle floating in the crowd zone
+    this.add.rectangle(JUMBOTRON_X, JUMBOTRON_Y, JUMBOTRON_W, JUMBOTRON_H, 0x0a0a1a, 0.88).setDepth(1)
+      .setStrokeStyle(2, 0x444466);
+    this.add.rectangle(JUMBOTRON_X, JUMBOTRON_Y, JUMBOTRON_W - 8, JUMBOTRON_H - 8, 0x000000, 0).setDepth(1)
+      .setStrokeStyle(1, 0x333355);
 
-    // Score + Peanuts (vertically centered in bar)
-    this.scoreText = this.add.text(640, 13, '', {
-      fontSize: '20px', fontFamily: 'monospace', color: '#ffd600',
-    }).setOrigin(0.5, 0).setDepth(1);
+    // Score + Peanuts (top line)
+    this.scoreText = this.add.text(JUMBOTRON_X, JUMBOTRON_Y - 30, '', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#ffd600',
+    }).setOrigin(0.5, 0).setDepth(2);
 
-    // Left: INN + Outs
-    this.inningOutsText = this.add.text(BATTER_X + PANEL_W / 2 + 20, 16, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff',
-    }).setDepth(1);
+    // INN + Outs (left)
+    this.inningOutsText = this.add.text(JUMBOTRON_X - JUMBOTRON_W / 2 + 20, JUMBOTRON_Y + 5, '', {
+      fontSize: '15px', fontFamily: 'monospace', color: '#ffffff',
+    }).setDepth(2);
 
-    // Right: B + S count (right-aligned before pitcher panel)
-    this.countText = this.add.text(PITCHER_X - PANEL_W / 2 - 10, 16, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff',
-    }).setOrigin(1, 0).setDepth(1);
+    // B + S count (right)
+    this.countText = this.add.text(JUMBOTRON_X + JUMBOTRON_W / 2 - 20, JUMBOTRON_Y + 5, '', {
+      fontSize: '15px', fontFamily: 'monospace', color: '#ffffff',
+    }).setOrigin(1, 0).setDepth(2);
 
     this.countManager = new CountManager();
 
-    this.peanutBalanceText = this.add.text(640, 6, '', {
+    this.peanutBalanceText = this.add.text(JUMBOTRON_X, JUMBOTRON_Y + 30, '', {
       fontSize: '13px', fontFamily: 'monospace', color: '#ffd600',
-    }).setOrigin(0.5, 0).setDepth(1).setVisible(false);
+    }).setOrigin(0.5, 0).setDepth(2).setVisible(false);
 
     this._updateScoreboard();
   }
@@ -220,6 +244,23 @@ export default class GameScene extends Phaser.Scene {
     }
     const innHalf = s.half === 'top' ? '\u25b2' : '\u25bc';
     this.inningOutsText.setText(`INN ${s.inning} ${innHalf}   Outs: ${outDots.join(' ')}`);
+
+    // Out counter red flash when outs increase
+    if (s.outs > (this._prevOuts ?? 0)) {
+      this.tweens.killTweensOf(this.inningOutsText);
+      this.inningOutsText.setScale(1);
+      const origColor = this.inningOutsText.style.color;
+      this.inningOutsText.setColor('#ff5252');
+      this.tweens.add({
+        targets: this.inningOutsText,
+        scaleX: 1.15, scaleY: 1.15,
+        duration: 100,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onComplete: () => this.inningOutsText.setColor(origColor),
+      });
+    }
+    this._prevOuts = s.outs;
 
     // Line 2 right: B + S count
     const count = this.countManager.getCount();
@@ -241,49 +282,49 @@ export default class GameScene extends Phaser.Scene {
   _createBatterPanel() {
     const panelLeft = BATTER_X - PANEL_W / 2;
     const textW = PANEL_W - 20;
-    // Dark panel background
-    this.add.rectangle(BATTER_X, 280, PANEL_W, 400, 0x0a1f0d, 0.85)
+    // Dark panel background — field zone
+    this.add.rectangle(BATTER_X, PANEL_CY, PANEL_W, PANEL_H, 0x0a1f0d, 0.85)
       .setStrokeStyle(2, 0x2e7d32);
 
     // Team + "AT BAT" header
     const team = this.rosterManager.getTeam();
     const headerLabel = team ? `${team.logo} AT BAT` : 'AT BAT';
-    this.add.text(BATTER_X, 95, headerLabel, {
+    this.add.text(BATTER_X, PANEL_TOP + 12, headerLabel, {
       fontSize: '12px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
     // Player name
-    this.batterNameText = this.add.text(BATTER_X, 120, '', {
+    this.batterNameText = this.add.text(BATTER_X, PANEL_TOP + 35, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5).setDepth(2);
 
     // Lineup number
-    this.batterNumText = this.add.text(BATTER_X, 148, '', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
+    this.batterNumText = this.add.text(BATTER_X, PANEL_TOP + 58, '', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#81c784',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5).setDepth(2);
 
     // Stats
-    this.batterPwrText = this.add.text(panelLeft + 10, 175, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
+    this.batterPwrText = this.add.text(panelLeft + 10, PANEL_TOP + 78, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#ff8a65',
       fixedWidth: textW,
     }).setDepth(2);
-    this.batterCntText = this.add.text(panelLeft + 10, 195, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
+    this.batterCntText = this.add.text(panelLeft + 10, PANEL_TOP + 96, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#64b5f6',
       fixedWidth: textW,
     }).setDepth(2);
-    this.batterSpdText = this.add.text(panelLeft + 10, 215, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+    this.batterSpdText = this.add.text(panelLeft + 10, PANEL_TOP + 114, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#81c784',
       fixedWidth: textW,
     }).setDepth(2);
 
     // Divider
-    this.add.rectangle(BATTER_X, 240, PANEL_W - 30, 1, 0x2e7d32, 0.5);
+    this.add.rectangle(BATTER_X, PANEL_TOP + 135, PANEL_W - 30, 1, 0x2e7d32, 0.5);
 
     // "TRAITS" label
-    this.batterTraitLabel = this.add.text(BATTER_X, 252, 'TRAITS', {
+    this.batterTraitLabel = this.add.text(BATTER_X, PANEL_TOP + 147, 'TRAITS', {
       fontSize: '11px', fontFamily: 'monospace', color: '#4caf50',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5).setDepth(2);
@@ -321,7 +362,7 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.batterTraitLabel.setText('TRAITS');
       batter.traits.forEach((trait, i) => {
-        const sprites = this._createTraitMiniCard(BATTER_X, 275 + i * 75, trait);
+        const sprites = this._createTraitMiniCard(BATTER_X, PANEL_TOP + 170 + i * 65, trait);
         this.batterTraitSprites.push(...sprites);
       });
     }
@@ -352,46 +393,46 @@ export default class GameScene extends Phaser.Scene {
   _createPitcherPanel() {
     const panelLeft = PITCHER_X - PANEL_W / 2;
     const textW = PANEL_W - 20;
-    this.add.rectangle(PITCHER_X, 280, PANEL_W, 400, 0x1a0a0d, 0.85)
+    this.add.rectangle(PITCHER_X, PANEL_CY, PANEL_W, PANEL_H, 0x1a0a0d, 0.85)
       .setStrokeStyle(2, 0x8b0000);
 
     // "PITCHING" header
-    this.add.text(PITCHER_X, 95, 'PITCHING', {
+    this.add.text(PITCHER_X, PANEL_TOP + 12, 'PITCHING', {
       fontSize: '12px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5);
 
     // Pitcher name
-    this.pitcherNameText = this.add.text(PITCHER_X, 120, '', {
+    this.pitcherNameText = this.add.text(PITCHER_X, PANEL_TOP + 35, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       align: 'center', wordWrap: { width: textW }, fixedWidth: textW,
     }).setOrigin(0.5).setDepth(2);
 
     // Opponent team label
-    this.pitcherTeamText = this.add.text(PITCHER_X, 148, '', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#e57373',
+    this.pitcherTeamText = this.add.text(PITCHER_X, PANEL_TOP + 58, '', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#e57373',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5).setDepth(2);
 
     // Stats
-    this.pitcherVelText = this.add.text(panelLeft + 10, 170, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#ff8a65',
+    this.pitcherVelText = this.add.text(panelLeft + 10, PANEL_TOP + 78, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#ff8a65',
       fixedWidth: textW,
     }).setDepth(2);
-    this.pitcherCtlText = this.add.text(panelLeft + 10, 190, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#64b5f6',
+    this.pitcherCtlText = this.add.text(panelLeft + 10, PANEL_TOP + 96, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#64b5f6',
       fixedWidth: textW,
     }).setDepth(2);
-    this.pitcherStaText = this.add.text(panelLeft + 10, 210, '', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
+    this.pitcherStaText = this.add.text(panelLeft + 10, PANEL_TOP + 114, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#81c784',
       fixedWidth: textW,
     }).setDepth(2);
 
     // Divider
-    this.add.rectangle(PITCHER_X, 235, PANEL_W - 30, 1, 0x8b0000, 0.5);
+    this.add.rectangle(PITCHER_X, PANEL_TOP + 135, PANEL_W - 30, 1, 0x8b0000, 0.5);
 
     // "TRAITS" label
-    this.pitcherTraitLabel = this.add.text(PITCHER_X, 247, 'TRAITS', {
+    this.pitcherTraitLabel = this.add.text(PITCHER_X, PANEL_TOP + 147, 'TRAITS', {
       fontSize: '11px', fontFamily: 'monospace', color: '#e53935',
       fixedWidth: textW, align: 'center',
     }).setOrigin(0.5).setDepth(2);
@@ -422,7 +463,7 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.pitcherTraitLabel.setText('TRAITS');
       pitcher.traits.forEach((trait, i) => {
-        const sprites = this._createTraitMiniCard(PITCHER_X, 270 + i * 75, trait, true);
+        const sprites = this._createTraitMiniCard(PITCHER_X, PANEL_TOP + 170 + i * 65, trait, true);
         this.pitcherTraitSprites.push(...sprites);
       });
     }
@@ -450,6 +491,20 @@ export default class GameScene extends Phaser.Scene {
       align: 'center', wordWrap: { width: w - 10 },
     }).setOrigin(0.5).setDepth(3);
 
+    // Balatro-style wiggle — gentle sine-wave rotation
+    const wiggleDelay = Math.random() * 2000; // desync cards
+    [bg, name, desc].forEach(el => {
+      this.tweens.add({
+        targets: el,
+        angle: { from: -1.5, to: 1.5 },
+        duration: 2000,
+        delay: wiggleDelay,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    });
+
     return [bg, name, desc];
   }
 
@@ -472,8 +527,8 @@ export default class GameScene extends Phaser.Scene {
     this.runners = [null, null, null]; // runner dots for 1st, 2nd, 3rd
     this.runnerLabels = [null, null, null]; // runner name labels
     this._prevBases = [null, null, null]; // track previous state for animations
-    const cx = 640, cy = 195;
-    const r = 85;
+    const cx = DIAMOND_CX, cy = DIAMOND_CY;
+    const r = DIAMOND_R;
     this.baseDiamondCenter = { x: cx, y: cy };
     this.baseDiamondRadius = r;
     this.basePositions = [
@@ -598,6 +653,18 @@ export default class GameScene extends Phaser.Scene {
           duration: 500,
           delay: stagger,
           ease: 'Quad.easeInOut',
+          onComplete: () => {
+            // Pulse glow on occupied base runner
+            this.tweens.add({
+              targets: runner,
+              scaleX: runner.scaleX * 1.12,
+              scaleY: runner.scaleY * 1.12,
+              duration: 600,
+              yoyo: true,
+              repeat: -1,
+              ease: 'Sine.easeInOut',
+            });
+          },
         });
       } else if (!occupied && wasOccupied) {
         // Runner left — animate to next base or home
@@ -627,6 +694,16 @@ export default class GameScene extends Phaser.Scene {
             ? this.add.image(destX, destY, runnerKey).setScale(2.5).setDepth(3)
             : this.add.circle(destX, destY, 10, 0xffd600).setDepth(3);
           this.runners[i] = runner;
+          // Pulse glow
+          this.tweens.add({
+            targets: runner,
+            scaleX: runner.scaleX * 1.12,
+            scaleY: runner.scaleY * 1.12,
+            duration: 600,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+          });
         }
       } else {
         // No runner, clean up
@@ -735,24 +812,30 @@ export default class GameScene extends Phaser.Scene {
   // ── Result Display (center) ───────────────────────────
 
   _createResultDisplay() {
-    this.resultText = this.add.text(640, 345, '', {
-      fontSize: '34px', fontFamily: 'monospace', color: '#ffffff',
+    // Dark box behind result/preview text for readability
+    const boxCY = PREVIEW_Y + 12;
+    this.resultBoxCY = boxCY;
+    this.resultBox = this.add.rectangle(640, boxCY, 420, 55, 0x0a0a1a, 0.75)
+      .setStrokeStyle(1, 0x333355, 0.5).setDepth(1);
+
+    this.resultText = this.add.text(640, boxCY, '', {
+      fontSize: '28px', fontFamily: 'monospace', color: '#ffffff',
       align: 'center', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(2);
 
-    this.handNameText = this.add.text(640, 430, '', {
-      fontSize: '22px', fontFamily: 'monospace', color: '#aaaaaa',
+    this.handNameText = this.add.text(640, boxCY + 18, '', {
+      fontSize: '18px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
     }).setOrigin(0.5).setDepth(2);
 
-    // Live hand preview (shown while selecting cards — shares space with result text)
-    this.handPreviewText = this.add.text(640, 345, '', {
+    // Live hand preview (shown while selecting cards)
+    this.handPreviewText = this.add.text(640, boxCY - 10, '', {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffd600',
       align: 'center', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(7).setAlpha(0);
 
-    // Live score preview: peanuts x mult = total (shares space with hand name)
-    this.scorePreviewText = this.add.text(640, 370, '', {
+    // Live score preview: peanuts x mult = total
+    this.scorePreviewText = this.add.text(640, boxCY + 16, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center',
     }).setOrigin(0.5).setDepth(8).setAlpha(0);
@@ -764,14 +847,55 @@ export default class GameScene extends Phaser.Scene {
     this.scorePopups = [];
   }
 
+  /** Set result display: auto-centers single line, spreads two lines, shrinks if needed */
+  _setResultText(text, subtitle = '', color = null) {
+    const cy = this.resultBoxCY;
+    const maxW = 390;
+    this.resultText.setScale(1);
+    this.resultText.setText(text);
+    this.handNameText.setScale(1);
+    this.handNameText.setText(subtitle);
+    if (color) this.resultText.setColor(color);
+    if (subtitle) {
+      this.resultText.setY(cy - 10);
+      this.handNameText.setY(cy + 16);
+    } else {
+      this.resultText.setY(cy);
+    }
+    if (this.resultText.width > maxW) {
+      this.resultText.setScale(maxW / this.resultText.width);
+    }
+    if (this.handNameText.width > maxW) {
+      this.handNameText.setScale(maxW / this.handNameText.width);
+    }
+  }
+
+  /** Update just the subtitle line, adjusting vertical positions */
+  _setResultSubtitle(subtitle, color = '#aaaaaa') {
+    const cy = this.resultBoxCY;
+    const maxW = 390;
+    this.handNameText.setScale(1);
+    this.handNameText.setText(subtitle);
+    this.handNameText.setColor(color);
+    if (subtitle) {
+      this.resultText.setY(cy - 10);
+      this.handNameText.setY(cy + 16);
+    } else {
+      this.resultText.setY(cy);
+    }
+    if (this.handNameText.width > maxW) {
+      this.handNameText.setScale(maxW / this.handNameText.width);
+    }
+  }
+
   // ── Info Text ─────────────────────────────────────────
 
   _createInfoText() {
-    this.discardInfo = this.add.text(640, 395, '', {
+    this.discardInfo = this.add.text(640, PREVIEW_Y + 40, '', {
       fontSize: '14px', fontFamily: 'monospace', color: '#b2dfdb',
     }).setOrigin(0.5).setDepth(7);
 
-    this.deckInfo = this.add.text(BATTER_X, 490, '', {
+    this.deckInfo = this.add.text(BATTER_X, PANEL_CY + PANEL_H / 2 + 15, '', {
       fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
     }).setOrigin(0.5).setDepth(1);
 
@@ -784,9 +908,8 @@ export default class GameScene extends Phaser.Scene {
 
   _updateInfoText() {
     const count = this.countManager.getCount();
-    const freeTakeStr = this.freeTakesRemaining > 0 ? ` | Free takes: ${this.freeTakesRemaining}` : '';
     this.discardInfo.setText(
-      `Select cards to PLAY or DISCARD${freeTakeStr}`
+      this.freeTakesRemaining > 0 ? `Free takes: ${this.freeTakesRemaining}` : ''
     );
     this.deckInfo.setText(`Deck: ${this.cardEngine.deck.length}`);
 
@@ -809,9 +932,9 @@ export default class GameScene extends Phaser.Scene {
 
   _createStaffStack() {
     const stackX = 10;
-    const stackY = 495;
+    const stackY = PANEL_CY + PANEL_H / 2 + 30;  // below batter panel
     const stackW = PANEL_W + 10;
-    const stackH = 170;
+    const stackH = 150;
 
     this.add.rectangle(stackX + stackW / 2, stackY + stackH / 2, stackW, stackH, 0x0a1f0d, 0.8)
       .setStrokeStyle(1, 0x2e7d32, 0.5).setDepth(0);
@@ -873,11 +996,55 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // ── Light Stand Flash (Home Run celebration) ─────────
+
+  _flashLightStands() {
+    // Light stand positions (from 320×180 pixel art scaled 4×)
+    const stands = [
+      { x: 120, y: 20 },   // left tower
+      { x: 1152, y: 20 },  // right tower
+    ];
+    const colors = [0xffffff, 0xffd600, 0xff6d00, 0xff1744, 0x69f0ae];
+    const flashCount = 8;
+
+    stands.forEach(pos => {
+      for (let i = 0; i < flashCount; i++) {
+        const color = colors[i % colors.length];
+        const glow = this.add.circle(pos.x, pos.y, 40 + Math.random() * 20, color, 0.7)
+          .setDepth(0).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({
+          targets: glow,
+          alpha: { from: 0, to: 0.6 + Math.random() * 0.3 },
+          scaleX: { from: 0.5, to: 1.2 + Math.random() * 0.5 },
+          scaleY: { from: 0.5, to: 1.5 + Math.random() * 0.8 },
+          duration: 120 + Math.random() * 80,
+          delay: i * 150,
+          yoyo: true,
+          onComplete: () => glow.destroy(),
+        });
+      }
+
+      // Lingering light ray
+      const ray = this.add.rectangle(pos.x, pos.y + 60, 8, 140, 0xffd600, 0.3)
+        .setDepth(0).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({
+        targets: ray,
+        alpha: { from: 0, to: 0.4 },
+        scaleX: { from: 0.5, to: 2 },
+        duration: 400,
+        delay: 200,
+        yoyo: true,
+        hold: 600,
+        onComplete: () => ray.destroy(),
+      });
+    });
+  }
+
   // ── Roster Overlay ────────────────────────────────────
 
   _createRosterButton() {
     const btnX = 10 + (PANEL_W + 10) / 2;
-    const btnY = 495 + 175;
+    const btnY = PANEL_CY + PANEL_H / 2 + 190;  // below staff stack
     const btnW = PANEL_W + 10;
     const btnH = 28;
 
@@ -1024,15 +1191,15 @@ export default class GameScene extends Phaser.Scene {
   // ── Buttons ───────────────────────────────────────────
 
   _createButtons() {
-    this.playBtn = this._makeButton(500, 680, 'PLAY', 0x2e7d32, () => this._onPlay());
-    this.discardBtn = this._makeButton(640, 680, 'DISCARD', 0xf57f17, () => this._onDiscard());
+    this.playBtn = this._makeButton(500, BUTTON_Y, 'PLAY', 0x2e7d32, () => this._onPlay());
+    this.discardBtn = this._makeButton(640, BUTTON_Y, 'DISCARD', 0xf57f17, () => this._onDiscard());
 
     // Hand reference "?" button
-    const helpBg = this.add.rectangle(1240, 680, 40, 40, 0x333333)
+    const helpBg = this.add.rectangle(1240, BUTTON_Y, 40, 40, 0x333333)
       .setStrokeStyle(1, 0x555555)
       .setInteractive({ useHandCursor: true })
       .setDepth(3);
-    const helpTxt = this.add.text(1240, 680, '?', {
+    const helpTxt = this.add.text(1240, BUTTON_Y, '?', {
       fontSize: '22px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(4);
     helpBg.on('pointerover', () => helpBg.setStrokeStyle(1, 0xffd600));
@@ -1073,7 +1240,7 @@ export default class GameScene extends Phaser.Scene {
   // ── Sort Buttons ───────────────────────────────────────
 
   _createSortButtons() {
-    const sortY = 680;
+    const sortY = BUTTON_Y;
     const modes = [
       { label: 'DEF', mode: 'default' },
       { label: 'RNK', mode: 'rank' },
@@ -1392,7 +1559,10 @@ export default class GameScene extends Phaser.Scene {
     };
     // evaluateHand mutates the snapshot — use a copy so getSuccessChance reads clean counters
     const evalState = { baseballState: { ...counters } };
-    const result = CardEngine.evaluateHand(cards, null, null, evalState);
+    // Apply batter traits to preview so abilities like ace_wild_straight are reflected
+    const batter = this.rosterManager.currentBatter();
+    const batterPreMod = batter?.traits ? TraitManager.buildPreModifier(batter.traits) : null;
+    const result = CardEngine.evaluateHand(cards, batterPreMod, null, evalState);
     const n = cards.length;
 
     // Resolve the true hand name (Groundout/Flyout → original hand)
@@ -1415,22 +1585,20 @@ export default class GameScene extends Phaser.Scene {
         preview = 'High Card — Strikeout';
         color = '#ff8a80';
       }
-    } else if (successPct >= 100) {
-      // Guaranteed hands (Four of a Kind+)
-      const desc = result.playedDescription || trueHand;
-      preview = `${desc} \u2192 ${result.outcome}`;
-      color = '#ff6e40';
     } else {
-      // Hands with out chance — color-coded, no percentage
-      const desc = result.playedDescription || trueHand;
-      const outcome = HAND_TABLE.find(h => h.handName === trueHand)?.outcome || result.outcome;
+      // Always show best possible outcome from HAND_TABLE, not the rolled result
+      const entry = HAND_TABLE.find(h => h.handName === trueHand);
+      const outcome = entry?.outcome || result.outcome;
+      const desc = result.playedDescription && !result.wasGroundout
+        ? result.playedDescription
+        : trueHand;
       preview = `${desc} \u2192 ${outcome}`;
 
-      // Color by success chance
-      if (successPct >= 70) color = '#69f0ae';      // green — safe
-      else if (successPct >= 40) color = '#ffd600';  // gold — risky
-      else if (successPct >= 20) color = '#ff8a65';  // orange — dangerous
-      else color = '#ff5252';                         // red — near-certain out
+      if (successPct >= 100) color = '#ff6e40';
+      else if (successPct >= 70) color = '#69f0ae';      // green — safe
+      else if (successPct >= 40) color = '#ffd600';       // gold — risky
+      else if (successPct >= 20) color = '#ff8a65';       // orange — dangerous
+      else color = '#ff5252';                              // red — near-certain out
     }
 
     this.handPreviewText.setText(preview);
@@ -1600,8 +1768,7 @@ export default class GameScene extends Phaser.Scene {
   // ── Game Flow ─────────────────────────────────────────
 
   _startAtBat() {
-    this.resultText.setText('');
-    this.handNameText.setText('');
+    this._setResultText('');
     this.selectedIndices.clear();
     this.handPreviewText.setText('').setAlpha(0);
     this.scorePreviewText.setText('').setAlpha(0);
@@ -1668,17 +1835,15 @@ export default class GameScene extends Phaser.Scene {
       this.inputLocked = true;
       this._setButtonsEnabled(false, false);
       this.time.delayedCall(300, () => {
-        this.resultText.setText('HIT BY PITCH!');
-        this.resultText.setColor('#ffab40');
+        this._setResultText('HIT BY PITCH!', '', '#ffab40');
         this.resultText.setAlpha(1);
-        this.resultText.setScale(1);
         this.tweens.add({
           targets: this.resultText,
           scale: { from: 1.3, to: 1 },
           duration: 300,
           ease: 'Back.easeOut',
         });
-        this.handNameText.setText(hbp.description);
+        this._setResultSubtitle(hbp.description);
         this.handNameText.setColor('#ffab40');
 
         this.baseball.resolveOutcome('HBP', 0, batter);
@@ -1711,10 +1876,8 @@ export default class GameScene extends Phaser.Scene {
     // Free takes bypass the count (Batting Gloves, Fresh Cleats, Bench Coach)
     if (this.freeTakesRemaining > 0) {
       this.freeTakesRemaining--;
-      this.resultText.setText('FREE TAKE!');
-      this.resultText.setColor('#81d4fa');
+      this._setResultText('FREE TAKE!', '', '#81d4fa');
       this.resultText.setAlpha(1);
-      this.resultText.setScale(1);
       this.tweens.add({ targets: this.resultText, alpha: 0, duration: 400, delay: 600 });
       this._updateScoreboard();
       this._doCardDiscard();
@@ -1743,10 +1906,8 @@ export default class GameScene extends Phaser.Scene {
       calloutColor = '#ff5252';
     }
 
-    this.resultText.setText(calloutText);
-    this.resultText.setColor(calloutColor);
+    this._setResultText(calloutText, '', calloutColor);
     this.resultText.setAlpha(1);
-    this.resultText.setScale(1);
     this.tweens.add({ targets: this.resultText, alpha: 0, duration: 400, delay: 600 });
 
     this._updateScoreboard();
@@ -1759,8 +1920,7 @@ export default class GameScene extends Phaser.Scene {
       this._updateScoreboard();
       this._addGameLog('Wild pitch — runner advances!', '#ffab40');
       this.time.delayedCall(700, () => {
-        this.handNameText.setText(wildPitch.description);
-        this.handNameText.setColor('#ffab40');
+        this._setResultSubtitle(wildPitch.description, '#ffab40');
         this.tweens.add({ targets: this.handNameText, alpha: { from: 0, to: 1 }, duration: 200 });
         this.tweens.add({ targets: this.handNameText, alpha: 0, duration: 300, delay: 800 });
       });
@@ -1769,10 +1929,8 @@ export default class GameScene extends Phaser.Scene {
     // Walk from balls — resolve immediately, skip card play
     if (pitchResult.isWalk) {
       this.time.delayedCall(800, () => {
-        this.resultText.setText('WALK!');
-        this.resultText.setColor('#66bb6a');
+        this._setResultText('WALK!', '', '#66bb6a');
         this.resultText.setAlpha(1);
-        this.resultText.setScale(1);
         this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
 
         const walkBatter = this.rosterManager.getCurrentBatter();
@@ -1797,10 +1955,8 @@ export default class GameScene extends Phaser.Scene {
     // Strikeout from count — 3 strikes, at-bat over
     if (pitchResult.isStrikeout) {
       this.time.delayedCall(800, () => {
-        this.resultText.setText('STRUCK OUT!');
-        this.resultText.setColor('#ff5252');
+        this._setResultText('STRUCK OUT!', '', '#ff5252');
         this.resultText.setAlpha(1);
-        this.resultText.setScale(1);
         this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
 
         const kBatter = this.rosterManager.getCurrentBatter();
@@ -1825,10 +1981,8 @@ export default class GameScene extends Phaser.Scene {
     // Foul pop-up: 8% chance a foul ball is caught for an out
     if (pitchResult.isFoul && Math.random() < 0.08) {
       this.time.delayedCall(800, () => {
-        this.resultText.setText('FOUL POP-UP CAUGHT!');
-        this.resultText.setColor('#ff8a80');
+        this._setResultText('FOUL POP-UP CAUGHT!', '', '#ff8a80');
         this.resultText.setAlpha(1);
-        this.resultText.setScale(1);
         this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
 
         const foulBatter = this.rosterManager.getCurrentBatter();
@@ -1882,6 +2036,18 @@ export default class GameScene extends Phaser.Scene {
       this.dealOrder = this.cardEngine.hand.map((_, i) => i);
       this._renderHand();
       this._updateInfoText();
+      // Deck counter shrink pulse
+      if (this.deckInfo) {
+        this.tweens.killTweensOf(this.deckInfo);
+        this.deckInfo.setScale(1);
+        this.tweens.add({
+          targets: this.deckInfo,
+          scaleX: 0.7, scaleY: 0.7,
+          duration: 80,
+          yoyo: true,
+          ease: 'Quad.easeOut',
+        });
+      }
       this._setButtonsEnabled(true, this._canDiscard());
       this.inputLocked = false;
     });
@@ -2139,8 +2305,7 @@ export default class GameScene extends Phaser.Scene {
     // ── Phase 0: Show pitcher pre-trait activation if any ──
     let pitcherDelay = 0;
     if (pitcherPreMessage) {
-      this.handNameText.setText(`\u26be ${pitcherPreMessage}`);
-      this.handNameText.setColor('#ff5252');
+      this._setResultSubtitle(`\u26be ${pitcherPreMessage}`, '#ff5252');
       this.handNameText.setAlpha(1);
       this.tweens.add({
         targets: this.handNameText,
@@ -2153,18 +2318,10 @@ export default class GameScene extends Phaser.Scene {
     // ── Phase 1: Announce the hand (T=pitcherDelay) ──
     this.time.delayedCall(pitcherDelay, () => {
       const announcement = handResult.playedDescription || handResult.handName;
-      this.resultText.setText(announcement);
-      this.resultText.setColor('#ffd600');
+      const subtitle = pitcherPostMessage ? `\u26be ${pitcherPostMessage}` : '';
+      this._setResultText(announcement, subtitle, '#ffd600');
       this.resultText.setAlpha(1);
-      this.resultText.setScale(1);
-
-      // Show pitcher post-modifier effect below the hand name
-      if (pitcherPostMessage) {
-        this.handNameText.setText(`\u26be ${pitcherPostMessage}`);
-        this.handNameText.setColor('#ff5252');
-      } else {
-        this.handNameText.setText('');
-      }
+      if (subtitle) this.handNameText.setColor('#ff5252');
 
       this.tweens.add({
         targets: this.resultText,
@@ -2220,8 +2377,7 @@ export default class GameScene extends Phaser.Scene {
     if (batterPostMessage) {
       batterTraitDelay = 500;
       this.time.delayedCall(pitcherDelay + 500, () => {
-        this.handNameText.setText(`\u26be ${batterPostMessage}`);
-        this.handNameText.setColor('#69f0ae'); // Green for batter traits
+        this._setResultSubtitle(`\u26be ${batterPostMessage}`, '#69f0ae');
         this.tweens.add({
           targets: this.handNameText,
           alpha: { from: 0, to: 1 },
@@ -2235,8 +2391,7 @@ export default class GameScene extends Phaser.Scene {
     if (staffBonuses.outcomeChanged && staffBonuses.messages.length > 0) {
       staffDelay = 500;
       this.time.delayedCall(pitcherDelay + batterTraitDelay + 500, () => {
-        this.handNameText.setText(`\u2b50 ${staffBonuses.messages[0].text}`);
-        this.handNameText.setColor(staffBonuses.messages[0].color);
+        this._setResultSubtitle(`\u2b50 ${staffBonuses.messages[0].text}`, staffBonuses.messages[0].color);
         this.tweens.add({
           targets: this.handNameText,
           alpha: { from: 0, to: 1 },
@@ -2250,8 +2405,7 @@ export default class GameScene extends Phaser.Scene {
     if (situationalMessage) {
       situationalDelay = 500;
       this.time.delayedCall(pitcherDelay + batterTraitDelay + staffDelay + 500, () => {
-        this.handNameText.setText(`\u26be ${situationalMessage}`);
-        this.handNameText.setColor(situational.type === 'error' ? '#ffab40' : '#ff5252');
+        this._setResultSubtitle(`\u26be ${situationalMessage}`, situational.type === 'error' ? '#ffab40' : '#ff5252');
         this.tweens.add({
           targets: this.handNameText,
           alpha: { from: 0, to: 1 },
@@ -2325,8 +2479,7 @@ export default class GameScene extends Phaser.Scene {
       }
 
       // Show outcome text
-      this.resultText.setText(desc);
-      this.resultText.setColor(isOut ? '#ff8a80' : '#69f0ae');
+      this._setResultText(desc, '', isOut ? '#ff8a80' : '#69f0ae');
       this.tweens.add({
         targets: this.resultText,
         scale: { from: 0.5, to: 1 }, alpha: { from: 0, to: 1 },
@@ -2339,11 +2492,15 @@ export default class GameScene extends Phaser.Scene {
         const intensity = handResult.outcome === 'Home Run' ? 0.006 : 0.003;
         const duration = handResult.outcome === 'Home Run' ? 300 : 200;
         this.cameras.main.shake(duration, intensity);
-        if (handResult.outcome === 'Home Run') SoundManager.homeRun();
+        if (handResult.outcome === 'Home Run') { SoundManager.homeRun(); this._flashLightStands(); }
         else SoundManager.extraBaseHit();
       } else if (isOut) {
-        if (handResult.outcome === 'Strikeout') SoundManager.strikeout();
-        else SoundManager.out();
+        if (handResult.outcome === 'Strikeout') {
+          SoundManager.strikeout();
+          this.cameras.main.shake(200, 0.003);
+        } else {
+          SoundManager.out();
+        }
       } else {
         SoundManager.hit();
       }
@@ -2362,12 +2519,22 @@ export default class GameScene extends Phaser.Scene {
         if (runsForSound > 0) {
           SoundManager.runScored();
           this._celebrateRuns(runsForSound);
+          // Score text punch
+          this.tweens.killTweensOf(this.scoreText);
+          this.scoreText.setScale(1);
+          this.tweens.add({
+            targets: this.scoreText,
+            scaleX: 1.2, scaleY: 1.2,
+            duration: 100,
+            yoyo: true,
+            ease: 'Quad.easeOut',
+          });
         }
       });
 
       // For outs, skip cascade — just show outcome and move on
       if (isOut) {
-        this.handNameText.setText('');
+        this._setResultSubtitle('');
 
         this.rosterManager.advanceBatter();
         this.time.delayedCall(RUNNER_DELAY + 200, () => this._updateBatterPanel());
@@ -2390,7 +2557,7 @@ export default class GameScene extends Phaser.Scene {
         if (totalRuns > 0) {
           const popupColor = totalRuns >= 4 ? '#ff6e40' : totalRuns >= 2 ? '#ffd600' : '#69f0ae';
           const popupText = totalRuns >= 4 ? `+${totalRuns} RUNS!!!` : `+${totalRuns} RUN${totalRuns > 1 ? 'S' : ''}!`;
-          this._showScorePopup(popupText, popupColor, 640, 250);
+          this._showScorePopup(popupText, popupColor, DIAMOND_CX, DIAMOND_CY - DIAMOND_R - 20);
         }
 
         // Chip earnings flash
@@ -2589,6 +2756,16 @@ export default class GameScene extends Phaser.Scene {
         this.peanutBalanceText.setText(`Peanuts: ${Math.round(obj.val)}`);
       },
     });
+    // Bounce pop on change
+    this.tweens.killTweensOf(this.peanutBalanceText);
+    this.peanutBalanceText.setScale(1);
+    this.tweens.add({
+      targets: this.peanutBalanceText,
+      scaleX: 1.3, scaleY: 1.3,
+      duration: 120,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+    });
   }
 
   _resolveSacBunt(batter) {
@@ -2596,17 +2773,14 @@ export default class GameScene extends Phaser.Scene {
     this.cardEngine.discardPile.push(...this.cardEngine.hand);
     this.cardEngine.hand = [];
 
-    this.resultText.setText('SAC BUNT!');
-    this.resultText.setColor('#ffab40');
+    this._setResultText('SAC BUNT!', 'Runners advance, batter out', '#ffab40');
     this.resultText.setAlpha(1);
-    this.resultText.setScale(1);
     this.tweens.add({
       targets: this.resultText,
       scale: { from: 1.3, to: 1 },
       duration: 300,
       ease: 'Back.easeOut',
     });
-    this.handNameText.setText('Runners advance, batter out');
     this.handNameText.setColor('#ffab40');
 
     // Animate cards out
@@ -2628,8 +2802,7 @@ export default class GameScene extends Phaser.Scene {
       const sacRuns = outcome.runsScored > 0 ? ` +${outcome.runsScored}R` : '';
       this._addGameLog(`${batter.name.split(' ').pop()}: Sac Bunt — runners advance${sacRuns}`, '#ffab40');
 
-      this.resultText.setText(outcome.description);
-      this.resultText.setColor('#ffab40');
+      this._setResultText(outcome.description, '', '#ffab40');
       this._updateScoreboard();
 
       this.rosterManager.advanceBatter();
@@ -2987,6 +3160,18 @@ export default class GameScene extends Phaser.Scene {
     return null;
   }
 
+  /** Horizontal white flash bar that sweeps across during inning transitions */
+  _flashWipeBar() {
+    const bar = this.add.rectangle(-1280, 360, 1280, 8, 0xffffff, 0.9).setDepth(20);
+    this.tweens.add({
+      targets: bar,
+      x: { from: -640, to: 1920 },
+      duration: 350,
+      ease: 'Quad.easeIn',
+      onComplete: () => bar.destroy(),
+    });
+  }
+
   _showMidInningTransition() {
     this.inputLocked = true;
     this._setButtonsEnabled(false, false);
@@ -2997,6 +3182,8 @@ export default class GameScene extends Phaser.Scene {
     // Hide diamond sprites during transition
     if (this.batterSprite) this.batterSprite.setVisible(false);
     if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(false);
+    // Flash wipe bar
+    this._flashWipeBar();
     const s = this.baseball.getStatus();
     const elements = [];
 
@@ -3045,6 +3232,8 @@ export default class GameScene extends Phaser.Scene {
     // Hide diamond sprites during transition
     if (this.batterSprite) this.batterSprite.setVisible(false);
     if (this.pitcherMoundSprite) this.pitcherMoundSprite.setVisible(false);
+    // Flash wipe bar
+    this._flashWipeBar();
     const s = this.baseball.getStatus();
     const elements = [];
 

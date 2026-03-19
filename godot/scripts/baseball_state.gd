@@ -186,7 +186,7 @@ func resolve_outcome(outcome: String, hand_score: int = 0, batter = null) -> Dic
 			bases = [null, null, null]
 			outs = 0
 			state = State.SWITCH_SIDE
-			description += " - Side retired!"
+			pass  # Side retired shown via inning transition
 		else:
 			state = State.BATTING
 	else:

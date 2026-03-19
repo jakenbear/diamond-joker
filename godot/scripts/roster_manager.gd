@@ -97,6 +97,9 @@ func swap_pitcher(index: int) -> Dictionary:
 func sim_single_at_bat(inning: int, pitch_type: String, bases: Array, staff_mods: Dictionary = {}) -> Dictionary:
 	var p: Dictionary = my_pitcher
 	var fatigue: float = _get_pitcher_fatigue(p, inning)
+	# Bullpen Coach: delay fatigue onset
+	if staff_mods.get("fatigue_delay", 0) > 0:
+		fatigue = _get_pitcher_fatigue(p, maxi(1, inning - staff_mods["fatigue_delay"]))
 	var pitch: Dictionary = PitchTypes.TYPES.get(pitch_type, PitchTypes.TYPES["fastball"])
 	var batter: Dictionary = opponent_roster[opponent_batter_index]
 
@@ -105,7 +108,7 @@ func sim_single_at_bat(inning: int, pitch_type: String, bases: Array, staff_mods
 
 	# IBB - automatic walk
 	if pitch_type == "ibb":
-		var scored: int = _advance_runners(bases, 1, 0, batter)
+		var scored: int = _advance_runners(bases, 1, 0, batter, true)
 		opponent_batter_index = (opponent_batter_index + 1) % 9
 		return {"outcome": "Walk (IBB)", "is_out": false, "bases_gained": 1, "batter": batter, "walked": true, "scored": scored}
 
@@ -116,7 +119,7 @@ func sim_single_at_bat(inning: int, pitch_type: String, bases: Array, staff_mods
 	if pitch_type == "breaking":
 		var walk_chance: float = maxf(0.0, (6 - p.get("control", 5)) * 0.04)
 		if walk_chance > 0.0 and randf() < walk_chance:
-			var scored: int = _advance_runners(bases, 1, 0, batter)
+			var scored: int = _advance_runners(bases, 1, 0, batter, true)
 			opponent_batter_index = (opponent_batter_index + 1) % 9
 			return {"outcome": "Walk", "is_out": false, "bases_gained": 1, "batter": batter, "walked": true, "scored": scored}
 
@@ -358,7 +361,7 @@ func _sim_at_bat(p: Dictionary, batter: Dictionary, fatigue: float = 1.0) -> Dic
 		return {"outcome": "Single", "is_out": false, "bases_gained": 1}
 
 
-func _advance_runners(bases: Array, bases_gained: int, batter_speed: int, batter = null) -> int:
+func _advance_runners(bases: Array, bases_gained: int, batter_speed: int, batter = null, is_walk: bool = false) -> int:
 	var scored: int = 0
 
 	if bases_gained >= 4:
@@ -371,7 +374,25 @@ func _advance_runners(bases: Array, bases_gained: int, batter_speed: int, batter
 		bases[2] = null
 		return scored
 
-	# Move runners forward
+	if is_walk:
+		# Walk/HBP: only advance runners in a continuous forced chain from 1st
+		var force_up_to: int = -1
+		for i in 3:
+			if bases[i]:
+				force_up_to = i
+			else:
+				break
+		for i in range(force_up_to, -1, -1):
+			var runner = bases[i]
+			bases[i] = null
+			if i + 1 >= 3:
+				scored += 1
+			else:
+				bases[i + 1] = runner
+		bases[0] = batter if batter else true
+		return scored
+
+	# Hits: move runners forward by bases_gained
 	for i in range(2, -1, -1):
 		if bases[i]:
 			var runner = bases[i]

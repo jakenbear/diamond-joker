@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head><title>Stadium BG Generator</title></head>
+<body style="background:#222;display:flex;flex-direction:column;align-items:center;padding:20px;">
+<h3 style="color:#fff;font-family:monospace;">Stadium Background (320x180) — right-click canvas to Save As PNG</h3>
+<canvas id="c" width="320" height="180" style="image-rendering:pixelated;width:1280px;height:720px;border:1px solid #555;"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+
+// Sky — dark night
+ctx.fillStyle = '#0a1628';
+ctx.fillRect(0, 0, 320, 180);
+
+// Stars
+ctx.fillStyle = '#ffffff';
+for (let i = 0; i < 30; i++) {
+  const sx = Math.floor(Math.random() * 320);
+  const sy = Math.floor(Math.random() * 18);
+  ctx.globalAlpha = 0.3 + Math.random() * 0.5;
+  ctx.fillRect(sx, sy, 1, 1);
+}
+ctx.globalAlpha = 1.0;
+
+// Light towers — tall poles with bright tops (left and right)
+ctx.fillStyle = '#444444';
+ctx.fillRect(30, 5, 2, 50);
+ctx.fillRect(288, 5, 2, 50);
+ctx.fillStyle = '#ffffcc';
+ctx.fillRect(28, 3, 6, 4);
+ctx.fillRect(286, 3, 6, 4);
+
+// Crowd stands — curved rows behind outfield wall (shifted up for more field)
+const crowdColors = ['#8b4513','#a0522d','#6b3410','#7a4520','#5c2d0e'];
+for (let y = 15; y < 57; y++) {
+  for (let x = 0; x < 320; x++) {
+    const cx = 160;
+    const distFromCenter = Math.abs(x - cx);
+    const maxDist = 160 - (y - 15) * 0.5;
+    if (distFromCenter < maxDist) {
+      if (Math.random() < 0.65) {
+        ctx.fillStyle = crowdColors[Math.floor(Math.random() * crowdColors.length)];
+      } else {
+        const shirts = ['#cc3333','#3366cc','#ffcc00','#33aa55','#ff6600','#9933cc','#ffffff','#ff69b4','#00cccc'];
+        ctx.fillStyle = shirts[Math.floor(Math.random() * shirts.length)];
+      }
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+}
+
+// Outfield wall — same curve shape, shifted up ~15px
+for (let x = 0; x < 320; x++) {
+  const cx = 160;
+  const distFromCenter = Math.abs(x - cx);
+  const wallY = 55 + Math.pow(distFromCenter / 160, 2) * 14;
+  ctx.fillStyle = '#0d4a0d';
+  ctx.fillRect(x, Math.floor(wallY), 1, 5);
+  ctx.fillStyle = '#1a6b1a';
+  ctx.fillRect(x, Math.floor(wallY), 1, 1);
+}
+
+// Warning track — brown strip
+for (let x = 0; x < 320; x++) {
+  const cx = 160;
+  const distFromCenter = Math.abs(x - cx);
+  const wallY = 60 + Math.pow(distFromCenter / 160, 2) * 14;
+  ctx.fillStyle = '#8b6914';
+  ctx.fillRect(x, Math.floor(wallY), 1, 3);
+}
+
+// Outfield grass — green with subtle mow stripes
+for (let y = 63; y < 180; y++) {
+  const shade = Math.floor(30 + (y - 63) * 0.35);
+  const stripe = Math.floor((y - 63) / 6) % 2 === 0 ? 5 : -3;
+  ctx.fillStyle = `rgb(${shade - 8}, ${shade + 55 + stripe}, ${shade - 8})`;
+  ctx.fillRect(0, y, 320, 1);
+}
+
+// Foul poles — yellow
+ctx.fillStyle = '#ffcc00';
+ctx.fillRect(0, 50, 2, 18);
+ctx.fillRect(318, 50, 2, 18);
+
+// Darken the whole thing for UI readability
+ctx.fillStyle = 'rgba(0, 0, 0, 0.30)';
+ctx.fillRect(0, 0, 320, 180);
+</script>
+</body>
+</html>

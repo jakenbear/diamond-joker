@@ -2,3 +2,5 @@
 .serena/
 dist/
 node_modules/
+desktop/build/
+desktop/dist/

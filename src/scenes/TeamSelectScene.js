@@ -8,9 +8,23 @@ const CARD_W = 250;
 const CARD_H = 320;
 const CARD_GAP = 30;
 
+const LOGO_KEYS = { CAN: 'logo_canada', USA: 'logo_usa', JPN: 'logo_japan', MEX: 'logo_mexico' };
+
 export default class TeamSelectScene extends Phaser.Scene {
   constructor() {
     super({ key: 'TeamSelectScene' });
+  }
+
+  preload() {
+    if (!this.textures.exists('stadium_bg')) {
+      this.load.image('stadium_bg', 'assets/stadium_bg.png');
+    }
+    TEAMS.forEach(t => {
+      const key = LOGO_KEYS[t.id];
+      if (key && !this.textures.exists(key)) {
+        this.load.image(key, `assets/${key}.png`);
+      }
+    });
   }
 
   create() {
@@ -61,9 +75,10 @@ export default class TeamSelectScene extends Phaser.Scene {
     const headerBg = this.add.rectangle(640, 38, 1280, 74, team.colorHex, 0.15);
     this.elements.push(headerBg);
 
-    const headerLogo = this.add.text(80, 38, team.logo, {
-      fontSize: '40px',
-    }).setOrigin(0.5);
+    const hLogoKey = LOGO_KEYS[team.id];
+    const headerLogo = hLogoKey && this.textures.exists(hLogoKey)
+      ? this.add.image(80, 38, hLogoKey).setOrigin(0.5).setDisplaySize(50, 50)
+      : this.add.text(80, 38, team.logo, { fontSize: '40px' }).setOrigin(0.5);
     this.elements.push(headerLogo);
 
     const headerName = this.add.text(130, 25, `${team.name.toUpperCase()} ${team.nickname.toUpperCase()}`, {
@@ -91,7 +106,8 @@ export default class TeamSelectScene extends Phaser.Scene {
     });
     this.elements.push(colLabels);
 
-    this.add.rectangle(350, 128, 660, 1, 0x444444);
+    const colDivider = this.add.rectangle(350, 128, 660, 1, 0x444444);
+    this.elements.push(colDivider);
 
     team.batters.forEach((b, i) => {
       const rowY = 145 + i * 34;
@@ -176,7 +192,7 @@ export default class TeamSelectScene extends Phaser.Scene {
 
     // Show your team summary at top
     const yourLabel = this.add.text(640, 70,
-      `${yourTeam.logo} You: ${yourTeam.name} ${yourTeam.nickname}  |  Pitcher: ${yourTeam.pitchers[this.selectedPitcherIdx].name}`, {
+      `You: ${yourTeam.name} ${yourTeam.nickname}  |  Pitcher: ${yourTeam.pitchers[this.selectedPitcherIdx].name}`, {
       fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
     }).setOrigin(0.5);
     this.elements.push(yourLabel);
@@ -218,95 +234,78 @@ export default class TeamSelectScene extends Phaser.Scene {
     }).setOrigin(0.5);
     this.elements.push(title);
 
-    // Your team (left)
-    const yourPanel = this.add.rectangle(320, 280, 400, 360, yourTeam.colorHex, 0.12)
-      .setStrokeStyle(2, yourTeam.colorHex);
-    this.elements.push(yourPanel);
+    // Helper to create a matchup card
+    const makeMatchupCard = (cx, team, pitcherName, pitcherStats, starterColor) => {
+      const cw = 340;
+      const ch = 320;
+      const top = 250 - ch / 2;
 
-    this.add.text(320, 120, yourTeam.logo, { fontSize: '64px' }).setOrigin(0.5);
-    const yourName = this.add.text(320, 175, yourTeam.name.toUpperCase(), {
-      fontSize: '32px', fontFamily: 'monospace', color: yourTeam.color, fontStyle: 'bold',
-    }).setOrigin(0.5);
-    this.elements.push(yourName);
+      // Card body — cream like playing cards
+      const panel = this.add.rectangle(cx, 250, cw, ch, 0xfaf3e0)
+        .setStrokeStyle(3, 0x8b7d5e);
+      this.elements.push(panel);
 
-    const yourNick = this.add.text(320, 210, yourTeam.nickname, {
-      fontSize: '18px', fontFamily: 'monospace', color: '#aaaaaa',
-    }).setOrigin(0.5);
-    this.elements.push(yourNick);
+      // Team-colored accent stripe
+      const stripe = this.add.rectangle(cx, top + 14, cw - 6, 26, team.colorHex, 0.9);
+      this.elements.push(stripe);
+      const stripeLabel = this.add.text(cx, top + 14, team.name.toUpperCase(), {
+        fontSize: '13px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5);
+      this.elements.push(stripeLabel);
 
-    // Your lineup preview
+      // Logo
+      const logoKey = LOGO_KEYS[team.id];
+      const logo = logoKey && this.textures.exists(logoKey)
+        ? this.add.image(cx, 190, logoKey).setOrigin(0.5).setDisplaySize(80, 80).setDepth(1)
+        : this.add.text(cx, 190, team.logo, { fontSize: '56px' }).setOrigin(0.5);
+      this.elements.push(logo);
+
+      // Nickname
+      const nick = this.add.text(cx, 255, team.nickname, {
+        fontSize: '22px', fontFamily: 'monospace', color: '#3e2723', fontStyle: 'bold',
+      }).setOrigin(0.5);
+      this.elements.push(nick);
+
+      // Divider
+      const div = this.add.rectangle(cx, 280, cw - 40, 1, team.colorHex, 0.5);
+      this.elements.push(div);
+
+      // Starter info
+      const starter = this.add.text(cx, 305, `Starter: ${pitcherName}`, {
+        fontSize: '14px', fontFamily: 'monospace', color: starterColor,
+      }).setOrigin(0.5);
+      this.elements.push(starter);
+
+      const stats = this.add.text(cx, 330,
+        `VEL ${pitcherStats.velocity}  CTL ${pitcherStats.control}  STM ${pitcherStats.stamina}`, {
+        fontSize: '12px', fontFamily: 'monospace', color: '#6d4c41',
+      }).setOrigin(0.5);
+      this.elements.push(stats);
+
+      // Corner pips
+      const pip = team.name.charAt(0);
+      const topPip = this.add.text(cx - cw / 2 + 12, top + 32, pip, {
+        fontSize: '14px', fontFamily: 'monospace', color: '#6d4c41', fontStyle: 'bold',
+      }).setOrigin(0.5);
+      const botPip = this.add.text(cx + cw / 2 - 12, 250 + ch / 2 - 12, pip, {
+        fontSize: '14px', fontFamily: 'monospace', color: '#6d4c41', fontStyle: 'bold',
+      }).setOrigin(0.5).setAngle(180);
+      this.elements.push(topPip, botPip);
+    };
+
+    // Your team card (left)
     const yourPitcher = yourTeam.pitchers[this.selectedPitcherIdx];
-    const yourStarter = this.add.text(320, 250, `Starter: ${yourPitcher.name}`, {
-      fontSize: '14px', fontFamily: 'monospace', color: '#81c784',
-    }).setOrigin(0.5);
-    this.elements.push(yourStarter);
-
-    const yourStats = this.add.text(320, 275,
-      `VEL ${yourPitcher.velocity}  CTL ${yourPitcher.control}  STM ${yourPitcher.stamina}`, {
-      fontSize: '12px', fontFamily: 'monospace', color: '#888888',
-    }).setOrigin(0.5);
-    this.elements.push(yourStats);
-
-    // Top 3 batters
-    yourTeam.batters.slice(0, 4).forEach((b, i) => {
-      const txt = this.add.text(180, 310 + i * 22,
-        `${b.pos.padEnd(3)} ${b.name}`, {
-        fontSize: '12px', fontFamily: 'monospace', color: '#bbbbbb',
-      });
-      this.elements.push(txt);
-    });
-    const moreY = this.add.text(180, 310 + 4 * 22, '... and 5 more', {
-      fontSize: '11px', fontFamily: 'monospace', color: '#666666',
-    });
-    this.elements.push(moreY);
+    makeMatchupCard(320, yourTeam, yourPitcher.name, yourPitcher, '#2e7d32');
 
     // VS
-    const vs = this.add.text(640, 260, 'VS', {
+    const vs = this.add.text(640, 250, 'VS', {
       fontSize: '48px', fontFamily: 'monospace', color: '#ffd600', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.elements.push(vs);
 
-    // Opponent team (right)
-    const oppPanel = this.add.rectangle(960, 280, 400, 360, oppTeam.colorHex, 0.12)
-      .setStrokeStyle(2, oppTeam.colorHex);
-    this.elements.push(oppPanel);
-
-    this.add.text(960, 120, oppTeam.logo, { fontSize: '64px' }).setOrigin(0.5);
-    const oppName = this.add.text(960, 175, oppTeam.name.toUpperCase(), {
-      fontSize: '32px', fontFamily: 'monospace', color: oppTeam.color, fontStyle: 'bold',
-    }).setOrigin(0.5);
-    this.elements.push(oppName);
-
-    const oppNick = this.add.text(960, 210, oppTeam.nickname, {
-      fontSize: '18px', fontFamily: 'monospace', color: '#aaaaaa',
-    }).setOrigin(0.5);
-    this.elements.push(oppNick);
-
-    // Opponent ace pitcher
-    const oppAce = oppTeam.pitchers[0]; // Their ace
-    const oppStarter = this.add.text(960, 250, `Starter: ${oppAce.name}`, {
-      fontSize: '14px', fontFamily: 'monospace', color: '#e57373',
-    }).setOrigin(0.5);
-    this.elements.push(oppStarter);
-
-    const oppPStats = this.add.text(960, 275,
-      `VEL ${oppAce.velocity}  CTL ${oppAce.control}  STM ${oppAce.stamina}`, {
-      fontSize: '12px', fontFamily: 'monospace', color: '#888888',
-    }).setOrigin(0.5);
-    this.elements.push(oppPStats);
-
-    // Opponent top batters
-    oppTeam.batters.slice(0, 4).forEach((b, i) => {
-      const txt = this.add.text(820, 310 + i * 22,
-        `${b.pos.padEnd(3)} ${b.name}`, {
-        fontSize: '12px', fontFamily: 'monospace', color: '#bbbbbb',
-      });
-      this.elements.push(txt);
-    });
-    const moreO = this.add.text(820, 310 + 4 * 22, '... and 5 more', {
-      fontSize: '11px', fontFamily: 'monospace', color: '#666666',
-    });
-    this.elements.push(moreO);
+    // Opponent team card (right)
+    const oppAce = oppTeam.pitchers[0];
+    makeMatchupCard(960, oppTeam, oppAce.name, oppAce, '#c62828');
 
     // Back button
     this._addBackButton(() => this._showOpponentPicker());
@@ -341,65 +340,94 @@ export default class TeamSelectScene extends Phaser.Scene {
   // ── Shared Helpers ──────────────────────────────────────
 
   _createTeamCard(x, y, team, idx, onClick) {
-    const bg = this.add.rectangle(x, y, CARD_W, CARD_H, 0x1a3a1a)
-      .setStrokeStyle(3, team.colorHex)
+    // Card body — cream like a playing card
+    const bg = this.add.rectangle(x, y, CARD_W, CARD_H, 0xfaf3e0)
+      .setStrokeStyle(3, 0x8b7d5e)
       .setInteractive({ useHandCursor: true });
     this.elements.push(bg);
 
-    const banner = this.add.rectangle(x, y - CARD_H / 2 + 30, CARD_W - 4, 58, team.colorHex, 0.25);
-    this.elements.push(banner);
+    // Team-colored accent stripe at top
+    const stripe = this.add.rectangle(x, y - CARD_H / 2 + 14, CARD_W - 6, 26, team.colorHex, 0.9);
+    this.elements.push(stripe);
 
-    const logo = this.add.text(x, y - 115, team.logo, { fontSize: '56px' }).setOrigin(0.5);
+    // Team name on the stripe
+    const stripeLabel = this.add.text(x, y - CARD_H / 2 + 14, team.name.toUpperCase(), {
+      fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    this.elements.push(stripeLabel);
+
+    // Logo
+    const logoKey = LOGO_KEYS[team.id];
+    const logo = logoKey && this.textures.exists(logoKey)
+      ? this.add.image(x, y - 65, logoKey).setOrigin(0.5).setDisplaySize(90, 90)
+      : this.add.text(x, y - 65, team.logo, { fontSize: '56px' }).setOrigin(0.5);
     this.elements.push(logo);
 
-    const name = this.add.text(x, y - 55, team.name.toUpperCase(), {
-      fontSize: '26px', fontFamily: 'monospace', color: team.color, fontStyle: 'bold',
+    // Team full name
+    const name = this.add.text(x, y + 10, team.nickname, {
+      fontSize: '22px', fontFamily: 'monospace', color: '#3e2723', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.elements.push(name);
 
-    const nick = this.add.text(x, y - 28, team.nickname, {
-      fontSize: '16px', fontFamily: 'monospace', color: '#aaaaaa',
-    }).setOrigin(0.5);
-    this.elements.push(nick);
-
-    const div = this.add.rectangle(x, y + 5, CARD_W - 40, 1, team.colorHex, 0.4);
+    // Divider
+    const div = this.add.rectangle(x, y + 35, CARD_W - 40, 1, team.colorHex, 0.5);
     this.elements.push(div);
 
-    const style = this.add.text(x, y + 30, team.style, {
-      fontSize: '12px', fontFamily: 'monospace', color: '#81c784',
+    // Play style
+    const style = this.add.text(x, y + 55, team.style, {
+      fontSize: '11px', fontFamily: 'monospace', color: '#5d4037',
       wordWrap: { width: CARD_W - 30 }, align: 'center',
     }).setOrigin(0.5);
     this.elements.push(style);
 
+    // Stats
     const avgPow = (team.batters.reduce((s, b) => s + b.power, 0) / 9).toFixed(1);
     const avgCon = (team.batters.reduce((s, b) => s + b.contact, 0) / 9).toFixed(1);
     const avgSpd = (team.batters.reduce((s, b) => s + b.speed, 0) / 9).toFixed(1);
 
-    const stats = this.add.text(x, y + 70,
-      `PWR ${avgPow}  CNT ${avgCon}  SPD ${avgSpd}`, {
-      fontSize: '11px', fontFamily: 'monospace', color: '#999999',
+    const stats = this.add.text(x, y + 90,
+      `Power ${avgPow}  Contact ${avgCon}  Speed ${avgSpd}`, {
+      fontSize: '10px', fontFamily: 'monospace', color: '#6d4c41',
     }).setOrigin(0.5);
     this.elements.push(stats);
 
-    const pCount = this.add.text(x, y + 95, `${team.pitchers.length} pitchers`, {
-      fontSize: '11px', fontFamily: 'monospace', color: '#777777',
+    // Pitcher count at bottom
+    const pCount = this.add.text(x, y + 115, `${team.pitchers.length} pitchers`, {
+      fontSize: '11px', fontFamily: 'monospace', color: '#8d6e63',
     }).setOrigin(0.5);
     this.elements.push(pCount);
 
-    const all = [bg, banner, logo, name, nick, div, style, stats, pCount];
+    // Corner pips (like a playing card rank)
+    const pip = team.name.charAt(0);
+    const topPip = this.add.text(x - CARD_W / 2 + 12, y - CARD_H / 2 + 32, pip, {
+      fontSize: '16px', fontFamily: 'monospace', color: '#6d4c41', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    const botPip = this.add.text(x + CARD_W / 2 - 12, y + CARD_H / 2 - 12, pip, {
+      fontSize: '16px', fontFamily: 'monospace', color: '#6d4c41', fontStyle: 'bold',
+    }).setOrigin(0.5).setAngle(180);
+    this.elements.push(topPip, botPip);
+
+    const all = [bg, stripe, stripeLabel, logo, name, div, style, stats, pCount, topPip, botPip];
     all.forEach(el => { el.setAlpha(0); el.y += 20; });
     this.tweens.add({
       targets: all, alpha: 1, y: '-=20',
       duration: 300, delay: idx * 100 + 100, ease: 'Quad.easeOut',
     });
 
+    // Store base scales after display size is applied (images have non-1 scales)
+    all.forEach(el => { el._baseScaleX = el.scaleX; el._baseScaleY = el.scaleY; });
+
     bg.on('pointerover', () => {
       bg.setStrokeStyle(3, 0xffd600);
-      this.tweens.add({ targets: all, scaleX: 1.03, scaleY: 1.03, duration: 100 });
+      all.forEach(el => this.tweens.add({
+        targets: el, scaleX: el._baseScaleX * 1.03, scaleY: el._baseScaleY * 1.03, duration: 100,
+      }));
     });
     bg.on('pointerout', () => {
-      bg.setStrokeStyle(3, team.colorHex);
-      this.tweens.add({ targets: all, scaleX: 1, scaleY: 1, duration: 100 });
+      bg.setStrokeStyle(3, 0x8b7d5e);
+      all.forEach(el => this.tweens.add({
+        targets: el, scaleX: el._baseScaleX, scaleY: el._baseScaleY, duration: 100,
+      }));
     });
 
     bg.on('pointerdown', onClick);
@@ -409,18 +437,19 @@ export default class TeamSelectScene extends Phaser.Scene {
     const w = 500;
     const h = 52;
     const isSelected = idx === this.selectedPitcherIdx;
+    const els = [];
 
     const bg = this.add.rectangle(x + w / 2 - 20, y + h / 2, w, h,
       isSelected ? team.colorHex : 0x1a3a1a, isSelected ? 0.3 : 1)
       .setStrokeStyle(2, isSelected ? 0xffd600 : 0x333333)
       .setInteractive({ useHandCursor: true });
-    this.elements.push(bg);
+    els.push(bg);
 
     if (isSelected) {
       const badge = this.add.text(x - 10, y + h / 2, '\u2605', {
         fontSize: '20px', fontFamily: 'monospace', color: '#ffd600',
       }).setOrigin(0.5);
-      this.elements.push(badge);
+      els.push(badge);
     }
 
     const name = this.add.text(x + 10, y + 10, pitcher.name, {
@@ -428,17 +457,17 @@ export default class TeamSelectScene extends Phaser.Scene {
       color: isSelected ? '#ffffff' : '#bbbbbb',
       fontStyle: isSelected ? 'bold' : 'normal',
     });
-    this.elements.push(name);
+    els.push(name);
 
     const statsStr = `VEL ${pitcher.velocity}  CTL ${pitcher.control}  STM ${pitcher.stamina}`;
     const stats = this.add.text(x + 10, y + 30, statsStr, {
       fontSize: '12px', fontFamily: 'monospace', color: '#888888',
     });
-    this.elements.push(stats);
+    els.push(stats);
 
-    this._drawStatBar(x + 280, y + 16, pitcher.velocity, '#ff7043');
-    this._drawStatBar(x + 350, y + 16, pitcher.control, '#42a5f5');
-    this._drawStatBar(x + 420, y + 16, pitcher.stamina, '#66bb6a');
+    this._drawStatBar(x + 280, y + 16, pitcher.velocity, '#ff7043', els);
+    this._drawStatBar(x + 350, y + 16, pitcher.control, '#42a5f5', els);
+    this._drawStatBar(x + 420, y + 16, pitcher.stamina, '#66bb6a', els);
 
     bg.on('pointerover', () => {
       if (idx !== this.selectedPitcherIdx) bg.setStrokeStyle(2, 0xffd600);
@@ -448,8 +477,30 @@ export default class TeamSelectScene extends Phaser.Scene {
     });
     bg.on('pointerdown', () => {
       this.selectedPitcherIdx = idx;
-      this._showRosterView(team);
+      this._refreshPitcherCards(team);
     });
+
+    this.elements.push(...els);
+    this.pitcherCards.push(...els);
+  }
+
+  _refreshPitcherCards(team) {
+    // Destroy only pitcher card elements
+    this.pitcherCards.forEach(el => {
+      const idx = this.elements.indexOf(el);
+      if (idx >= 0) this.elements.splice(idx, 1);
+      el.destroy();
+    });
+    this.pitcherCards = [];
+
+    team.pitchers.forEach((p, i) => {
+      this._createPitcherCard(720, 150 + i * 64, p, i, team);
+    });
+
+    // Update starter label
+    if (this.starterLabel) {
+      this.starterLabel.setText(`Starter: ${team.pitchers[this.selectedPitcherIdx].name}`);
+    }
   }
 
   _addBackButton(onClick) {
@@ -466,19 +517,20 @@ export default class TeamSelectScene extends Phaser.Scene {
     backBg.on('pointerdown', onClick);
   }
 
-  _drawStatBar(x, y, value, color) {
+  _drawStatBar(x, y, value, color, targetArr = null) {
     const bgBar = this.add.rectangle(x, y, 50, 8, 0x333333).setOrigin(0, 0.5);
-    this.elements.push(bgBar);
-
     const fillW = Math.max(2, (value / 10) * 50);
     const fill = this.add.rectangle(x, y, fillW, 8,
       Phaser.Display.Color.HexStringToColor(color).color).setOrigin(0, 0.5);
-    this.elements.push(fill);
-
     const label = this.add.text(x + 54, y, `${value}`, {
       fontSize: '11px', fontFamily: 'monospace', color: '#999999',
     }).setOrigin(0, 0.5);
-    this.elements.push(label);
+
+    if (targetArr) {
+      targetArr.push(bgBar, fill, label);
+    } else {
+      this.elements.push(bgBar, fill, label);
+    }
   }
 
   _clearElements() {
