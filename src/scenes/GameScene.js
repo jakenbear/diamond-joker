@@ -98,6 +98,11 @@ export default class GameScene extends Phaser.Scene {
     // Blank card base for staff cards
     this.load.image('card_blank', 'assets/cards/space5.png');
 
+    // Stadium background
+    if (!this.textures.exists('stadium_bg')) {
+      this.load.image('stadium_bg', 'assets/stadium_bg.png');
+    }
+
     // Set nearest-neighbor filtering on card textures only (keeps text smooth)
     this.load.on('complete', () => {
       for (const s of suits) {
@@ -119,7 +124,7 @@ export default class GameScene extends Phaser.Scene {
         }
       }
       // Nearest-neighbor on mascot spritesheet, faces, and blank card
-      for (const key of ['mascots', 'faces', 'card_blank']) {
+      for (const key of ['mascots', 'faces', 'card_blank', 'stadium_bg']) {
         if (this.textures.exists(key)) {
           this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
         }
@@ -166,6 +171,12 @@ export default class GameScene extends Phaser.Scene {
     this.pitcherTraitSprites = [];
     this.sortMode = 'default'; // 'default' | 'rank' | 'suit'
     this.dealOrder = [];       // original card indices for default sort
+
+    // Add stadium background
+    if (this.textures.exists('stadium_bg')) {
+      this.add.image(640, 360, 'stadium_bg').setScale(4).setDepth(-2);
+      this.textures.get('stadium_bg').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
 
     this._createBaseDiamond();
     this._createScoreboard();
