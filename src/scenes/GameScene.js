@@ -3455,17 +3455,17 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Box ──
     const boxX = W / 2, boxY = H / 2 - 30;
-    const boxW = 180, boxH = 180;
+    const boxW = 240, boxH = 240;
     const box = this.add.rectangle(boxX, boxY, boxW, boxH, 0x1a1a2e, 0.95)
       .setStrokeStyle(3, 0x444466).setAlpha(0);
     container.add(box);
 
     // ── Baseball (circle + stitch lines) ──
-    const ball = this.add.circle(boxX, boxY, 28, 0xfafafa).setAlpha(0);
+    const ball = this.add.circle(boxX, boxY, 55, 0xfafafa).setAlpha(0);
     // Red stitching — two arcs approximated as curved lines
-    const stitch1 = this.add.rectangle(boxX - 8, boxY, 16, 2.5, 0xcc3333)
+    const stitch1 = this.add.rectangle(boxX - 16, boxY, 32, 4, 0xcc3333)
       .setAngle(20).setAlpha(0);
-    const stitch2 = this.add.rectangle(boxX + 8, boxY, 16, 2.5, 0xcc3333)
+    const stitch2 = this.add.rectangle(boxX + 16, boxY, 32, 4, 0xcc3333)
       .setAngle(-20).setAlpha(0);
     const ballGroup = [ball, stitch1, stitch2];
     container.add(ballGroup);
