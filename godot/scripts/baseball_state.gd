@@ -43,7 +43,7 @@ var trips_played_this_inning: int = 0
 var straights_played_this_inning: int = 0
 var flushes_played_this_inning: int = 0
 var staff: Array[Dictionary] = []  # Active coaches and mascots
-var staff_slots: int = 2           # Start with 2 slots, expandable to 4
+var staff_slots: int = 3           # Start with 3 slots, expandable to 4
 
 
 func reset() -> void:
@@ -67,7 +67,7 @@ func reset() -> void:
 	straights_played_this_inning = 0
 	flushes_played_this_inning = 0
 	staff = []
-	staff_slots = 2
+	staff_slots = 3
 
 
 func get_total_peanuts() -> int:

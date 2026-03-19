@@ -2411,32 +2411,35 @@ group('5c. Staff Slots (BaseballState)');
 {
   const bs = new BaseballState();
   bs.reset();
-  assert(bs.staffSlots === 2, 'Start with 2 staff slots');
+  assert(bs.staffSlots === 3, 'Start with 3 staff slots');
   assert(Array.isArray(bs.staff) && bs.staff.length === 0, 'Start with no staff');
 
   const coach1 = { id: 'batting_coach', name: 'Batting Coach', price: 30, effect: { type: 'team_stat_boost' } };
   const mascot1 = { id: 'thunder_bear', name: 'Thunder Bear', price: 50, effect: { type: 'double_peanuts' } };
   const coach2 = { id: 'scout', name: 'Scout', price: 25, effect: { type: 'shop_extra_cards' } };
+  const coach3 = { id: 'physio', name: 'Physio', price: 20, effect: { type: 'fatigue_delay' } };
 
   assert(bs.addStaff(coach1) === true, 'Can add first staff');
   assert(bs.staff.length === 1, 'Staff count is 1');
   assert(bs.addStaff(mascot1) === true, 'Can add second staff');
   assert(bs.staff.length === 2, 'Staff count is 2');
-  assert(bs.addStaff(coach2) === false, 'Cannot exceed 2 slot limit');
-  assert(bs.staff.length === 2, 'Staff count still 2 after failed add');
+  assert(bs.addStaff(coach2) === true, 'Can add third staff');
+  assert(bs.staff.length === 3, 'Staff count is 3');
+  assert(bs.addStaff(coach3) === false, 'Cannot exceed 3 slot limit');
+  assert(bs.staff.length === 3, 'Staff count still 3 after failed add');
 
   // Unlock a slot
-  bs.staffSlots = 3;
-  assert(bs.addStaff(coach2) === true, 'Can add after slot unlock');
-  assert(bs.staff.length === 3, 'Staff count is 3');
+  bs.staffSlots = 4;
+  assert(bs.addStaff(coach3) === true, 'Can add after slot unlock');
+  assert(bs.staff.length === 4, 'Staff count is 4');
 
   // Remove
   assert(bs.removeStaff('thunder_bear') === true, 'Can remove staff by ID');
-  assert(bs.staff.length === 2, 'Staff count after removal');
+  assert(bs.staff.length === 3, 'Staff count after removal');
   assert(bs.removeStaff('nonexistent') === false, 'Cannot remove nonexistent staff');
 
   // getStaff
-  assert(bs.getStaff().length === 2, 'getStaff returns current staff');
+  assert(bs.getStaff().length === 3, 'getStaff returns current staff');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2483,7 +2486,7 @@ console.log('\n\x1b[1m── Part 7: Staff Effect Integration ──\x1b[0m');
 {
   // 7a: Staff slot management
   const bs = new BaseballState();
-  assert(bs.staffSlots === 2, 'Default staff slots is 2');
+  assert(bs.staffSlots === 3, 'Default staff slots is 3');
 
   const coach = COACHES.find(c => c.id === 'batting_coach');
   assert(bs.addStaff(coach), 'Can add first staff member');
@@ -2491,13 +2494,15 @@ console.log('\n\x1b[1m── Part 7: Staff Effect Integration ──\x1b[0m');
 
   const coach2 = COACHES.find(c => c.id === 'bench_coach');
   assert(bs.addStaff(coach2), 'Can add second staff member');
-  assert(!bs.addStaff(COACHES[2]), 'Cannot add 3rd member with 2 slots');
+  const coach3 = COACHES.find(c => c.id === 'scout');
+  assert(bs.addStaff(coach3), 'Can add third staff member');
+  assert(!bs.addStaff(COACHES.find(c => c.id !== 'batting_coach' && c.id !== 'bench_coach' && c.id !== 'scout' && c.id !== 'equipment_manager')), 'Cannot add 4th member with 3 slots');
 
   // Equipment Manager unlocks slot
   const em = COACHES.find(c => c.id === 'equipment_manager');
-  bs.removeStaff(coach2.id);
+  bs.removeStaff(coach3.id);
   bs.addStaff(em);
-  assert(bs.staffSlots === 3, 'Equipment Manager unlocks +1 slot');
+  assert(bs.staffSlots === 4, 'Equipment Manager unlocks +1 slot');
 
   // 7b: getStaffByEffect filtering
   const bs2 = new BaseballState();
@@ -3507,7 +3512,7 @@ group('17. Staff Slot Management');
 
 {
   const bs = new BaseballState();
-  assert(bs.staffSlots === 2, 'Default staff slots: 2');
+  assert(bs.staffSlots === 3, 'Default staff slots: 3');
   assert(bs.getStaff().length === 0, 'Start with no staff');
 
   const coach = { ...COACHES[0] };
@@ -3518,10 +3523,14 @@ group('17. Staff Slot Management');
   assert(bs.addStaff(mascot), 'Add second staff: succeeds');
   assert(bs.getStaff().length === 2, '2 staff after adding');
 
-  // No room for a third
   const coach2 = { ...COACHES[1] };
-  assert(!bs.addStaff(coach2), 'Add 3rd staff to 2 slots: fails');
-  assert(bs.getStaff().length === 2, 'Still 2 staff');
+  assert(bs.addStaff(coach2), 'Add 3rd staff to 3 slots: succeeds');
+  assert(bs.getStaff().length === 3, '3 staff after adding');
+
+  // No room for a fourth
+  const coach3 = { ...COACHES[2] };
+  assert(!bs.addStaff(coach3), 'Add 4th staff to 3 slots: fails');
+  assert(bs.getStaff().length === 3, 'Still 3 staff');
 }
 
 {

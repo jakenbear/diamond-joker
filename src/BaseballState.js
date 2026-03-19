@@ -49,7 +49,7 @@ export default class BaseballState {
     this.straightsPlayedThisInning = 0;
     this.flushesPlayedThisInning = 0;
     this.staff = [];       // Active coaches and mascots
-    this.staffSlots = 2;   // Start with 2 slots, expandable to 4
+    this.staffSlots = 3;   // Start with 3 slots, expandable to 4
   }
 
   /** Get total accumulated peanuts (currency for shop) */
