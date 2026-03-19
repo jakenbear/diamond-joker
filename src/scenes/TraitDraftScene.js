@@ -131,7 +131,7 @@ export default class TraitDraftScene extends Phaser.Scene {
 
   _createConfirmButton() {
     // Randomize button (dice)
-    const diceBg = this.add.rectangle(440, 680, 160, 48, 0x1a2a3a)
+    const diceBg = this.add.rectangle(440, 680, 200, 48, 0x1a2a3a)
       .setStrokeStyle(2, 0x5c6bc0)
       .setInteractive({ useHandCursor: true });
     const diceTxt = this.add.text(440, 680, '\u{1F3B2} QUICK PICKS', {
