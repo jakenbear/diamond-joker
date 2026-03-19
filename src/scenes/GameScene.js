@@ -3461,15 +3461,15 @@ export default class GameScene extends Phaser.Scene {
       .setStrokeStyle(3, 0x444466).setAlpha(0);
     container.add(box);
 
-    // ── Baseball (circle + two stitch lines, one per half) ──
-    const ball = this.add.circle(boxX, boxY, 55, 0xfafafa).setAlpha(0);
-    const s1CX = boxX - 24; // left half center
-    const s2CX = boxX + 24; // right half center
-    const stitch1 = this.add.rectangle(s1CX, boxY, 40, 6, 0xcc3333).setAlpha(0);
-    const stitch2 = this.add.rectangle(s2CX, boxY, 40, 6, 0xcc3333).setAlpha(0);
-    // Each spins around its own center — win = both land horizontal (0°)
+    // ── Baseball (circle + two full-diameter lines spinning opposite) ──
+    const ballR = 55;
+    const ball = this.add.circle(boxX, boxY, ballR, 0xfafafa).setAlpha(0);
+    const lineW = ballR * 2 - 10; // nearly full diameter
+    const lineH = 7;
+    const stitch1 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
+    const stitch2 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
     let s1Angle = 0;
-    let s2Angle = 90; // start offset from s1
+    let s2Angle = 90; // start perpendicular
     const ballGroup = [ball, stitch1, stitch2];
     container.add(ballGroup);
 
@@ -3503,13 +3503,9 @@ export default class GameScene extends Phaser.Scene {
     const REVEAL_TIME = 3000; // show check/X
     const FADEOUT_TIME = 3500;
 
-    // Rig final stitch angles: success = both at 0° (horizontal), fail = near-miss then drift
-    const s1Final = 0; // always lands horizontal
-    // On fail: s2 gets close to 0° (tease!) then drifts to a visible offset
-    const s2NearMiss = isOut ? 5 : 0;                     // how close it gets before drifting
-    const s2Final = isOut ? 30 + Math.random() * 40 : 0;  // final resting angle on fail
-    const s1SpeedMult = 1.0;
-    const s2SpeedMult = 1.12;
+    // Rig final angles: success = both at 0° (one fat green line), fail = near-miss then drift
+    const s2NearMiss = isOut ? 5 : 0;
+    const s2Final = isOut ? 25 + Math.random() * 40 : 0;
 
     this.time.delayedCall(SPIN_START, () => {
       if (skipped) return;
@@ -3537,36 +3533,30 @@ export default class GameScene extends Phaser.Scene {
           // Ball rotates normally
           ball.setAngle(ball.angle + angleDelta);
 
-          // Stitches spin at different rates
-          s1Angle += angleDelta * s1SpeedMult;
-          s2Angle += angleDelta * s2SpeedMult;
+          // Lines spin in opposite directions
+          s1Angle += angleDelta;
+          s2Angle -= angleDelta;
 
-          // In the last 30%, blend toward the rigged final angles
+          // In the last 30%, blend both toward their rigged final angles
           if (progress > 0.7) {
             const blend = (progress - 0.7) / 0.3; // 0→1 over last 30%
             const norm = (a) => ((a % 180) + 180) % 180;
+
+            // s1 always blends to 0° (horizontal)
             const s1Curr = norm(s1Angle);
+            stitch1.setAngle(s1Curr * (1 - blend * blend));
+
+            // s2: on fail, approach near-miss then drift away. On success, converge to 0°
             const s2Curr = norm(s2Angle);
-
-            // s1 always blends smoothly to 0°
-            const s1Blend = blend * blend;
-            stitch1.setAngle(s1Curr + (s1Final - s1Curr) * s1Blend);
-
-            // s2: on fail, blend toward near-miss (0-50%), then drift to final (50-100%)
-            // On success, just blend straight to 0°
-            let s2Target;
             if (isOut && blend < 0.5) {
-              // First half: approach near-miss (almost aligned — tease!)
               const nearBlend = (blend / 0.5) * (blend / 0.5);
-              s2Target = s2Curr + (s2NearMiss - s2Curr) * nearBlend;
+              stitch2.setAngle(s2Curr + (s2NearMiss - s2Curr) * nearBlend);
             } else if (isOut) {
-              // Second half: drift away from near-miss to final offset
-              const driftBlend = ((blend - 0.5) / 0.5);
-              s2Target = s2NearMiss + (s2Final - s2NearMiss) * driftBlend;
+              const driftBlend = (blend - 0.5) / 0.5;
+              stitch2.setAngle(s2NearMiss + (s2Final - s2NearMiss) * driftBlend);
             } else {
-              s2Target = s2Curr + (s2Final - s2Curr) * (blend * blend);
+              stitch2.setAngle(s2Curr * (1 - blend * blend));
             }
-            stitch2.setAngle(s2Target);
           } else {
             stitch1.setAngle(s1Angle);
             stitch2.setAngle(s2Angle);
