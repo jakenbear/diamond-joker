@@ -1068,7 +1068,7 @@ export default class GameScene extends Phaser.Scene {
 
     bg.on('pointerover', () => bg.setStrokeStyle(1, 0xffd600));
     bg.on('pointerout', () => bg.setStrokeStyle(1, 0x4caf50));
-    bg.on('pointerdown', () => this._toggleRosterOverlay());
+    bg.on('pointerdown', () => { SoundManager.uiTap(); this._toggleRosterOverlay(); });
 
     this.rosterOverlayVisible = false;
     this.rosterOverlayElements = [];
@@ -1215,7 +1215,7 @@ export default class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(4);
     helpBg.on('pointerover', () => helpBg.setStrokeStyle(1, 0xffd600));
     helpBg.on('pointerout', () => helpBg.setStrokeStyle(1, 0x555555));
-    helpBg.on('pointerdown', () => this._toggleHandReference());
+    helpBg.on('pointerdown', () => { SoundManager.uiTap(); this._toggleHandReference(); });
 
     this.handRefVisible = false;
     this.handRefElements = [];
@@ -1232,7 +1232,7 @@ export default class GameScene extends Phaser.Scene {
     bg.on('pointerover', () => { if (bg.input.enabled) bg.setAlpha(1); });
     bg.on('pointerout', () => { if (bg.input.enabled) bg.setAlpha(0.9); });
     bg.on('pointerdown', () => {
-      if (!this.inputLocked) callback();
+      if (!this.inputLocked) { SoundManager.uiTap(); callback(); }
     });
 
     return { bg, txt };
@@ -1273,6 +1273,7 @@ export default class GameScene extends Phaser.Scene {
 
       bg.on('pointerdown', () => {
         if (this.inputLocked) return;
+        SoundManager.uiTap();
         this.sortMode = m.mode;
         this._updateSortHighlight();
         this._resortHand();
@@ -3571,8 +3572,16 @@ export default class GameScene extends Phaser.Scene {
         box.setStrokeStyle(4, 0x69f0ae);
         iconText.setText('\u2714');
         iconText.setColor('#69f0ae');
-        // Ball glows
         ball.setFillStyle(0xffffff);
+        // Stitches meet in middle and turn green
+        this.tweens.add({
+          targets: stitch1, x: boxX, angle: 0, duration: 200, ease: 'Quad.easeOut',
+          onComplete: () => stitch1.setFillStyle(0x69f0ae),
+        });
+        this.tweens.add({
+          targets: stitch2, x: boxX, angle: 0, duration: 200, ease: 'Quad.easeOut',
+          onComplete: () => stitch2.setFillStyle(0x69f0ae),
+        });
         // Scale pop
         this.tweens.add({
           targets: [box, ...ballGroup],

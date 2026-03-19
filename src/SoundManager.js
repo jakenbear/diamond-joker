@@ -137,6 +137,11 @@ const SoundManager = {
     tone(300, 0.15, 'sawtooth', 0.06);
     setTimeout(() => tone(200, 0.25, 'sawtooth', 0.05), 120);
   },
+
+  /** Subtle UI pip for generic button presses */
+  uiTap() {
+    tone(660, 0.03, 'sine', 0.03);
+  },
 };
 
 export default SoundManager;
