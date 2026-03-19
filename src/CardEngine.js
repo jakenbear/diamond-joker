@@ -111,6 +111,7 @@ export default class CardEngine {
 
   /**
    * Evaluate 1-5 selected cards as a poker hand.
+   * Automatically finds the best sub-hand if submitting extra cards.
    * Straights and flushes require exactly 5 cards.
    */
   static evaluateHand(cards, preModifier = null, postModifier = null, gameState = null, strikeCount = 0) {
@@ -124,46 +125,17 @@ export default class CardEngine {
       evalCards = preModifier(cards);
     }
 
-    const n = evalCards.length;
-    const ranks = evalCards.map(c => c.rank).sort((a, b) => a - b);
-    const suits = evalCards.map(c => c.suit);
+    // Find the best hand among all subsets of the submitted cards
+    const { handIdx, bestCards } = CardEngine._bestSubHand(evalCards);
+    const ranks = bestCards.map(c => c.rank).sort((a, b) => a - b);
 
-    // Flushes and straights require exactly 5 cards
-    const isFlush = n === 5 && suits.every(s => s === suits[0]);
-    const isStraight = n === 5 && CardEngine._isStraight(ranks);
-
-    // Rank frequency counts
+    // Rank frequency counts (from best subset)
     const freq = {};
     for (const r of ranks) {
       freq[r] = (freq[r] || 0) + 1;
     }
-    const counts = Object.values(freq).sort((a, b) => b - a);
 
     const pairRank = CardEngine._getPairRank(freq);
-
-    let handIdx;
-
-    if (isFlush && isStraight && ranks[0] === 10 && ranks[4] === 14) {
-      handIdx = 0; // Royal Flush
-    } else if (isFlush && isStraight) {
-      handIdx = 1; // Straight Flush
-    } else if (counts[0] === 4) {
-      handIdx = 2; // Four of a Kind
-    } else if (counts[0] === 3 && counts[1] === 2) {
-      handIdx = 3; // Full House
-    } else if (isFlush) {
-      handIdx = 4; // Flush
-    } else if (isStraight) {
-      handIdx = 5; // Straight
-    } else if (counts[0] === 3) {
-      handIdx = 6; // Three of a Kind
-    } else if (counts[0] === 2 && counts[1] === 2) {
-      handIdx = 7; // Two Pair
-    } else if (counts[0] === 2) {
-      handIdx = 8; // Pair
-    } else {
-      handIdx = 9; // High Card
-    }
 
     let entry = { ...HAND_TABLE[handIdx] };
 
@@ -187,7 +159,7 @@ export default class CardEngine {
     }
 
     // Add a readable description of what was played
-    entry.playedDescription = CardEngine._describePlay(evalCards, entry.handName);
+    entry.playedDescription = CardEngine._describePlay(bestCards, entry.handName);
     entry.pairRank = pairRank;
 
     entry.score = Math.round(entry.peanuts * entry.mult);
@@ -398,6 +370,73 @@ export default class CardEngine {
 
     outChance = Math.min(BALANCE.outMax, Math.max(BALANCE.outMin, outChance));
     return Math.round((1 - outChance) * 100);
+  }
+
+  /**
+   * Find the best poker hand among all subsets of the given cards.
+   * Tries all C(n,k) combinations for k = n down to 1 and returns the
+   * best (lowest handIdx). For ≤5 cards this is at most 31 subsets.
+   */
+  static _bestSubHand(cards) {
+    const n = cards.length;
+
+    // Evaluate a specific set of cards and return its handIdx
+    const classifyCards = (subset) => {
+      const sn = subset.length;
+      const ranks = subset.map(c => c.rank).sort((a, b) => a - b);
+      const suits = subset.map(c => c.suit);
+      const isFlush = sn === 5 && suits.every(s => s === suits[0]);
+      const isStraight = sn === 5 && CardEngine._isStraight(ranks);
+      const freq = {};
+      for (const r of ranks) freq[r] = (freq[r] || 0) + 1;
+      const counts = Object.values(freq).sort((a, b) => b - a);
+
+      if (isFlush && isStraight && ranks[0] === 10 && ranks[4] === 14) return 0;
+      if (isFlush && isStraight) return 1;
+      if (counts[0] === 4) return 2;
+      if (counts[0] === 3 && counts[1] === 2) return 3;
+      if (isFlush) return 4;
+      if (isStraight) return 5;
+      if (counts[0] === 3) return 6;
+      if (counts[0] === 2 && counts[1] === 2) return 7;
+      if (counts[0] === 2) return 8;
+      return 9;
+    };
+
+    // Start with the full set
+    let bestIdx = classifyCards(cards);
+    let bestCards = cards;
+
+    // If already a strong hand or only 1-2 cards, no point checking subsets
+    if (bestIdx <= 1 || n <= 2) return { handIdx: bestIdx, bestCards };
+
+    // Try all subsets from size n-1 down to max(1, n-3) to find a better hand
+    // (skipping a kicker can reveal Two Pair, etc.)
+    const trySubsets = (size) => {
+      const indices = Array.from({ length: size }, (_, i) => i);
+      while (true) {
+        const subset = indices.map(i => cards[i]);
+        const idx = classifyCards(subset);
+        if (idx < bestIdx) {
+          bestIdx = idx;
+          bestCards = subset;
+        }
+        // Generate next combination
+        let i = size - 1;
+        while (i >= 0 && indices[i] === n - size + i) i--;
+        if (i < 0) break;
+        indices[i]++;
+        for (let j = i + 1; j < size; j++) indices[j] = indices[j - 1] + 1;
+      }
+    };
+
+    // Only check subsets if we have more than the minimum needed
+    for (let sz = n - 1; sz >= 1; sz--) {
+      if (bestIdx <= 1) break; // Can't do better than Straight Flush
+      trySubsets(sz);
+    }
+
+    return { handIdx: bestIdx, bestCards };
   }
 
   /** Check if sorted ranks form a straight (handles ace-low) */

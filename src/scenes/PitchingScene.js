@@ -1032,18 +1032,18 @@ export default class PitchingScene extends Phaser.Scene {
 
   _showdownEffectDesc(key) {
     const descs = {
-      fastball: 'Swap hole card\nfrom top 30%',
-      breaking: 'Flip community\ncard face-down',
-      slider: 'Replace a\ncommunity card',
-      changeup: 'Peek at batter\nhole card',
-      cutter: 'Lock a card\nin place',
-      curveball: 'Downgrade batter\nbest card -2',
-      sinker: 'All community\ncards -1 rank',
-      splitter: 'Destroy a\ncommunity card',
-      twoseam: 'Swap board card\nwith batter hole',
-      knuckle: 'Randomize ALL\ncommunity ranks',
-      screwball: 'Replace a batter\nhole card',
-      palmball: 'Plant best card\nfrom your deck',
+      fastball: 'Swap a hole card\nfor a top-30% card',
+      breaking: 'Flip a random\nboard card face-down',
+      slider: 'Replace a random\nboard card from deck',
+      changeup: 'Peek at one of\nbatter\'s hole cards',
+      cutter: 'Auto-lock a random\nboard card in place',
+      curveball: 'Batter\'s best\ncard gets -2 rank',
+      sinker: 'All board\ncards get -1 rank',
+      splitter: 'Remove a random\nboard card entirely',
+      twoseam: 'Swap a board card\nwith a batter hole',
+      knuckle: 'Scramble ALL\nboard card ranks',
+      screwball: 'Replace a random\nbatter hole card',
+      palmball: 'Plant your best\ndeck card next deal',
     };
     return descs[key] || '';
   }

@@ -114,49 +114,21 @@ static func evaluate_hand(cards: Array[Dictionary], pre_modifier: Callable = Cal
 	if pre_modifier.is_valid():
 		eval_cards = pre_modifier.call(cards)
 
-	var n: int = eval_cards.size()
+	# Find the best hand among all subsets of the submitted cards
+	var best_result: Dictionary = _best_sub_hand(eval_cards)
+	var hand_idx: int = best_result["hand_idx"]
+	var best_cards: Array[Dictionary] = best_result["best_cards"]
 	var ranks: Array[int] = []
-	var suits: Array[String] = []
-	for c in eval_cards:
+	for c in best_cards:
 		ranks.append(c["rank"])
-		suits.append(c["suit"])
 	ranks.sort()
 
-	# Flush and straight require exactly 5 cards
-	var is_flush: bool = n == 5 and suits.all(func(s): return s == suits[0])
-	var is_straight: bool = n == 5 and _is_straight(ranks)
-
-	# Rank frequency counts
+	# Rank frequency counts (from best subset)
 	var freq: Dictionary = {}
 	for r in ranks:
 		freq[r] = freq.get(r, 0) + 1
-	var counts: Array = freq.values()
-	counts.sort()
-	counts.reverse()
 
 	var pair_rank: int = _get_pair_rank(freq)
-	var hand_idx: int
-
-	if is_flush and is_straight and ranks[0] == 10 and ranks[4] == 14:
-		hand_idx = 0  # Royal Flush
-	elif is_flush and is_straight:
-		hand_idx = 1  # Straight Flush
-	elif counts[0] == 4:
-		hand_idx = 2  # Four of a Kind
-	elif counts[0] == 3 and counts.size() > 1 and counts[1] == 2:
-		hand_idx = 3  # Full House
-	elif is_flush:
-		hand_idx = 4  # Flush
-	elif is_straight:
-		hand_idx = 5  # Straight
-	elif counts[0] == 3:
-		hand_idx = 6  # Three of a Kind
-	elif counts[0] == 2 and counts.size() > 1 and counts[1] == 2:
-		hand_idx = 7  # Two Pair
-	elif counts[0] == 2:
-		hand_idx = 8  # Pair
-	else:
-		hand_idx = 9  # High Card
 
 	var entry: Dictionary = HandTable.get_entry(hand_idx)
 
@@ -175,7 +147,7 @@ static func evaluate_hand(cards: Array[Dictionary], pre_modifier: Callable = Cal
 		if not quality_result.is_empty():
 			entry = quality_result
 
-	entry["played_description"] = _describe_play(eval_cards, entry["hand_name"])
+	entry["played_description"] = _describe_play(best_cards, entry["hand_name"])
 	entry["score"] = roundi(entry["peanuts"] * entry["mult"])
 
 	# Apply post-modifier
@@ -370,6 +342,82 @@ static func get_success_chance(hand_name: String, pair_rank: int = 0, strike_cou
 
 	out_chance = clampf(out_chance, Balance.OUT_MIN, Balance.OUT_MAX)
 	return roundi((1.0 - out_chance) * 100)
+
+
+## Classify a set of cards into a hand index (0=Royal Flush .. 9=High Card)
+static func _classify_cards(subset: Array[Dictionary]) -> int:
+	var sn: int = subset.size()
+	var r: Array[int] = []
+	var s: Array[String] = []
+	for c in subset:
+		r.append(c["rank"])
+		s.append(c["suit"])
+	r.sort()
+	var is_flush: bool = sn == 5 and s.all(func(x): return x == s[0])
+	var is_straight: bool = sn == 5 and _is_straight(r)
+	var freq: Dictionary = {}
+	for rank in r:
+		freq[rank] = freq.get(rank, 0) + 1
+	var counts: Array = freq.values()
+	counts.sort()
+	counts.reverse()
+	if is_flush and is_straight and r[0] == 10 and r[4] == 14:
+		return 0
+	if is_flush and is_straight:
+		return 1
+	if counts[0] == 4:
+		return 2
+	if counts[0] == 3 and counts.size() > 1 and counts[1] == 2:
+		return 3
+	if is_flush:
+		return 4
+	if is_straight:
+		return 5
+	if counts[0] == 3:
+		return 6
+	if counts[0] == 2 and counts.size() > 1 and counts[1] == 2:
+		return 7
+	if counts[0] == 2:
+		return 8
+	return 9
+
+
+## Find the best poker hand among all subsets of the given cards.
+static func _best_sub_hand(cards_arr: Array[Dictionary]) -> Dictionary:
+	var n: int = cards_arr.size()
+	var best_idx: int = _classify_cards(cards_arr)
+	var best_cards: Array[Dictionary] = cards_arr
+
+	if best_idx <= 1 or n <= 2:
+		return {"hand_idx": best_idx, "best_cards": best_cards}
+
+	# Try all subsets from size n-1 down to 1
+	for sz in range(n - 1, 0, -1):
+		if best_idx <= 1:
+			break
+		# Generate all C(n, sz) combinations
+		var indices: Array[int] = []
+		for i in sz:
+			indices.append(i)
+		while true:
+			var subset: Array[Dictionary] = []
+			for i in indices:
+				subset.append(cards_arr[i])
+			var idx: int = _classify_cards(subset)
+			if idx < best_idx:
+				best_idx = idx
+				best_cards = subset
+			# Next combination
+			var i: int = sz - 1
+			while i >= 0 and indices[i] == n - sz + i:
+				i -= 1
+			if i < 0:
+				break
+			indices[i] += 1
+			for j in range(i + 1, sz):
+				indices[j] = indices[j - 1] + 1
+
+	return {"hand_idx": best_idx, "best_cards": best_cards}
 
 
 static func _is_straight(sorted_ranks: Array[int]) -> bool:
