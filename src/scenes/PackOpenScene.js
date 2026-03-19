@@ -29,6 +29,7 @@ export default class PackOpenScene extends Phaser.Scene {
     this.cardEngine = data.cardEngine;
     this.gameLogEntries = data.gameLogEntries || [];
     this.tier = data.tier || 'bronze'; // 'bronze' or 'gold'
+    this.showShowdowns = data.showShowdowns || false;
   }
 
   create() {
@@ -309,6 +310,7 @@ export default class PackOpenScene extends Phaser.Scene {
         cardEngine: this.cardEngine,
         gameLogEntries: this.gameLogEntries,
         tier: this.tier,
+        showShowdowns: this.showShowdowns,
       });
     });
   }
@@ -358,6 +360,7 @@ export default class PackOpenScene extends Phaser.Scene {
       traitManager: this.traitManager,
       cardEngine: this.cardEngine,
       gameLogEntries: this.gameLogEntries,
+      showShowdowns: this.showShowdowns,
     });
   }
 }

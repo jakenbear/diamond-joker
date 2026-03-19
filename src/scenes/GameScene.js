@@ -3153,6 +3153,7 @@ export default class GameScene extends Phaser.Scene {
         baseball: this.baseball,
         cardEngine: this.cardEngine,
         gameLogEntries: this.gameLogEntries,
+        showShowdowns: this.showShowdowns,
       });
       return;
     }
