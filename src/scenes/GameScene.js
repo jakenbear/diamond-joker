@@ -3429,15 +3429,12 @@ export default class GameScene extends Phaser.Scene {
   // ── Pitch Resolution Animation ("Card Roulette Pitch") ──────────────
 
   /**
-   * Cinematic overlay: ball travels pitcher→batter while an outcome card
-   * cycles slot-machine style, locking on the real result at the plate.
-   * @param {object} handResult - evaluated hand with .outcome
-   * @param {boolean} isOut - true if outcome is an out
-   * @param {Function} callback - called when animation finishes
+   * Spinning ball overlay: a baseball spins fast in a box over the pitcher,
+   * gradually slows to a stop, then shows green checkmark (hit) or red X (out).
    */
   _playPitchResolution(handResult, isOut, callback) {
     const W = 1280, H = 720;
-    const DEPTH = 1000; // above everything
+    const DEPTH = 1000;
     const container = this.add.container(0, 0).setDepth(DEPTH);
     let skipped = false;
 
@@ -3445,211 +3442,146 @@ export default class GameScene extends Phaser.Scene {
     const overlay = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0)
       .setInteractive();
     container.add(overlay);
-    this.tweens.add({ targets: overlay, fillAlpha: 0.75, duration: 300 });
+    this.tweens.add({ targets: overlay, fillAlpha: 0.6, duration: 250 });
 
     // Click-to-skip
     overlay.on('pointerdown', () => {
       if (skipped) return;
       skipped = true;
-      this.tweens.killAll();
+      if (spinTimer) spinTimer.remove();
       container.destroy();
       callback();
     });
 
-    // ── Pitcher silhouette (left) ──
-    const pitcherX = 180, figY = H / 2 - 20;
-    const pitcherBody = this.add.rectangle(pitcherX, figY, 30, 60, 0xcccccc).setAlpha(0);
-    const pitcherHead = this.add.circle(pitcherX, figY - 42, 14, 0xcccccc).setAlpha(0);
-    // Arm in throwing pose
-    const pitcherArm = this.add.rectangle(pitcherX + 20, figY - 15, 25, 8, 0xcccccc)
-      .setAngle(-30).setAlpha(0);
-    container.add([pitcherBody, pitcherHead, pitcherArm]);
+    // ── Box ──
+    const boxX = W / 2, boxY = H / 2 - 30;
+    const boxW = 180, boxH = 180;
+    const box = this.add.rectangle(boxX, boxY, boxW, boxH, 0x1a1a2e, 0.95)
+      .setStrokeStyle(3, 0x444466).setAlpha(0);
+    container.add(box);
 
-    // ── Batter silhouette (right) ──
-    const batterX = 1100;
-    const batterBody = this.add.rectangle(batterX, figY, 30, 60, 0xcccccc).setAlpha(0);
-    const batterHead = this.add.circle(batterX, figY - 42, 14, 0xcccccc).setAlpha(0);
-    // Bat (angled, ready position)
-    const bat = this.add.rectangle(batterX - 25, figY - 30, 8, 55, 0xdeb887)
-      .setAngle(-45).setAlpha(0);
-    container.add([batterBody, batterHead, bat]);
+    // ── Baseball (circle + stitch lines) ──
+    const ball = this.add.circle(boxX, boxY, 28, 0xfafafa).setAlpha(0);
+    // Red stitching — two arcs approximated as curved lines
+    const stitch1 = this.add.rectangle(boxX - 8, boxY, 16, 2.5, 0xcc3333)
+      .setAngle(20).setAlpha(0);
+    const stitch2 = this.add.rectangle(boxX + 8, boxY, 16, 2.5, 0xcc3333)
+      .setAngle(-20).setAlpha(0);
+    const ballGroup = [ball, stitch1, stitch2];
+    container.add(ballGroup);
 
-    // Fade in figures
-    const figures = [pitcherBody, pitcherHead, pitcherArm, batterBody, batterHead, bat];
-    this.tweens.add({ targets: figures, alpha: 0.8, duration: 250, delay: 200 });
-
-    // ── Baseball ──
-    const ball = this.add.circle(pitcherX + 30, figY - 10, 8, 0xffffff).setAlpha(0);
-    // Red stitching lines
-    const stitch1 = this.add.rectangle(ball.x, ball.y - 3, 8, 1.5, 0xff3333).setAlpha(0);
-    const stitch2 = this.add.rectangle(ball.x, ball.y + 3, 8, 1.5, 0xff3333).setAlpha(0);
-    container.add([ball, stitch1, stitch2]);
-
-    // ── Outcome card (centered, large) ──
-    const cardX = W / 2, cardY = figY;
-    const cardW = 140, cardH = 190;
-    const cardBg = this.add.rectangle(cardX, cardY, cardW, cardH, 0x2a2a3a)
-      .setStrokeStyle(3, 0x8b7d5e).setAlpha(0);
-    const cardPattern = this.add.text(cardX, cardY, '?', {
-      fontSize: '60px', fontFamily: 'monospace', color: '#5c5c7a', fontStyle: 'bold',
+    // ── Result icon (check or X) — hidden until reveal ──
+    const iconText = this.add.text(boxX, boxY + 110, '', {
+      fontSize: '48px', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5).setAlpha(0);
-    container.add([cardBg, cardPattern]);
+    container.add(iconText);
 
-    // Build the outcome pool for cycling
-    const realOutcome = handResult.outcome;
-    const outcomePool = this._buildOutcomePool(realOutcome, isOut);
+    // ── Label under box ──
+    const label = this.add.text(boxX, boxY + boxH / 2 + 20, 'Pitching...', {
+      fontSize: '16px', fontFamily: 'monospace', color: '#aaaaaa',
+    }).setOrigin(0.5).setAlpha(0);
+    container.add(label);
 
     // ── Timeline ──
-    const T_BALL_START = 500;
-    const T_CYCLE_START = 1000;
-    const T_CYCLE_SLOW = 2200;
-    const T_LOCK = 3000;
-    const T_RESOLVE = 3100;
-    const T_FADEOUT = 3500;
 
-    // T=0.5: Ball appears + starts traveling
-    this.time.delayedCall(T_BALL_START, () => {
+    // T=0.2: Fade in box + ball
+    this.time.delayedCall(200, () => {
       if (skipped) return;
-      ball.setAlpha(1); stitch1.setAlpha(1); stitch2.setAlpha(1);
-      cardBg.setAlpha(1); cardPattern.setAlpha(1);
-
-      // Ball arc from pitcher to batter
-      const ballEndX = batterX - 40;
-      const travelDur = T_LOCK - T_BALL_START;
-      this.tweens.add({
-        targets: [ball, stitch1, stitch2],
-        x: ballEndX,
-        duration: travelDur,
-        ease: 'Sine.easeIn',
-      });
-      // Slight vertical arc
-      this.tweens.add({
-        targets: [ball, stitch1, stitch2],
-        y: figY - 50,
-        duration: travelDur / 2,
-        yoyo: true,
-        ease: 'Sine.easeOut',
-      });
+      box.setAlpha(1);
+      ballGroup.forEach(b => b.setAlpha(1));
+      label.setAlpha(1);
     });
 
-    // T=1.0: Card starts cycling outcomes (fast)
-    let cycleIdx = 0;
-    let cycleTimer = null;
-    const startCycling = (interval) => {
-      if (cycleTimer) cycleTimer.remove();
-      cycleTimer = this.time.addEvent({
+    // Spin the ball — start fast, decelerate over ~2.5s
+    let spinSpeed = 720; // degrees per second
+    let spinTimer = null;
+    const SPIN_START = 300;
+    const SPIN_END = 2800;    // ball stops spinning
+    const REVEAL_TIME = 3000; // show check/X
+    const FADEOUT_TIME = 3500;
+
+    this.time.delayedCall(SPIN_START, () => {
+      if (skipped) return;
+
+      // Continuous rotation via timer
+      const interval = 16; // ~60fps
+      spinTimer = this.time.addEvent({
         delay: interval,
         loop: true,
         callback: () => {
-          if (skipped) { cycleTimer.remove(); return; }
-          cycleIdx = (cycleIdx + 1) % outcomePool.length;
-          const outcome = outcomePool[cycleIdx];
-          cardBg.setFillStyle(this._outcomeCardColor(outcome));
-          cardPattern.setText(this._outcomeCardLabel(outcome));
-          cardPattern.setFontSize(outcome.length > 10 ? '22px' : '28px');
-          cardPattern.setColor('#ffffff');
-          // Quick scale punch on each flip
-          this.tweens.killTweensOf(cardBg);
-          cardBg.setScale(1);
-          this.tweens.add({
-            targets: [cardBg, cardPattern],
-            scaleX: { from: 0.92, to: 1 }, scaleY: { from: 1.04, to: 1 },
-            duration: interval * 0.6,
-            ease: 'Back.easeOut',
-          });
+          if (skipped) return;
+          const elapsed = this.time.now - spinStartTime;
+          const progress = Math.min(1, elapsed / (SPIN_END - SPIN_START));
+
+          // Ease-out deceleration: fast → slow
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const currentSpeed = spinSpeed * (1 - eased * 0.97); // slows to ~3% of original
+
+          const angleDelta = currentSpeed * (interval / 1000);
+          ballGroup.forEach(b => b.setAngle(b.angle + angleDelta));
+
+          // Wobble increases as it slows
+          if (progress > 0.7) {
+            const wobble = (progress - 0.7) * 8;
+            ball.setScale(1 + Math.sin(elapsed * 0.02) * wobble * 0.03);
+          }
         },
       });
-    };
-
-    this.time.delayedCall(T_CYCLE_START, () => {
-      if (skipped) return;
-      startCycling(100); // Fast cycling
+      var spinStartTime = this.time.now;
     });
 
-    // T=2.2: Slow down cycling
-    this.time.delayedCall(T_CYCLE_SLOW, () => {
+    // T=2.8: Stop spinning
+    this.time.delayedCall(SPIN_END, () => {
       if (skipped) return;
-      startCycling(220);
-      // Card wobble intensifies
-      this.tweens.add({
-        targets: [cardBg, cardPattern],
-        angle: { from: -2, to: 2 },
-        duration: 80,
-        yoyo: true,
-        repeat: 4,
-      });
+      if (spinTimer) spinTimer.remove();
+      spinTimer = null;
+      label.setText('');
     });
 
-    // T=2.7: Even slower
-    this.time.delayedCall(T_CYCLE_SLOW + 500, () => {
-      if (skipped) return;
-      startCycling(400);
-    });
-
-    // T=3.0: Lock on real outcome
-    this.time.delayedCall(T_LOCK, () => {
-      if (skipped) return;
-      if (cycleTimer) cycleTimer.remove();
-
-      // Show real outcome
-      cardBg.setFillStyle(this._outcomeCardColor(realOutcome));
-      cardPattern.setText(this._outcomeCardLabel(realOutcome));
-      cardPattern.setFontSize(realOutcome.length > 10 ? '22px' : '28px');
-      cardPattern.setColor('#ffffff');
-      cardBg.setStrokeStyle(4, isOut ? 0xff5252 : 0x69f0ae);
-
-      // Card slam effect
-      this.tweens.add({
-        targets: [cardBg, cardPattern],
-        scaleX: { from: 1.3, to: 1 }, scaleY: { from: 1.3, to: 1 },
-        duration: 200,
-        ease: 'Back.easeOut',
-      });
-    });
-
-    // T=3.1: Bat swing + hit/miss
-    this.time.delayedCall(T_RESOLVE, () => {
+    // T=3.0: Reveal result
+    this.time.delayedCall(REVEAL_TIME, () => {
       if (skipped) return;
 
       if (isOut) {
-        // Whiff — bat swings through
+        // Red X
+        box.setStrokeStyle(4, 0xff3333);
+        iconText.setText('\u2716');
+        iconText.setColor('#ff3333');
+        // Ball turns red-ish
+        ball.setFillStyle(0xff6666);
+        // Shake the box
         this.tweens.add({
-          targets: bat, angle: 45, duration: 150, ease: 'Quad.easeIn',
-        });
-        // Ball passes through
-        this.tweens.add({
-          targets: [ball, stitch1, stitch2],
-          x: batterX + 80, alpha: 0,
-          duration: 200, delay: 100,
+          targets: [box, ...ballGroup, iconText],
+          x: '+=5', duration: 40, yoyo: true, repeat: 3,
         });
       } else {
-        // Connect — bat swings and meets ball
+        // Green check
+        box.setStrokeStyle(4, 0x69f0ae);
+        iconText.setText('\u2714');
+        iconText.setColor('#69f0ae');
+        // Ball glows
+        ball.setFillStyle(0xffffff);
+        // Scale pop
         this.tweens.add({
-          targets: bat, angle: 30, duration: 100, ease: 'Quad.easeIn',
-        });
-        // White flash
-        const flash = this.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0);
-        container.add(flash);
-        this.tweens.add({
-          targets: flash, fillAlpha: 0.5, duration: 50, yoyo: true,
-        });
-        // Ball rockets off screen
-        this.tweens.add({
-          targets: [ball, stitch1, stitch2],
-          x: -50, y: figY - 200, alpha: 0,
-          duration: 300, delay: 80, ease: 'Quad.easeIn',
+          targets: [box, ...ballGroup],
+          scaleX: { from: 1.15, to: 1 }, scaleY: { from: 1.15, to: 1 },
+          duration: 200, ease: 'Back.easeOut',
         });
       }
+
+      iconText.setAlpha(1);
+      this.tweens.add({
+        targets: iconText,
+        scaleX: { from: 2, to: 1 }, scaleY: { from: 2, to: 1 },
+        duration: 250, ease: 'Back.easeOut',
+      });
     });
 
-    // T=3.5: Fade out overlay, call callback
-    this.time.delayedCall(T_FADEOUT, () => {
+    // T=3.5: Fade out, callback
+    this.time.delayedCall(FADEOUT_TIME, () => {
       if (skipped) return;
       this.tweens.add({
-        targets: overlay, fillAlpha: 0, duration: 250,
-      });
-      this.tweens.add({
-        targets: [...figures, cardBg, cardPattern, ball, stitch1, stitch2],
+        targets: [overlay, box, ...ballGroup, iconText, label],
         alpha: 0, duration: 250,
         onComplete: () => {
           container.destroy();
@@ -3657,59 +3589,6 @@ export default class GameScene extends Phaser.Scene {
         },
       });
     });
-  }
-
-  /** Build a pool of outcomes to cycle through (includes real + decoys) */
-  _buildOutcomePool(realOutcome, isOut) {
-    const hits = ['Single', 'Double', 'Triple', 'Home Run'];
-    const outs = ['Strikeout', 'Groundout', 'Flyout'];
-    const pool = [realOutcome];
-
-    // Add contrasting outcomes for tension
-    if (isOut) {
-      // Sprinkle in some hits they ALMOST got
-      pool.push('Single', 'Double');
-      pool.push(...outs.filter(o => o !== realOutcome).slice(0, 1));
-    } else {
-      // Sprinkle in outs they ALMOST got
-      pool.push('Groundout', 'Flyout');
-      pool.push(...hits.filter(h => h !== realOutcome).slice(0, 2));
-    }
-
-    // Shuffle the pool so it doesn't always cycle in the same order
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    return pool;
-  }
-
-  /** Get card background color for an outcome */
-  _outcomeCardColor(outcome) {
-    switch (outcome) {
-      case 'Home Run': return 0xff6e40;
-      case 'Triple': return 0xffd600;
-      case 'Double': return 0x69f0ae;
-      case 'Single': return 0x4fc3f7;
-      case 'Strikeout': return 0x8a2020;
-      case 'Groundout': return 0x6a3a3a;
-      case 'Flyout': return 0x6a3a3a;
-      default: return 0x444444;
-    }
-  }
-
-  /** Get display label for outcome card */
-  _outcomeCardLabel(outcome) {
-    switch (outcome) {
-      case 'Home Run': return 'HOME\nRUN';
-      case 'Triple': return 'TRIPLE';
-      case 'Double': return 'DOUBLE';
-      case 'Single': return 'SINGLE';
-      case 'Strikeout': return 'STRIKE\nOUT';
-      case 'Groundout': return 'GROUND\nOUT';
-      case 'Flyout': return 'FLY\nOUT';
-      default: return outcome.toUpperCase();
-    }
   }
 
   _endGame() {
