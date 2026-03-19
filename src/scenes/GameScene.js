@@ -807,8 +807,10 @@ export default class GameScene extends Phaser.Scene {
   /** Set result display: auto-centers single line, spreads two lines, shrinks if needed */
   _setResultText(text, subtitle = '', color = null) {
     const cy = this.resultBoxCY;
+    const maxW = 390;
     this.resultText.setScale(1);
     this.resultText.setText(text);
+    this.handNameText.setScale(1);
     this.handNameText.setText(subtitle);
     if (color) this.resultText.setColor(color);
     if (subtitle) {
@@ -817,16 +819,19 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.resultText.setY(cy);
     }
-    // Shrink if text overflows the 420px box
-    const maxW = 390;
     if (this.resultText.width > maxW) {
       this.resultText.setScale(maxW / this.resultText.width);
+    }
+    if (this.handNameText.width > maxW) {
+      this.handNameText.setScale(maxW / this.handNameText.width);
     }
   }
 
   /** Update just the subtitle line, adjusting vertical positions */
   _setResultSubtitle(subtitle, color = '#aaaaaa') {
     const cy = this.resultBoxCY;
+    const maxW = 390;
+    this.handNameText.setScale(1);
     this.handNameText.setText(subtitle);
     this.handNameText.setColor(color);
     if (subtitle) {
@@ -834,6 +839,9 @@ export default class GameScene extends Phaser.Scene {
       this.handNameText.setY(cy + 16);
     } else {
       this.resultText.setY(cy);
+    }
+    if (this.handNameText.width > maxW) {
+      this.handNameText.setScale(maxW / this.handNameText.width);
     }
   }
 
