@@ -3495,7 +3495,7 @@ export default class GameScene extends Phaser.Scene {
     const SPIN_DUR = SPIN_END - SPIN_START;
 
     // ── Pick variant randomly ──
-    const variants = ['lines', 'rings', 'slots', 'crosshair', 'dice'];
+    const variants = ['lines', 'rings', 'slots', 'crosshair', 'dice', 'bounce'];
     const variant = variants[Math.floor(Math.random() * variants.length)];
 
     // Elements that vary per variant
@@ -3704,7 +3704,7 @@ export default class GameScene extends Phaser.Scene {
         dot.setFillStyle(color);
       };
 
-    } else {
+    } else if (variant === 'dice') {
       // ── Variant 5: Tumbling dice — 3 squares rotating, all must land flat ──
       const diceSize = 40;
       const diceGap = 52;
@@ -3755,6 +3755,150 @@ export default class GameScene extends Phaser.Scene {
         const color = fail ? 0xff3333 : 0x69f0ae;
         dice.forEach(d => { d.setFillStyle(color); d.setStrokeStyle(2, 0xffffff); });
         pips.forEach(p => p.setFillStyle(0xffffff));
+      };
+
+    } else {
+      // ── Variant 6: Bouncing ball — lands in colored zone = success ──
+      const halfW = boxW / 2 - 8, halfH = boxH / 2 - 8;
+      const ballR = 8;
+      const friction = 0.985; // per-step velocity decay
+      const bounceDecay = 0.8; // speed lost on wall bounce
+      const dt = 1; // simulation step
+      const minSpeed = 0.15;
+
+      // Pre-simulate ball physics to find final resting position
+      const startSpeed = 3.5 + Math.random() * 2;
+      const startAngle = Math.random() * Math.PI * 2;
+      let simVx = Math.cos(startAngle) * startSpeed;
+      let simVy = Math.sin(startAngle) * startSpeed;
+      let simX = 0, simY = 0; // relative to box center
+
+      const path = [{ x: simX, y: simY }];
+      for (let step = 0; step < 5000; step++) {
+        simX += simVx * dt;
+        simY += simVy * dt;
+        // Bounce off walls
+        if (simX < -halfW + ballR) { simX = -halfW + ballR; simVx = Math.abs(simVx) * bounceDecay; }
+        if (simX > halfW - ballR) { simX = halfW - ballR; simVx = -Math.abs(simVx) * bounceDecay; }
+        if (simY < -halfH + ballR) { simY = -halfH + ballR; simVy = Math.abs(simVy) * bounceDecay; }
+        if (simY > halfH - ballR) { simY = halfH - ballR; simVy = -Math.abs(simVy) * bounceDecay; }
+        simVx *= friction;
+        simVy *= friction;
+        path.push({ x: simX, y: simY });
+        if (Math.sqrt(simVx * simVx + simVy * simVy) < minSpeed) break;
+      }
+      const finalX = path[path.length - 1].x;
+      const finalY = path[path.length - 1].y;
+      const totalSteps = path.length;
+
+      // Generate a random quadrilateral
+      // Success: quad contains final position. Fail: quad placed elsewhere.
+      const makeQuad = (cx, cy, size) => {
+        const pts = [];
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+          const r = size * (0.6 + Math.random() * 0.5);
+          pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+        }
+        return pts;
+      };
+
+      const pointInQuad = (px, py, pts) => {
+        // Winding number test for convex-ish quad
+        let inside = true;
+        for (let i = 0; i < pts.length; i++) {
+          const j = (i + 1) % pts.length;
+          const cross = (pts[j].x - pts[i].x) * (py - pts[i].y) - (pts[j].y - pts[i].y) * (px - pts[i].x);
+          if (cross < 0) { inside = false; break; }
+        }
+        if (inside) return true;
+        // Try opposite winding
+        inside = true;
+        for (let i = 0; i < pts.length; i++) {
+          const j = (i + 1) % pts.length;
+          const cross = (pts[j].x - pts[i].x) * (py - pts[i].y) - (pts[j].y - pts[i].y) * (px - pts[i].x);
+          if (cross > 0) { inside = false; break; }
+        }
+        return inside;
+      };
+
+      let quadPts;
+      const quadSize = 30 + Math.random() * 15;
+      if (!isOut) {
+        // Success: place quad around the final position
+        quadPts = makeQuad(finalX, finalY, quadSize);
+        // Ensure it actually contains the point (regenerate if not)
+        for (let attempt = 0; attempt < 20; attempt++) {
+          if (pointInQuad(finalX, finalY, quadPts)) break;
+          quadPts = makeQuad(finalX, finalY, quadSize);
+        }
+      } else {
+        // Fail: place quad far from final position
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const ox = (Math.random() - 0.5) * halfW * 1.4;
+          const oy = (Math.random() - 0.5) * halfH * 1.4;
+          quadPts = makeQuad(ox, oy, quadSize);
+          if (!pointInQuad(finalX, finalY, quadPts)) break;
+        }
+      }
+
+      // Draw the zone polygon
+      const zoneGraphics = this.add.graphics().setAlpha(0);
+      zoneGraphics.fillStyle(0x2255aa, 0.35);
+      zoneGraphics.beginPath();
+      zoneGraphics.moveTo(boxX + quadPts[0].x, boxY + quadPts[0].y);
+      for (let i = 1; i < quadPts.length; i++) {
+        zoneGraphics.lineTo(boxX + quadPts[i].x, boxY + quadPts[i].y);
+      }
+      zoneGraphics.closePath();
+      zoneGraphics.fillPath();
+      zoneGraphics.lineStyle(2, 0x4488dd, 0.6);
+      zoneGraphics.beginPath();
+      zoneGraphics.moveTo(boxX + quadPts[0].x, boxY + quadPts[0].y);
+      for (let i = 1; i < quadPts.length; i++) {
+        zoneGraphics.lineTo(boxX + quadPts[i].x, boxY + quadPts[i].y);
+      }
+      zoneGraphics.closePath();
+      zoneGraphics.strokePath();
+
+      // The ball
+      const bounceBall = this.add.circle(boxX, boxY, ballR, 0xfafafa).setAlpha(0);
+
+      variantGroup = [zoneGraphics, bounceBall];
+      container.add(variantGroup);
+
+      // Map simulation steps to the eased timeline
+      onTick = (eased) => {
+        const stepIdx = Math.min(totalSteps - 1, Math.floor(eased * totalSteps));
+        const pos = path[stepIdx];
+        bounceBall.x = boxX + pos.x;
+        bounceBall.y = boxY + pos.y;
+      };
+
+      onReveal = (fail) => {
+        if (fail) {
+          zoneGraphics.clear();
+          zoneGraphics.fillStyle(0xff3333, 0.3);
+          zoneGraphics.beginPath();
+          zoneGraphics.moveTo(boxX + quadPts[0].x, boxY + quadPts[0].y);
+          for (let i = 1; i < quadPts.length; i++) {
+            zoneGraphics.lineTo(boxX + quadPts[i].x, boxY + quadPts[i].y);
+          }
+          zoneGraphics.closePath();
+          zoneGraphics.fillPath();
+          bounceBall.setFillStyle(0xff6666);
+        } else {
+          zoneGraphics.clear();
+          zoneGraphics.fillStyle(0x69f0ae, 0.4);
+          zoneGraphics.beginPath();
+          zoneGraphics.moveTo(boxX + quadPts[0].x, boxY + quadPts[0].y);
+          for (let i = 1; i < quadPts.length; i++) {
+            zoneGraphics.lineTo(boxX + quadPts[i].x, boxY + quadPts[i].y);
+          }
+          zoneGraphics.closePath();
+          zoneGraphics.fillPath();
+          bounceBall.setFillStyle(0x69f0ae);
+        }
       };
     }
 
