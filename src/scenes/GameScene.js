@@ -3474,20 +3474,6 @@ export default class GameScene extends Phaser.Scene {
       .setStrokeStyle(3, 0x444466).setAlpha(0);
     container.add(box);
 
-    // ── Baseball (circle + three full-diameter lines spinning) ──
-    const ballR = 55;
-    const ball = this.add.circle(boxX, boxY, ballR, 0xfafafa).setAlpha(0);
-    const lineW = ballR * 2 - 10; // nearly full diameter
-    const lineH = 7;
-    const stitch1 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
-    const stitch2 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
-    const stitch3 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
-    let s1Angle = 0;
-    let s2Angle = 60;  // evenly spaced starts
-    let s3Angle = 120;
-    const ballGroup = [ball, stitch1, stitch2, stitch3];
-    container.add(ballGroup);
-
     // ── Result icon (check or X) — hidden until reveal ──
     const iconText = this.add.text(boxX, boxY + 110, '', {
       fontSize: '48px', fontFamily: 'monospace', fontStyle: 'bold',
@@ -3500,46 +3486,287 @@ export default class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setAlpha(0);
     container.add(label);
 
-    // ── Timeline ──
-
-    // T=0.2: Fade in box + ball
-    this.time.delayedCall(200, () => {
-      if (skipped) return;
-      box.setAlpha(1);
-      ballGroup.forEach(b => b.setAlpha(1));
-      label.setAlpha(1);
-    });
-
-    // Spin the lines with pure physics — no blending, no course correction.
-    // The outcome is baked into the total rotation so they naturally land right.
+    // ── Shared timeline constants ──
     let spinTimer = null;
     const SPIN_START = 300;
     const SPIN_END = 2800;
     const REVEAL_TIME = 3000;
     const FADEOUT_TIME = 3500;
-    const SPIN_DUR = SPIN_END - SPIN_START; // 2500ms of deceleration
+    const SPIN_DUR = SPIN_END - SPIN_START;
 
-    // Pre-calculate total rotation for each line.
-    // Both use cubic ease-out: angle(t) = totalRot * (1 - (1-t)^3)
-    // s1 spins CW, s2 spins CCW. Line symmetry = 180°, so we only care about final % 180.
-    // Pick base rotations (~4-6 full spins) then adjust so final angle lands where we want.
-    const baseSpins = 5; // ~5 full rotations feels right for 2.5s
-    const s1Target = 0; // always land horizontal
-    const s2Target = isOut ? (25 + Math.random() * 40) : 0; // fail: 25-65° offset
-    const s3Target = isOut ? (-(15 + Math.random() * 35)) : 0; // fail: opposite offset
+    // ── Pick variant randomly ──
+    const variants = ['lines', 'rings', 'slots', 'crosshair', 'dice'];
+    const variant = variants[Math.floor(Math.random() * variants.length)];
 
-    // Snap total rotation so final visual angle lands on target (mod 180).
-    // dir: +1 for CW, -1 for CCW (s2 spins opposite)
-    const snapToTarget = (startAngle, target, spins, dir = 1) => {
-      const raw = spins * 360;
-      // Final angle = startAngle + dir * raw, we want (finalAngle % 180) === target
-      const finalRaw = ((startAngle + dir * raw) % 180 + 180) % 180;
-      const correction = target - finalRaw;
-      return raw + dir * correction;
-    };
-    const s1TotalRot = snapToTarget(s1Angle, s1Target, baseSpins, 1);
-    const s2TotalRot = snapToTarget(s2Angle, s2Target, baseSpins + 0.7, -1);
-    const s3TotalRot = snapToTarget(s3Angle, s3Target, baseSpins + 1.3, 1);
+    // Elements that vary per variant
+    let variantGroup = [];
+    let onTick = null;   // called each frame during spin: (eased, t) => void
+    let onReveal = null; // called at reveal: (isOut) => { colorize elements }
+
+    if (variant === 'lines') {
+      // ── Variant 1: Three spinning lines on a baseball ──
+      const ballR = 55;
+      const ball = this.add.circle(boxX, boxY, ballR, 0xfafafa).setAlpha(0);
+      const lineW = ballR * 2 - 10;
+      const lineH = 7;
+      const stitch1 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
+      const stitch2 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
+      const stitch3 = this.add.rectangle(boxX, boxY, lineW, lineH, 0xcc3333).setAlpha(0);
+      let s1Angle = 0, s2Angle = 60, s3Angle = 120;
+      variantGroup = [ball, stitch1, stitch2, stitch3];
+      container.add(variantGroup);
+
+      const baseSpins = 5;
+      const s1Target = 0;
+      const s2Target = isOut ? (25 + Math.random() * 40) : 0;
+      const s3Target = isOut ? (-(15 + Math.random() * 35)) : 0;
+
+      const snapToTarget = (startAngle, target, spins, dir = 1) => {
+        const raw = spins * 360;
+        const finalRaw = ((startAngle + dir * raw) % 180 + 180) % 180;
+        const correction = target - finalRaw;
+        return raw + dir * correction;
+      };
+      const s1TotalRot = snapToTarget(s1Angle, s1Target, baseSpins, 1);
+      const s2TotalRot = snapToTarget(s2Angle, s2Target, baseSpins + 0.7, -1);
+      const s3TotalRot = snapToTarget(s3Angle, s3Target, baseSpins + 1.3, 1);
+
+      onTick = (eased) => {
+        const s1Pos = s1Angle + s1TotalRot * eased;
+        const s2Pos = s2Angle - s2TotalRot * eased;
+        const s3Pos = s3Angle + s3TotalRot * eased;
+        stitch1.setAngle(s1Pos);
+        stitch2.setAngle(s2Pos);
+        stitch3.setAngle(s3Pos);
+        ball.setAngle(s1Pos * 0.5);
+      };
+
+      onReveal = (fail) => {
+        if (fail) {
+          ball.setFillStyle(0xff6666);
+          [stitch1, stitch2, stitch3].forEach(s => s.setFillStyle(0xff3333));
+        } else {
+          ball.setFillStyle(0xffffff);
+          [stitch1, stitch2, stitch3].forEach(s => s.setFillStyle(0x69f0ae));
+        }
+      };
+
+    } else if (variant === 'rings') {
+      // ── Variant 2: Three concentric pulsing rings ──
+      const targetR = 28;
+      const r1Start = 15, r2Start = 45, r3Start = 70;
+      const amp1 = 35, amp2 = 30, amp3 = 25;
+
+      const ring1 = this.add.circle(boxX, boxY, r1Start).setAlpha(0);
+      ring1.setStrokeStyle(4, 0xcc3333); ring1.setFillStyle(0, 0);
+      const ring2 = this.add.circle(boxX, boxY, r2Start).setAlpha(0);
+      ring2.setStrokeStyle(4, 0x3388cc); ring2.setFillStyle(0, 0);
+      const ring3 = this.add.circle(boxX, boxY, r3Start).setAlpha(0);
+      ring3.setStrokeStyle(4, 0xcccc33); ring3.setFillStyle(0, 0);
+      variantGroup = [ring1, ring2, ring3];
+      container.add(variantGroup);
+
+      const baseCycles = 6;
+      const failOffsets = isOut
+        ? [10 + Math.random() * 15, -(8 + Math.random() * 12), 15 + Math.random() * 10]
+        : [0, 0, 0];
+
+      const rigPhase = (centerR, amp, failOffset, cycles) => {
+        const wantSin = (targetR + failOffset - centerR) / amp;
+        const clampedSin = Math.max(-1, Math.min(1, wantSin));
+        const basePhase = cycles * Math.PI * 2;
+        const asin = Math.asin(clampedSin);
+        const candidate1 = Math.floor(basePhase / (Math.PI * 2)) * Math.PI * 2 + asin;
+        const candidate2 = Math.floor(basePhase / (Math.PI * 2)) * Math.PI * 2 + Math.PI - asin;
+        const d1 = Math.abs(candidate1 - basePhase);
+        const d2 = Math.abs(candidate2 - basePhase);
+        return d1 < d2 ? candidate1 : candidate2;
+      };
+
+      const center1 = (r1Start + targetR) / 2, center2 = (r2Start + targetR) / 2, center3 = (r3Start + targetR) / 2;
+      const totalPhase1 = rigPhase(center1, amp1, failOffsets[0], baseCycles);
+      const totalPhase2 = rigPhase(center2, amp2, failOffsets[1], baseCycles + 0.7);
+      const totalPhase3 = rigPhase(center3, amp3, failOffsets[2], baseCycles + 1.4);
+
+      onTick = (eased) => {
+        const r1 = center1 + amp1 * Math.sin(totalPhase1 * eased);
+        const r2 = center2 + amp2 * Math.sin(totalPhase2 * eased);
+        const r3 = center3 + amp3 * Math.sin(totalPhase3 * eased);
+        ring1.setRadius(Math.max(3, r1));
+        ring2.setRadius(Math.max(3, r2));
+        ring3.setRadius(Math.max(3, r3));
+      };
+
+      onReveal = (fail) => {
+        const color = fail ? 0xff3333 : 0x69f0ae;
+        [ring1, ring2, ring3].forEach(r => r.setStrokeStyle(4, color));
+      };
+
+    } else if (variant === 'slots') {
+      // ── Variant 3: Slot machine reels ──
+      // 3 columns of symbols scrolling vertically, stopping L→R
+      const symbols = ['\u26be', '\u2605', '\u25c6']; // ⚾ ★ ◆
+      const winSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+      const colX = [boxX - 42, boxX, boxX + 42];
+      const colStyle = { fontSize: '36px', fontFamily: 'monospace', color: '#ffffff' };
+
+      // Divider lines between columns
+      const div1 = this.add.rectangle(boxX - 21, boxY, 2, 100, 0x444466).setAlpha(0);
+      const div2 = this.add.rectangle(boxX + 21, boxY, 2, 100, 0x444466).setAlpha(0);
+
+      const reels = colX.map(x =>
+        this.add.text(x, boxY, symbols[0], colStyle).setOrigin(0.5).setAlpha(0)
+      );
+      variantGroup = [...reels, div1, div2];
+      container.add(variantGroup);
+
+      // Each reel cycles through symbols at a readable pace, stopping L→R
+      const stopTimes = [0.55, 0.75, 1.0];
+      const reelSpeeds = [5, 6, 7]; // gentle total cycles
+      const finalSymbols = isOut
+        ? [winSymbol, winSymbol, symbols.find(s => s !== winSymbol) || symbols[1]]
+        : [winSymbol, winSymbol, winSymbol];
+
+      // Pre-calculate phase offset so each reel lands on its final symbol
+      const reelOffsets = finalSymbols.map((sym, i) => {
+        const targetIdx = symbols.indexOf(sym);
+        const rawEnd = reelSpeeds[i]; // cycles at eased=1
+        const remainder = Math.floor(rawEnd) % symbols.length;
+        return (targetIdx - remainder + symbols.length) % symbols.length;
+      });
+
+      onTick = (eased) => {
+        reels.forEach((reel, i) => {
+          const reelProgress = Math.min(1, eased / stopTimes[i]);
+          const reelEased = 1 - Math.pow(1 - reelProgress, 3);
+          const cycle = reelEased * reelSpeeds[i];
+
+          if (reelProgress >= 1) {
+            reel.setText(finalSymbols[i]);
+            reel.y = boxY;
+          } else {
+            const symIdx = (Math.floor(cycle) + reelOffsets[i]) % symbols.length;
+            reel.setText(symbols[symIdx]);
+            reel.y = boxY + Math.sin(cycle * Math.PI * 2) * 3;
+          }
+        });
+      };
+
+      onReveal = (fail) => {
+        const color = fail ? '#ff3333' : '#69f0ae';
+        reels.forEach(r => r.setColor(color));
+        [div1, div2].forEach(d => d.setFillStyle(fail ? 0xff3333 : 0x69f0ae));
+      };
+
+    } else if (variant === 'crosshair') {
+      // ── Variant 4: Crosshair lock — H and V bars must meet at center ──
+      const barLen = 120, barThick = 5;
+      const hBar = this.add.rectangle(boxX, boxY, barLen, barThick, 0xcc3333).setAlpha(0);
+      const vBar = this.add.rectangle(boxX, boxY, barThick, barLen, 0x3388cc).setAlpha(0);
+      const dot = this.add.circle(boxX, boxY, 6, 0xcccc33).setAlpha(0);
+      variantGroup = [hBar, vBar, dot];
+      container.add(variantGroup);
+
+      // H bar sweeps vertically, V bar sweeps horizontally
+      // Both oscillate with decelerating frequency. Success = both at center.
+      const hAmp = 60, vAmp = 60;
+      const hCycles = 7, vCycles = 8.3;
+      // Rig final position: success = 0 offset, fail = offset
+      const hFinalOffset = isOut ? (15 + Math.random() * 25) * (Math.random() < 0.5 ? 1 : -1) : 0;
+      const vFinalOffset = isOut ? (15 + Math.random() * 25) * (Math.random() < 0.5 ? 1 : -1) : 0;
+
+      // Rig total phase so sin(totalPhase) lands at target offset
+      const rigCrosshair = (amp, offset, cycles) => {
+        const wantSin = offset / amp;
+        const clampedSin = Math.max(-1, Math.min(1, wantSin));
+        const basePhase = cycles * Math.PI * 2;
+        const asin = Math.asin(clampedSin);
+        const c1 = Math.floor(basePhase / (Math.PI * 2)) * Math.PI * 2 + asin;
+        const c2 = Math.floor(basePhase / (Math.PI * 2)) * Math.PI * 2 + Math.PI - asin;
+        return Math.abs(c1 - basePhase) < Math.abs(c2 - basePhase) ? c1 : c2;
+      };
+      const hTotalPhase = rigCrosshair(hAmp, hFinalOffset, hCycles);
+      const vTotalPhase = rigCrosshair(vAmp, vFinalOffset, vCycles);
+
+      onTick = (eased) => {
+        const hOff = hAmp * Math.sin(hTotalPhase * eased);
+        const vOff = vAmp * Math.sin(vTotalPhase * eased);
+        hBar.y = boxY + hOff;
+        vBar.x = boxX + vOff;
+        dot.x = boxX + vOff;
+        dot.y = boxY + hOff;
+      };
+
+      onReveal = (fail) => {
+        const color = fail ? 0xff3333 : 0x69f0ae;
+        hBar.setFillStyle(color);
+        vBar.setFillStyle(color);
+        dot.setFillStyle(color);
+      };
+
+    } else {
+      // ── Variant 5: Tumbling dice — 3 squares rotating, all must land flat ──
+      const diceSize = 40;
+      const diceGap = 52;
+      const diceColors = [0xcc3333, 0x3388cc, 0xcccc33];
+      const diceX = [boxX - diceGap, boxX, boxX + diceGap];
+
+      const dice = diceX.map((x, i) =>
+        this.add.rectangle(x, boxY, diceSize, diceSize, diceColors[i])
+          .setStrokeStyle(2, 0xffffff).setAlpha(0)
+      );
+      // Pips (dot in center of each die)
+      const pips = diceX.map((x) =>
+        this.add.circle(x, boxY, 5, 0xffffff).setAlpha(0)
+      );
+      variantGroup = [...dice, ...pips];
+      container.add(variantGroup);
+
+      // Each die spins at a different speed and must land at 0° (flat) on success
+      const baseSpins = 5;
+      const dieTargets = isOut
+        ? [0, 0, 20 + Math.random() * 40] // last die lands crooked
+        : [0, 0, 0];
+
+      const snapDie = (startAngle, target, spins) => {
+        const raw = spins * 360;
+        const finalRaw = ((startAngle + raw) % 90 + 90) % 90; // square symmetry = 90°
+        return raw + (target - finalRaw);
+      };
+
+      const dieStarts = [15, 45, 70];
+      const dieTotalRots = dieStarts.map((start, i) =>
+        snapDie(start, dieTargets[i], baseSpins + i * 0.6)
+      );
+
+      onTick = (eased) => {
+        dice.forEach((die, i) => {
+          const angle = dieStarts[i] + dieTotalRots[i] * eased;
+          die.setAngle(angle);
+          pips[i].setAngle(angle);
+          // Keep pips centered on dice
+          const rad = angle * Math.PI / 180;
+          pips[i].x = diceX[i]; // pips stay centered, die rotates visually
+          pips[i].y = boxY;
+        });
+      };
+
+      onReveal = (fail) => {
+        const color = fail ? 0xff3333 : 0x69f0ae;
+        dice.forEach(d => { d.setFillStyle(color); d.setStrokeStyle(2, 0xffffff); });
+        pips.forEach(p => p.setFillStyle(0xffffff));
+      };
+    }
+
+    // ── Timeline ──
+
+    // T=0.2: Fade in
+    this.time.delayedCall(200, () => {
+      if (skipped) return;
+      box.setAlpha(1);
+      variantGroup.forEach(b => b.setAlpha(1));
+      label.setAlpha(1);
+    });
 
     this.time.delayedCall(SPIN_START, () => {
       if (skipped) return;
@@ -3557,36 +3784,23 @@ export default class GameScene extends Phaser.Scene {
           if (skipped) return;
           const elapsed = this.time.now - spinStartTime;
           const t = Math.min(1, elapsed / SPIN_DUR);
-
-          // Cubic ease-out: fast start, natural deceleration
           const eased = 1 - Math.pow(1 - t, 3);
 
-          // Absolute positions from easing curve — no direction changes possible
-          const s1Pos = s1Angle + s1TotalRot * eased;
-          const s2Pos = s2Angle - s2TotalRot * eased; // opposite direction
-          const s3Pos = s3Angle + s3TotalRot * eased;  // same dir as s1 but different speed
+          onTick(eased, t);
 
-          stitch1.setAngle(s1Pos);
-          stitch2.setAngle(s2Pos);
-          stitch3.setAngle(s3Pos);
-          ball.setAngle(s1Pos * 0.5); // ball rotates gently
-
-          // Casino tick beeps — use normalized speed for timing
-          // Derivative of cubic ease-out is 3*(1-t)^2, range [0,3] → normalize to [0,1]
-          const speed = Math.pow(1 - t, 2); // 1 at start, 0 at end
+          const speed = Math.pow(1 - t, 2);
           tickInterval = 180 + (1 - speed) * 500;
           if (elapsed - lastTickTime >= tickInterval) {
             lastTickTime = elapsed;
             const pitch = startPitch - (1 - speed) * (startPitch - endPitch);
             SoundManager.spinTick(pitch);
           }
-
         },
       });
       var spinStartTime = this.time.now;
     });
 
-    // T=2.8: Stop spinning
+    // T=2.8: Stop
     this.time.delayedCall(SPIN_END, () => {
       if (skipped) return;
       if (spinTimer) spinTimer.remove();
@@ -3597,34 +3811,24 @@ export default class GameScene extends Phaser.Scene {
     // T=3.0: Reveal result
     this.time.delayedCall(REVEAL_TIME, () => {
       if (skipped) return;
+      onReveal(isOut);
 
       if (isOut) {
-        // Red X + fail buzzer — stitches stayed misaligned
         SoundManager.spinFail();
         box.setStrokeStyle(4, 0xff3333);
         iconText.setText('\u2716');
         iconText.setColor('#ff3333');
-        ball.setFillStyle(0xff6666);
-        stitch1.setFillStyle(0xff3333);
-        stitch2.setFillStyle(0xff3333);
-        stitch3.setFillStyle(0xff3333);
         this.tweens.add({
-          targets: [box, ...ballGroup, iconText],
+          targets: [box, ...variantGroup, iconText],
           x: '+=5', duration: 40, yoyo: true, repeat: 3,
         });
       } else {
-        // Green check + success ching — stitches aligned!
         SoundManager.spinSuccess();
         box.setStrokeStyle(4, 0x69f0ae);
         iconText.setText('\u2714');
         iconText.setColor('#69f0ae');
-        ball.setFillStyle(0xffffff);
-        stitch1.setFillStyle(0x69f0ae);
-        stitch2.setFillStyle(0x69f0ae);
-        stitch3.setFillStyle(0x69f0ae);
-        // Scale pop
         this.tweens.add({
-          targets: [box, ...ballGroup],
+          targets: [box, ...variantGroup],
           scaleX: { from: 1.15, to: 1 }, scaleY: { from: 1.15, to: 1 },
           duration: 200, ease: 'Back.easeOut',
         });
@@ -3642,7 +3846,7 @@ export default class GameScene extends Phaser.Scene {
     this.time.delayedCall(FADEOUT_TIME, () => {
       if (skipped) return;
       this.tweens.add({
-        targets: [overlay, box, ...ballGroup, iconText, label],
+        targets: [overlay, box, ...variantGroup, iconText, label],
         alpha: 0, duration: 250,
         onComplete: () => {
           container.destroy();

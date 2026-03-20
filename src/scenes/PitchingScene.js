@@ -118,12 +118,16 @@ export default class PitchingScene extends Phaser.Scene {
     const bs = 18; // base square size
     const gap = 26; // distance from center to each base
 
+    this._diamondContainer = this.add.container(0, 0).setDepth(7);
+
     // Diamond background panel
-    this.add.rectangle(cx, cy, gap * 2 + bs + 20, gap * 2 + bs + 20, 0x0a1f0d, 0.6)
-      .setStrokeStyle(1, 0x2e7d32, 0.4).setDepth(7).setAngle(45);
+    this._diamondContainer.add(
+      this.add.rectangle(cx, cy, gap * 2 + bs + 20, gap * 2 + bs + 20, 0x0a1f0d, 0.6)
+        .setStrokeStyle(1, 0x2e7d32, 0.4).setAngle(45)
+    );
 
     // Diamond outline
-    const g = this.add.graphics().setDepth(8);
+    const g = this.add.graphics();
     g.lineStyle(2, 0x4caf50, 0.6);
     g.beginPath();
     g.moveTo(cx, cy - gap);           // 2nd
@@ -132,21 +136,24 @@ export default class PitchingScene extends Phaser.Scene {
     g.lineTo(cx - gap, cy);           // 3rd
     g.closePath();
     g.strokePath();
+    this._diamondContainer.add(g);
 
     // Base squares: 1st (right), 2nd (top), 3rd (left)
     const emptyColor = 0x444444;
     this._baseBugSquares = [
-      this.add.rectangle(cx + gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 1st
-      this.add.rectangle(cx, cy - gap, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 2nd
-      this.add.rectangle(cx - gap, cy, bs, bs, emptyColor).setDepth(9).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 3rd
+      this.add.rectangle(cx + gap, cy, bs, bs, emptyColor).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 1st
+      this.add.rectangle(cx, cy - gap, bs, bs, emptyColor).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 2nd
+      this.add.rectangle(cx - gap, cy, bs, bs, emptyColor).setAngle(45).setStrokeStyle(1.5, 0x888888),  // 3rd
     ];
+    this._diamondContainer.add(this._baseBugSquares);
 
     // Runner name texts below home plate (vertical list: 1B / 2B / 3B)
     this._baseBugRunnerTexts = [
-      this.add.text(cx, cy + gap + 14, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0).setDepth(9),
-      this.add.text(cx, cy + gap + 27, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0).setDepth(9),
-      this.add.text(cx, cy + gap + 40, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0).setDepth(9),
+      this.add.text(cx, cy + gap + 14, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0),
+      this.add.text(cx, cy + gap + 27, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0),
+      this.add.text(cx, cy + gap + 40, '', { fontSize: '10px', fontFamily: 'monospace', color: '#ffd600' }).setOrigin(0.5, 0),
     ];
+    this._diamondContainer.add(this._baseBugRunnerTexts);
 
     // Keep these for _advanceOppRunners / _handleIBB compatibility
     this.basePositions = [
@@ -1132,31 +1139,138 @@ export default class PitchingScene extends Phaser.Scene {
     this._destroyPitchButtons();
     const result = this.showdownEngine.resolve();
 
-    // Show both hands
-    this._renderShowdownBoard();
-
-    // Reveal batter cards
+    // Reveal batter cards on the existing board first
     this.showdownEngine._revealedBatterCards = [0, 1];
     this._renderShowdownBoard();
 
-    const winnerLabel = result.winner === 'pitcher' ? 'YOU WIN' : 'BATTER WINS';
-    const winnerColor = result.isOut ? '#69f0ae' : '#ff5252';
-    this.resultText.setText(`${winnerLabel} — ${result.outcome}!`);
-    this.resultText.setColor(winnerColor);
+    // After a beat, animate into the showdown comparison layout
+    this.time.delayedCall(600, () => this._animateShowdownReveal(result));
+  }
 
-    const pHandName = result.pitcherHand.handName || 'High Card';
-    const bHandName = result.batterHand.handName || 'High Card';
-    this.handNameText.setText(`You: ${pHandName} (${result.pitcherHand.score}) vs Batter: ${bHandName} (${result.batterHand.score})`);
-    this.handNameText.setColor('#b0bec5');
+  _animateShowdownReveal(result) {
+    this._destroyBoardElements();
 
-    // Apply pitch-effect stamina drain
-    const pitchStaminaDrain = this.showdownEngine.getStaminaDrained();
-    if (pitchStaminaDrain > 0) {
-      this.rosterManager.myPitcherStamina = Math.max(0, this.rosterManager.myPitcherStamina - pitchStaminaDrain);
-    }
+    const CARD_BW = 96, CARD_BH = 126;
+    const ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
+    const ASSET_SUITS = { H:'h', D:'d', C:'c', S:'s' };
+    this._boardElements = [];
 
-    // Apply result to pitch state
-    this.time.delayedCall(1500, () => this._applyShowdownResult(result));
+    const pCards = result.pitcherHand.cards || [];
+    const bCards = result.batterHand.cards || [];
+
+    // Layout: two rows centered, opponent on top, you on bottom (matches board layout)
+    const topY = 220, botY = 380;
+    const cardSpacing = 110;
+    const startX = 640 - (Math.max(pCards.length, bCards.length) - 1) * cardSpacing / 2;
+
+    // Labels
+    const bLabel = this.add.text(startX - 80, topY, 'OPP', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#e53935', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5).setAlpha(0);
+    const pLabel = this.add.text(startX - 80, botY, 'YOU', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#4caf50', fontStyle: 'bold',
+    }).setOrigin(1, 0.5).setDepth(5).setAlpha(0);
+    this._boardElements.push(pLabel, bLabel);
+
+    // Create card sprites off-screen, then tween into place
+    const allSprites = [];
+
+    const makeCard = (card, targetX, targetY, delay) => {
+      const key = `card_${ASSET_SUITS[card.suit]}${ASSET_RANKS[card.rank]}`;
+      const sprite = this.add.image(640, 300, key)
+        .setScale(CARD_BW / 32, CARD_BH / 42)
+        .setDepth(5).setAlpha(0);
+      this._boardElements.push(sprite);
+      allSprites.push(sprite);
+
+      this.time.delayedCall(delay, () => {
+        SoundManager.uiTap();
+        this.tweens.add({
+          targets: sprite,
+          x: targetX, y: targetY, alpha: 1,
+          duration: 300, ease: 'Back.easeOut',
+        });
+      });
+      return sprite;
+    };
+
+    // Deal opponent cards (top row) first
+    const bSprites = bCards.map((card, i) =>
+      makeCard(card, startX + i * cardSpacing, topY, i * 120)
+    );
+
+    // Deal your cards (bottom row) after opponent
+    const pDelay = bCards.length * 120 + 200;
+    const pSprites = pCards.map((card, i) =>
+      makeCard(card, startX + i * cardSpacing, botY, pDelay + i * 120)
+    );
+
+    // Fade in labels with first cards
+    this.time.delayedCall(50, () => {
+      this.tweens.add({ targets: bLabel, alpha: 1, duration: 200 });
+    });
+    this.time.delayedCall(pDelay, () => {
+      this.tweens.add({ targets: pLabel, alpha: 1, duration: 200 });
+    });
+
+    // Hide diamond and text during the card reveal
+    this.resultText.setText('');
+    this.handNameText.setText('');
+    if (this._diamondContainer) this._diamondContainer.setVisible(false);
+
+    // After all cards dealt, highlight the winner
+    const revealDelay = pDelay + pCards.length * 120 + 400;
+    this.time.delayedCall(revealDelay, () => {
+      const winSprites = result.isOut ? pSprites : bSprites;
+      const loseSprites = result.isOut ? bSprites : pSprites;
+      const winColor = result.isOut ? 0x69f0ae : 0xff5252;
+
+      // Highlight winner cards with a glow tint (no border rectangles)
+      winSprites.forEach(s => {
+        s.setTint(result.isOut ? 0xccffcc : 0xffcccc);
+        this.tweens.add({
+          targets: s,
+          scaleX: s.scaleX * 1.05, scaleY: s.scaleY * 1.05,
+          duration: 200, ease: 'Back.easeOut',
+        });
+      });
+
+      // Dim loser cards
+      loseSprites.forEach(s => {
+        this.tweens.add({ targets: s, alpha: 0.4, duration: 300 });
+      });
+
+      // Show result text below the cards
+      this.resultText.setY(480);
+      const winnerLabel = result.winner === 'pitcher' ? 'YOU WIN' : 'BATTER WINS';
+      const winnerColor = result.isOut ? '#69f0ae' : '#ff5252';
+      this.resultText.setText(`${winnerLabel} — ${result.outcome}!`);
+      this.resultText.setColor(winnerColor);
+
+      const pHandName = result.pitcherHand.handName || 'High Card';
+      const bHandName = result.batterHand.handName || 'High Card';
+      this.handNameText.setY(500);
+      this.handNameText.setText(`You: ${pHandName}  vs  Batter: ${bHandName}`);
+      this.handNameText.setColor('#b0bec5');
+
+      if (result.isOut) {
+        SoundManager.spinSuccess();
+      } else {
+        SoundManager.spinFail();
+      }
+
+      // Apply pitch-effect stamina drain
+      const pitchStaminaDrain = this.showdownEngine.getStaminaDrained();
+      if (pitchStaminaDrain > 0) {
+        this.rosterManager.myPitcherStamina = Math.max(0, this.rosterManager.myPitcherStamina - pitchStaminaDrain);
+      }
+
+      // Apply result after a pause, restore diamond
+      this.time.delayedCall(1800, () => {
+        if (this._diamondContainer) this._diamondContainer.setVisible(true);
+        this._applyShowdownResult(result);
+      });
+    });
   }
 
   _applyShowdownResult(result) {

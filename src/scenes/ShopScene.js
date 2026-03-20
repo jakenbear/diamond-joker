@@ -96,6 +96,7 @@ export default class ShopScene extends Phaser.Scene {
             gameLogEntries: this.gameLogEntries,
             purchasesMade: this.purchasesMade,
             activeTab: tab.key,
+            showShowdowns: this.showShowdowns,
           });
         });
       }
@@ -568,6 +569,7 @@ export default class ShopScene extends Phaser.Scene {
       gameLogEntries: this.gameLogEntries,
       purchasesMade: this.purchasesMade,
       activeTab: this.activeTab,
+      showShowdowns: this.showShowdowns,
     });
   }
 

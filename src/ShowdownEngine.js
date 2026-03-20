@@ -124,6 +124,7 @@ export default class ShowdownEngine {
       const result = CardEngine.evaluateHand(combo);
       if (result.score > bestScore) {
         best = result;
+        best.cards = combo;
         bestScore = result.score;
       }
     }
