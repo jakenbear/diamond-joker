@@ -885,7 +885,7 @@ export default class PitchingScene extends Phaser.Scene {
     const wildPool = allPitchKeys.filter(k => !repertoire.includes(k) && !used.includes(k));
     const hasWild = wildPool.length > 0;
     const totalSlots = repertoire.length + (hasWild ? 1 : 0);
-    const totalW = totalSlots * spacing + 80; // +80 for skip
+    const totalW = totalSlots * spacing;
     const startX = 640 - totalW / 2 + cardW / 2;
 
     const hoverLift = 6;
@@ -1010,32 +1010,7 @@ export default class PitchingScene extends Phaser.Scene {
       this._pitchButtons.push(...elements);
     }
 
-    // "Skip" card
-    const skipX = startX + totalSlots * spacing;
-    const skipBg = this.add.rectangle(skipX, btnY, 80, cardH, 0x3a3a3a, 0.8)
-      .setStrokeStyle(2, 0x666666).setDepth(5)
-      .setInteractive({ useHandCursor: true });
-    const skipTxt = this.add.text(skipX, btnY, 'SKIP', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#999999', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(6);
-    skipBg._baseY = skipBg.y;
-    skipTxt._baseY = skipTxt.y;
-    skipBg.on('pointerover', () => {
-      skipBg.setStrokeStyle(3, 0xffd600);
-      [skipBg, skipTxt].forEach(el => {
-        this.tweens.killTweensOf(el);
-        this.tweens.add({ targets: el, y: el._baseY - hoverLift, duration: 80 });
-      });
-    });
-    skipBg.on('pointerout', () => {
-      skipBg.setStrokeStyle(2, 0x666666);
-      [skipBg, skipTxt].forEach(el => {
-        this.tweens.killTweensOf(el);
-        this.tweens.add({ targets: el, y: el._baseY, duration: 80 });
-      });
-    });
-    skipBg.on('pointerdown', () => this._advanceShowdownStage(stage, null));
-    this._pitchButtons.push(skipBg, skipTxt);
+    // No skip — player must choose a pitch each stage
   }
 
   _showdownEffectDesc(key) {

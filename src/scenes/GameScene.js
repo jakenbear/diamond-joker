@@ -1574,10 +1574,18 @@ export default class GameScene extends Phaser.Scene {
     };
     // evaluateHand mutates the snapshot — use a copy so getSuccessChance reads clean counters
     const evalState = { baseballState: { ...counters } };
-    // Apply batter traits to preview so abilities like ace_wild_straight are reflected
+    // Apply batter AND pitcher traits to preview so downgrade_face_cards etc. are reflected
     const batter = this.rosterManager.getCurrentBatter();
+    const pitcher = this.rosterManager.getCurrentPitcher();
     const batterPreMod = batter?.traits ? TraitManager.buildPreModifier(batter.traits) : null;
-    const result = CardEngine.evaluateHand(cards, batterPreMod, null, evalState);
+    const pitcherPreMod = pitcher?.traits ? TraitManager.buildPitcherPreModifier(pitcher.traits) : null;
+    const combinedPreMod = (batterPreMod || pitcherPreMod) ? (cards) => {
+      let c = cards;
+      if (pitcherPreMod) c = pitcherPreMod(c);
+      if (batterPreMod) c = batterPreMod(c);
+      return c;
+    } : null;
+    const result = CardEngine.evaluateHand(cards, combinedPreMod, null, evalState);
     const n = cards.length;
 
     // Resolve the true hand name (Groundout/Flyout → original hand)
