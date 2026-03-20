@@ -307,7 +307,15 @@ export default class ShowdownEngine {
     return this.staminaDrained;
   }
 
+  _replenishPitcherDeck() {
+    if (this.pitcherDeck.length === 0) {
+      this.pitcherDeck = ShowdownEngine.generateDeck(this.pitcher.velocity, this.pitcher.control);
+      this._shuffle(this.pitcherDeck);
+    }
+  }
+
   _effectFastball({ swapIndex = 0 }) {
+    this._replenishPitcherDeck();
     const sorted = [...this.pitcherDeck].sort((a, b) => b.rank - a.rank);
     const topPool = sorted.slice(0, Math.max(1, Math.ceil(sorted.length * 0.3)));
     const drawn = topPool[Math.floor(Math.random() * topPool.length)];
@@ -332,8 +340,8 @@ export default class ShowdownEngine {
       return { success: false, reason: 'Card is locked' };
     }
     const replaced = this.community[targetIndex];
+    this._replenishPitcherDeck();
     const newCard = this.pitcherDeck.pop();
-    if (!newCard) return { success: false, reason: 'Deck empty' };
     this.community[targetIndex] = newCard;
     return { success: true, replaced, newCard };
   }
@@ -413,9 +421,7 @@ export default class ShowdownEngine {
 
   _effectPalmball() {
     // Deal next community card from pitcher's deck instead of random
-    if (this.pitcherDeck.length === 0) {
-      return { success: false, reason: 'Deck empty' };
-    }
+    this._replenishPitcherDeck();
     // Sort deck descending and take the best card
     const sorted = [...this.pitcherDeck].sort((a, b) => b.rank - a.rank);
     const planted = sorted[0];
