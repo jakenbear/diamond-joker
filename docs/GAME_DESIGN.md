@@ -318,6 +318,15 @@ Low-control pitchers risk walks when throwing breaking balls.
 | Control | Walk/wild pitch prevention, hit chance |
 | Stamina | Fatigue start threshold, durability |
 
+### Stat Display
+Internal stats (1-10) are converted to baseball-style display values:
+- **contact** → **AVG** (.150–.400 range, ±.015 jitter per player name)
+- **power** → **HR** (0–60 range, ±3 jitter per player name)
+- **speed** → **SB** (0–80 range, ±4 jitter per player name)
+
+Jitter is seeded from player name for deterministic, unique values.
+Internal math always uses raw 1-10 values.
+
 ### Lineup Cycling
 - 9 batters cycle in order, wrapping around
 - Same for opponent lineup during PitchingScene
