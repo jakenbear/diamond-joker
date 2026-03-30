@@ -3,6 +3,7 @@
  * Flow: Phase 1 (pick team) → Phase 2 (roster + pitcher) → Phase 3 (pick opponent) → Game
  */
 import TEAMS from '../../data/teams.js';
+import StatDisplay from '../StatDisplay.js';
 
 const CARD_W = 250;
 const CARD_H = 320;
@@ -130,7 +131,7 @@ export default class TeamSelectScene extends Phaser.Scene {
       this._drawStatBar(600, rowY + 4, b.speed, '#66bb6a');
     });
 
-    const legend = this.add.text(440, 115, 'PWR       CNT       SPD', {
+    const legend = this.add.text(440, 115, 'HR        AVG       SB', {
       fontSize: '12px', fontFamily: 'monospace', color: '#666666',
     });
     this.elements.push(legend);
@@ -381,12 +382,12 @@ export default class TeamSelectScene extends Phaser.Scene {
     this.elements.push(style);
 
     // Stats
-    const avgPow = (team.batters.reduce((s, b) => s + b.power, 0) / 9).toFixed(1);
-    const avgCon = (team.batters.reduce((s, b) => s + b.contact, 0) / 9).toFixed(1);
-    const avgSpd = (team.batters.reduce((s, b) => s + b.speed, 0) / 9).toFixed(1);
+    const avgHR = Math.round(team.batters.reduce((s, b) => s + StatDisplay.toHR(b.power, b.name), 0) / 9);
+    const avgAVG = (team.batters.reduce((s, b) => s + StatDisplay.toAVG(b.contact, b.name), 0) / 9).toFixed(3).slice(1);
+    const avgSB = Math.round(team.batters.reduce((s, b) => s + StatDisplay.toSB(b.speed, b.name), 0) / 9);
 
     const stats = this.add.text(x, y + 90,
-      `Power ${avgPow}  Contact ${avgCon}  Speed ${avgSpd}`, {
+      `HR ${avgHR}  AVG ${avgAVG}  SB ${avgSB}`, {
       fontSize: '10px', fontFamily: 'monospace', color: '#6d4c41',
     }).setOrigin(0.5);
     this.elements.push(stats);
