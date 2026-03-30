@@ -9,6 +9,7 @@ import { PITCH_TYPES, assignPitchRepertoire } from '../RosterManager.js';
 import SoundManager from '../SoundManager.js';
 import SynergyEngine from '../SynergyEngine.js';
 import ShowdownEngine from '../ShowdownEngine.js';
+import StatDisplay from '../StatDisplay.js';
 
 const TEAM_SPRITE_KEY = { 'Canada': 'canada', 'USA': 'usa', 'Japan': 'japan', 'Mexico': 'mexico' };
 
@@ -375,7 +376,7 @@ export default class PitchingScene extends Phaser.Scene {
       }).setDepth(52));
 
       const batsLabel = player.bats === 'L' ? 'L' : 'R';
-      els.push(this.add.text(rosterX + 12, y + 20, `${batsLabel}  PWR:${player.power} CNT:${player.contact} SPD:${player.speed}`, {
+      els.push(this.add.text(rosterX + 12, y + 20, `${batsLabel}  ${StatDisplay.statLine(player)}`, {
         fontSize: '10px', fontFamily: 'monospace', color: '#81c784',
       }).setDepth(52));
 
@@ -579,9 +580,9 @@ export default class PitchingScene extends Phaser.Scene {
     const pos = batter.pos ? ` | ${batter.pos}` : '';
     this.oppBatterNumText.setText(`#${idx + 1} in lineup${pos}`);
 
-    this.oppBatterPwrText.setText(`PWR  ${this._statBar(batter.power)}`);
-    this.oppBatterCntText.setText(`CNT  ${this._statBar(batter.contact)}`);
-    this.oppBatterSpdText.setText(`SPD  ${this._statBar(batter.speed)}`);
+    this.oppBatterPwrText.setText(`HR  ${StatDisplay.fmtHR(batter.power, batter.name)}  ${this._statBar(batter.power)}`);
+    this.oppBatterCntText.setText(`AVG ${StatDisplay.fmtAVG(batter.contact, batter.name)}  ${this._statBar(batter.contact)}`);
+    this.oppBatterSpdText.setText(`SB  ${StatDisplay.fmtSB(batter.speed, batter.name)}  ${this._statBar(batter.speed)}`);
 
     // On-deck preview
     const nextIdx = (idx + 1) % this.rosterManager.opponentRoster.length;
