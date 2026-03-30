@@ -4,6 +4,7 @@
  */
 
 import BATTER_TRAITS from '../../data/batter_traits.js';
+import StatDisplay from '../StatDisplay.js';
 
 const RARITY_COLORS = {
   common:   { fill: '#81c784', bg: 0x1a2a3a },
@@ -63,7 +64,7 @@ export default class TraitDraftScene extends Phaser.Scene {
     }).setOrigin(0, 0.5);
 
     // Position and stats
-    this.add.text(62, y + 10, `${batter.pos}  P:${batter.power} C:${batter.contact} S:${batter.speed}`, {
+    this.add.text(62, y + 10, `${batter.pos}  ${StatDisplay.statLine(batter)}`, {
       fontSize: '11px', fontFamily: 'monospace', color: '#81c784',
     }).setOrigin(0, 0.5);
 

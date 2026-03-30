@@ -7,6 +7,7 @@
 import COACHES from '../../data/coaches.js';
 import MASCOTS from '../../data/mascots.js';
 import SynergyEngine from '../SynergyEngine.js';
+import StatDisplay from '../StatDisplay.js';
 
 const RARITY_COLORS = {
   common:   { fill: 0x4caf50, border: 0x66bb6a, label: '#81c784' },
@@ -426,7 +427,7 @@ export default class ShopScene extends Phaser.Scene {
       }
 
       const nameStr = `${i + 1}. ${player.name}`;
-      const statsStr = `PWR:${player.power} CNT:${player.contact} SPD:${player.speed}`;
+      const statsStr = StatDisplay.statLine(player);
       const traitStr = player.traits.length > 0
         ? player.traits.map(t => t.name).join(', ')
         : '(no traits)';

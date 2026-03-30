@@ -10,6 +10,7 @@
 
 import BONUS_PLAYERS from '../../data/bonus_players.js';
 import BATTER_TRAITS from '../../data/batter_traits.js';
+import StatDisplay from '../StatDisplay.js';
 
 const RARITY_COLORS = {
   common:   { fill: 0x4caf50, border: 0x66bb6a, label: '#81c784' },
@@ -157,7 +158,7 @@ export default class PackOpenScene extends Phaser.Scene {
     }).setOrigin(0.5));
 
     // Stats
-    front.add(this.add.text(0, -55, `PWR ${player.power}  CNT ${player.contact}  SPD ${player.speed}`, {
+    front.add(this.add.text(0, -55, `HR ${StatDisplay.fmtHR(player.power, player.name)}  AVG ${StatDisplay.fmtAVG(player.contact, player.name)}  SB ${StatDisplay.fmtSB(player.speed, player.name)}`, {
       fontSize: '13px', fontFamily: 'monospace', color: '#ff8a65',
     }).setOrigin(0.5));
 
@@ -268,7 +269,7 @@ export default class PackOpenScene extends Phaser.Scene {
         .setDepth(11);
 
       const nameStr = `${i + 1}. ${player.name}${isBonus ? ' (BONUS)' : ''}`;
-      const statsStr = `PWR:${player.power} CNT:${player.contact} SPD:${player.speed}`;
+      const statsStr = StatDisplay.statLine(player);
       const traitStr = player.traits.length > 0
         ? player.traits.map(t => t.name).join(', ')
         : '(no traits)';
