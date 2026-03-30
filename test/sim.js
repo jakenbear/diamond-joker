@@ -17,6 +17,7 @@ import MASCOTS from '../data/mascots.js';
 import BONUS_PLAYERS from '../data/bonus_players.js';
 import SYNERGIES from '../data/synergies.js';
 import SynergyEngine from '../src/SynergyEngine.js';
+import StatDisplay from '../src/StatDisplay.js';
 
 // Baseline gameState with discardCount=1 (no bonus/penalty) for out-rate tests
 const BASELINE_STATE = { discardCount: 1 };
@@ -4153,6 +4154,55 @@ group('27. Productive groundout');
     if (result.productiveOut) triggered++;
   }
   assert(triggered === 0, `Productive out never triggers on flyout (got ${triggered})`);
+}
+
+group('28. Stat Display Conversion');
+
+{
+  // toAVG: contact 1 → ~.150, contact 10 → ~.400, jittered by name
+  const avg1 = StatDisplay.toAVG(1, 'Test Player');
+  assert(avg1 >= 0.130 && avg1 <= 0.170, `toAVG(1) in range: ${avg1}`);
+  const avg10 = StatDisplay.toAVG(10, 'Test Player');
+  assert(avg10 >= 0.385 && avg10 <= 0.415, `toAVG(10) in range: ${avg10}`);
+
+  // toHR: power 1 → ~0, power 10 → ~60
+  const hr1 = StatDisplay.toHR(1, 'Test Player');
+  assert(hr1 >= 0 && hr1 <= 5, `toHR(1) in range: ${hr1}`);
+  const hr10 = StatDisplay.toHR(10, 'Test Player');
+  assert(hr10 >= 57 && hr10 <= 63, `toHR(10) in range: ${hr10}`);
+
+  // toSB: speed 1 → ~0, speed 10 → ~80
+  const sb1 = StatDisplay.toSB(1, 'Test Player');
+  assert(sb1 >= 0 && sb1 <= 5, `toSB(1) in range: ${sb1}`);
+  const sb10 = StatDisplay.toSB(10, 'Test Player');
+  assert(sb10 >= 76 && sb10 <= 84, `toSB(10) in range: ${sb10}`);
+
+  // Deterministic: same name+stat always returns same value
+  const a = StatDisplay.toAVG(7, 'Moose Leblanc');
+  const b = StatDisplay.toAVG(7, 'Moose Leblanc');
+  assert(a === b, 'toAVG is deterministic for same name');
+
+  // Different names produce different values (with high probability)
+  const c = StatDisplay.toAVG(7, 'Moose Leblanc');
+  const d = StatDisplay.toAVG(7, 'Tank Morrison');
+  assert(c !== d, 'toAVG differs for different names');
+
+  // Format helpers
+  const avgStr = StatDisplay.fmtAVG(8, 'Test Player');
+  assert(avgStr.startsWith('.'), `fmtAVG starts with dot: ${avgStr}`);
+  assert(avgStr.length === 4, `fmtAVG is 4 chars (.XXX): ${avgStr}`);
+
+  const hrStr = StatDisplay.fmtHR(7, 'Test Player');
+  assert(!isNaN(parseInt(hrStr)), `fmtHR is a number: ${hrStr}`);
+
+  const sbStr = StatDisplay.fmtSB(9, 'Test Player');
+  assert(!isNaN(parseInt(sbStr)), `fmtSB is a number: ${sbStr}`);
+
+  // Full stat line helper
+  const line = StatDisplay.statLine({ power: 8, contact: 7, speed: 6, name: 'Buck Fournier' });
+  assert(line.includes('AVG:'), `statLine has AVG: ${line}`);
+  assert(line.includes('HR:'), `statLine has HR: ${line}`);
+  assert(line.includes('SB:'), `statLine has SB: ${line}`);
 }
 
 // ═══════════════════════════════════════════════════════
