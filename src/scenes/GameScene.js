@@ -11,6 +11,7 @@ import CountManager from '../CountManager.js';
 import SituationalEngine from '../SituationalEngine.js';
 import SoundManager from '../SoundManager.js';
 import SynergyEngine from '../SynergyEngine.js';
+import StatDisplay from '../StatDisplay.js';
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const CARD_ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
@@ -363,9 +364,9 @@ export default class GameScene extends Phaser.Scene {
     const pos = batter.pos ? ` | ${batter.pos}` : '';
     this.batterNumText.setText(`#${idx + 1} in lineup${pos}`);
 
-    this.batterPwrText.setText(`PWR  ${this._statBar(batter.power)}`);
-    this.batterCntText.setText(`CNT  ${this._statBar(batter.contact)}`);
-    this.batterSpdText.setText(`SPD  ${this._statBar(batter.speed)}`);
+    this.batterPwrText.setText(`HR  ${StatDisplay.fmtHR(batter.power, batter.name)}  ${this._statBar(batter.power)}`);
+    this.batterCntText.setText(`AVG ${StatDisplay.fmtAVG(batter.contact, batter.name)}  ${this._statBar(batter.contact)}`);
+    this.batterSpdText.setText(`SB  ${StatDisplay.fmtSB(batter.speed, batter.name)}  ${this._statBar(batter.speed)}`);
 
     // Trait mini-cards
     this._clearTraitSprites(this.batterTraitSprites);
@@ -1141,7 +1142,7 @@ export default class GameScene extends Phaser.Scene {
       }).setDepth(52));
 
       const batsLabel = player.bats === 'L' ? 'L' : 'R';
-      els.push(this.add.text(rosterX + 12, y + 20, `${batsLabel}  PWR:${player.power} CNT:${player.contact} SPD:${player.speed}`, {
+      els.push(this.add.text(rosterX + 12, y + 20, `${batsLabel}  ${StatDisplay.statLine(player)}`, {
         fontSize: '10px', fontFamily: 'monospace', color: '#81c784',
       }).setDepth(52));
 
@@ -2626,7 +2627,7 @@ export default class GameScene extends Phaser.Scene {
       runningPeanuts += bonuses.powerPeanuts;
       const batter = this.rosterManager.getCurrentBatter();
       steps.push({
-        text: `+${bonuses.powerPeanuts} peanuts (PWR ${batter.power})`,
+        text: `+${bonuses.powerPeanuts} peanuts (${StatDisplay.fmtHR(batter.power, batter.name)} HR)`,
         color: '#ff8a65',
       });
     }
@@ -2636,7 +2637,7 @@ export default class GameScene extends Phaser.Scene {
       runningMult = Math.round((runningMult + bonuses.contactMult) * 10) / 10;
       const batter = this.rosterManager.getCurrentBatter();
       steps.push({
-        text: `+${bonuses.contactMult.toFixed(1)}x (CNT ${batter.contact})`,
+        text: `+${bonuses.contactMult.toFixed(1)}x (${StatDisplay.fmtAVG(batter.contact, batter.name)} AVG)`,
         color: '#64b5f6',
       });
     }
@@ -3009,7 +3010,7 @@ export default class GameScene extends Phaser.Scene {
           if (batter.power >= (eff.threshold || 8)) {
             const bonus = Math.round((handResult.mult * eff.value - handResult.mult) * 10) / 10;
             bonuses.multBonus += bonus;
-            bonuses.messages.push({ text: `x${eff.value} mult (PWR ${batter.power})`, color: '#ff8a65' });
+            bonuses.messages.push({ text: `x${eff.value} mult (${StatDisplay.fmtHR(batter.power, batter.name)} HR)`, color: '#ff8a65' });
           }
           break;
         }
