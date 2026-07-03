@@ -51,6 +51,9 @@ function checkCondition(cond, evalResult, gameState) {
     case 'losing_by':
       return gameState.opponentScore - gameState.playerScore >= cond.value;
 
+    case 'winning_by':
+      return gameState.playerScore - gameState.opponentScore >= cond.value;
+
     case 'first_batter_of_inning':
       return gameState.atBatsThisInning === 0;
 
