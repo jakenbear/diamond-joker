@@ -564,6 +564,16 @@ group('1f. Trait Effects via EffectEngine');
   assert(uncapped.mult === 1.5, 'cap_mult: mult 1.5 below cap is unchanged');
 }
 {
+  // Post: scale_mult reduces proportionally, floors at 1, rounds to 1 decimal
+  const big = { outcome: 'Home Run', handName: 'Straight', peanuts: 4, mult: 6 };
+  const scaled = EffectEngine.applyPost({ ...big }, { type: 'scale_mult', value: 0.75 }, {});
+  assert(scaled.mult === 4.5, 'scale_mult: mult 6 * 0.75 = 4.5');
+
+  const out = { outcome: 'Groundout', handName: 'Groundout', peanuts: 0, mult: 1 };
+  const floored = EffectEngine.applyPost({ ...out }, { type: 'scale_mult', value: 0.75 }, {});
+  assert(floored.mult === 1, 'scale_mult: mult 1 stays 1 (floor)');
+}
+{
   // Conditions: always
   assert(checkCondition({ type: 'always' }, {}, {}) === true, 'condition: always = true');
 }

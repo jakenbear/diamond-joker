@@ -202,6 +202,13 @@ const POST_HANDLERS = {
     return { ...result, mult: Math.min(result.mult, effect.value) };
   },
 
+  /** Scale the multiplier by a fraction (hurts big hands more); floors at 1 */
+  scale_mult(result, effect, gameState) {
+    if (!checkCondition(effect.condition, result, gameState)) return result;
+    const scaled = Math.max(1, Math.round(result.mult * effect.value * 10) / 10);
+    return { ...result, mult: scaled };
+  },
+
   /** Add peanuts per runner on base */
   per_runner_peanuts(result, effect, gameState) {
     const runners = gameState.bases.filter(b => b).length;
