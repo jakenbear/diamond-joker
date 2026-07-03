@@ -545,6 +545,8 @@ When the opponent bats, each at-bat is a **Texas Hold'em-style poker showdown** 
 2. **Turn** — 4th community card. Player picks another pitch ability.
 3. **River** — 5th community card. Player picks final pitch ability.
 
+**Interactivity:** Targeted pitches (fastball, slider, cutter, splitter, twoseam, breaking) let the player pick which card to hit — a suggested target is highlighted; click to change it, then CONFIRM (or CANCEL). A live hand read shows each side's current best hand (`YOU:` full, `OPP (visible):` from cards you can see) so the player can read the board. Effects animate on the affected card, and a tap skips post-effect pauses.
+
 Each pitch in the pitcher's 4-pitch repertoire is a **board manipulation ability** (one use per at-bat):
 
 | Pitch | Effect |
