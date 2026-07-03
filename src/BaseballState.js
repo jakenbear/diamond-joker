@@ -166,8 +166,10 @@ export default class BaseballState {
         description = `Fielder's Choice - Out ${this.outs}`;
       } else {
         this.outs++;
-        // Force play: groundout with runner on 1st forces all runners to advance
-        if (outcome === 'Groundout' && this.bases[0]) {
+        // Force play: groundout with runner on 1st forces all runners to advance.
+        // But if this groundout is the 3rd out, the inning is over the instant the
+        // batter is retired at first — no runners advance and no runs score (MLB 5.08(a)).
+        if (outcome === 'Groundout' && this.bases[0] && this.outs < 3) {
           const forceRuns = this._advanceForced();
           if (forceRuns > 0) {
             if (this.half === 'top') this.playerScore += forceRuns;

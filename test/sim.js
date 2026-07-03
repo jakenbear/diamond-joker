@@ -773,6 +773,32 @@ group('1g. BaseballState');
   assert(bs.bases.every(b => !b), 'Bases cleared after HR');
 }
 {
+  // Force play that records the 3rd out must NOT score runs (MLB 5.08(a):
+  // no run scores when the third out is the batter forced at first).
+  const bs = new BaseballState();
+  bs.half = 'top';
+  bs.bases = [true, true, true]; // bases loaded
+  bs.outs = 2;
+  const r = bs.resolveOutcome('Groundout');
+  assert(bs.outs === 0, 'Force-play 3rd out: inning ends (outs reset to 0)');
+  assert(bs.state === 'SWITCH_SIDE', 'Force-play 3rd out: state SWITCH_SIDE');
+  assert(r.runsScored === 0, 'Force-play 3rd out: no runs score');
+  assert(bs.playerScore === 0, 'Force-play 3rd out: player score unchanged');
+  assert(!/scored/.test(r.description) && !/runners advance/.test(r.description),
+    'Force-play 3rd out: description does not claim runners advance');
+  assert(bs.bases.every(b => !b), 'Force-play 3rd out: bases cleared');
+}
+{
+  // Sanity: force play with < 2 outs SHOULD still score the runner from 3rd.
+  const bs = new BaseballState();
+  bs.half = 'top';
+  bs.bases = [true, true, true];
+  bs.outs = 0;
+  const r = bs.resolveOutcome('Groundout');
+  assert(r.runsScored === 1, 'Force-play with 0 outs: runner on 3rd scores');
+  assert(bs.playerScore === 1, 'Force-play with 0 outs: player score +1');
+}
+{
   // processSacrificeFly: runner on 3rd scores + caller handles out
   const bs = new BaseballState();
   bs.bases = [false, false, true];
