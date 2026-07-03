@@ -1167,7 +1167,11 @@ export default class PitchingScene extends Phaser.Scene {
       scaleY: info.kind === 'destroy' ? 0.1 : 1.15,
       duration: 260,
       ease: 'Quad.easeOut',
-      onComplete: () => { flash.destroy(); onComplete(); },
+      onComplete: () => {
+        if (flash.scene) flash.destroy();
+        // Guard against scene teardown mid-tween: only advance if still active.
+        if (this.scene && this.scene.isActive()) onComplete();
+      },
     });
   }
 
