@@ -1080,6 +1080,8 @@ export default class PitchingScene extends Phaser.Scene {
 
   /** Commit a pitch with resolved options: apply, feedback, render, advance. */
   _commitPitch(pitchKey, stage, opts) {
+    this._lastTargetIdx = opts.targetIndex !== undefined ? opts.targetIndex
+      : (opts.swapIndex !== undefined ? opts.swapIndex : 0);
     const result = this.showdownEngine.applyPitch(pitchKey, opts);
     const pitch = PITCH_TYPES[pitchKey];
     if (result.success) {
@@ -1089,8 +1091,12 @@ export default class PitchingScene extends Phaser.Scene {
       this.handNameText.setText(`${pitch.name} failed: ${result.reason}`);
       this.handNameText.setColor('#ff5252');
     }
-    this._renderShowdownBoard();
-    this._pauseThenAdvance(stage, pitchKey, 800);
+    // A misfire may have redirected the actually-hit community index.
+    if (result.misfired && opts.targetIndex !== undefined) this._lastTargetIdx = opts.targetIndex;
+    this._animatePitchEffect(pitchKey, result, () => {
+      this._renderShowdownBoard();
+      this._pauseThenAdvance(stage, pitchKey, 400);
+    });
   }
 
   /** Wait `ms`, then advance the stage. */
@@ -1098,6 +1104,70 @@ export default class PitchingScene extends Phaser.Scene {
     this._advanceTimer = this.time.delayedCall(ms, () => {
       this._advanceTimer = null;
       this._advanceShowdownStage(stage, pitchKey);
+    });
+  }
+
+  /** Map a pitch to an animation kind + the board row it affects. */
+  _pitchAnimKind(pitchKey) {
+    const map = {
+      fastball:  { kind: 'swap',      owner: 'pitcher' },
+      slider:    { kind: 'swap',      owner: 'community' },
+      screwball: { kind: 'swap',      owner: 'batter' },
+      twoseam:   { kind: 'swap',      owner: 'community' },
+      palmball:  { kind: 'plant',     owner: 'community' },
+      changeup:  { kind: 'reveal',    owner: 'batter' },
+      curveball: { kind: 'downgrade', owner: 'batter' },
+      sinker:    { kind: 'downgrade', owner: 'community' },
+      breaking:  { kind: 'flip',      owner: 'community' },
+      cutter:    { kind: 'lock',      owner: 'community' },
+      splitter:  { kind: 'destroy',   owner: 'community' },
+      knuckle:   { kind: 'scramble',  owner: 'community' },
+      wild_thing:{ kind: 'scramble',  owner: 'community' },
+    };
+    return map[pitchKey] || null;
+  }
+
+  /**
+   * Play a brief flash animation over the affected card, then call onComplete.
+   * Overlay-only — never destroys board sprites (the re-render in onComplete does that).
+   */
+  _animatePitchEffect(pitchKey, result, onComplete) {
+    const info = this._pitchAnimKind(pitchKey);
+    if (!info) { onComplete(); return; }
+
+    const state = this.showdownEngine.getState();
+    const pos = (owner, idx) => {
+      if (owner === 'community') {
+        const n = state.community.length;
+        return { x: 640 - (n - 1) * 65 + idx * 130, y: 290 };
+      }
+      if (owner === 'pitcher') return { x: 580 + idx * 120, y: 480 };
+      return { x: 580 + idx * 120, y: 120 }; // batter
+    };
+
+    // Index of the affected card. Targeted pitches use the committed target
+    // (this._lastTargetIdx); internally-random pitches animate a representative index 0.
+    let idx = 0;
+    if (this._lastTargetIdx !== undefined && this._lastTargetIdx !== null) idx = this._lastTargetIdx;
+    // Clamp to a valid position for the owner row.
+    const rowLen = info.owner === 'community' ? state.community.length
+      : (info.owner === 'pitcher' ? state.pitcherHole.length : state.batterHole.length);
+    if (idx >= rowLen) idx = 0;
+
+    const { x, y } = pos(info.owner, idx);
+    const colorByKind = {
+      swap: 0x64b5f6, plant: 0x2e7d32, reveal: 0xffd600, downgrade: 0xff5252,
+      flip: 0x1e88e5, lock: 0xffd600, destroy: 0xff5252, scramble: 0x00838f,
+    };
+    const flash = this.add.rectangle(x, y, 100, 130, colorByKind[info.kind] || 0xffffff, 0.55).setDepth(12);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      scaleX: info.kind === 'destroy' ? 0.1 : 1.15,
+      scaleY: info.kind === 'destroy' ? 0.1 : 1.15,
+      duration: 260,
+      ease: 'Quad.easeOut',
+      onComplete: () => { flash.destroy(); onComplete(); },
     });
   }
 
