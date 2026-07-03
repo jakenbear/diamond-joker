@@ -13,6 +13,8 @@
  *   add_mult             — add/subtract mult                     { value, condition? }
  *   add_peanuts            — add/subtract peanuts                    { value, condition? }
  *   force_groundout      — convert weak hands to groundout       { condition }
+ *   cap_mult             — ceiling the mult                       { value, condition? }
+ *   scale_mult           — multiply the mult by a fraction        { value, condition? }
  *   compound             — apply multiple effects in sequence    { effects: [] }
  */
 export default [
@@ -113,5 +115,131 @@ export default [
     rarity: 'rare',
     phase: 'pitcher_post',
     effect: { type: 'add_mult', value: -3, condition: { type: 'inning_range', min: 7, max: 9 } },
+  },
+  // ── Expansion: Common ──
+  {
+    id: 'sinker',
+    name: 'Sinker',
+    description: '40% chance your highest card loses 2 ranks.',
+    rarity: 'common',
+    phase: 'pitcher_pre',
+    effect: { type: 'downgrade_highest', chance: 0.4, amount: 2 },
+  },
+  {
+    id: 'cutter',
+    name: 'Cutter',
+    description: '-1 peanut on all hits.',
+    rarity: 'common',
+    phase: 'pitcher_post',
+    effect: { type: 'add_peanuts', value: -1, condition: { type: 'peanuts_gte', value: 1 } },
+  },
+  {
+    id: 'sinkerballer',
+    name: 'Sinkerballer',
+    description: 'Pairs/Two Pair -2 mult. But Straights/Flushes get +2 peanuts.',
+    rarity: 'common',
+    phase: 'pitcher_post',
+    effect: {
+      type: 'compound',
+      effects: [
+        { type: 'add_mult', value: -2, condition: { type: 'hand_in', values: ['Pair', 'Two Pair'] } },
+        { type: 'add_peanuts', value: 2, condition: { type: 'hand_in', values: ['Straight', 'Flush'] } },
+      ],
+    },
+  },
+  {
+    id: 'fireballer',
+    name: 'Fireballer',
+    description: '-2 mult in innings 1-3 (fresh and dominant).',
+    rarity: 'common',
+    phase: 'pitcher_post',
+    effect: { type: 'add_mult', value: -2, condition: { type: 'inning_range', min: 1, max: 3 } },
+  },
+  {
+    id: 'backfoot_slider',
+    name: 'Backfoot Slider',
+    description: 'Face cards (J/Q/K) lose 1 rank.',
+    rarity: 'common',
+    phase: 'pitcher_pre',
+    effect: { type: 'downgrade_face_cards', amount: 1 },
+  },
+  // ── Expansion: Uncommon ──
+  {
+    id: 'junkballer',
+    name: 'Junkballer',
+    description: 'All mult capped at 4. But every hit gets +1 peanut.',
+    rarity: 'uncommon',
+    phase: 'pitcher_post',
+    effect: {
+      type: 'compound',
+      effects: [
+        { type: 'cap_mult', value: 4 },
+        { type: 'add_peanuts', value: 1, condition: { type: 'peanuts_gte', value: 1 } },
+      ],
+    },
+  },
+  {
+    id: 'bulldog',
+    name: 'Bulldog',
+    description: 'When you have the lead, -3 mult.',
+    rarity: 'uncommon',
+    phase: 'pitcher_post',
+    effect: { type: 'add_mult', value: -3, condition: { type: 'winning_by', value: 1 } },
+  },
+  {
+    id: 'wild_thing',
+    name: 'Wild Thing',
+    description: '50% chance two of your cards swap ranks. Chaos!',
+    rarity: 'uncommon',
+    phase: 'pitcher_pre',
+    effect: { type: 'swap_random', chance: 0.5 },
+  },
+  {
+    id: 'splitter',
+    name: 'Splitter',
+    description: 'Three of a Kind and better get -2 mult.',
+    rarity: 'uncommon',
+    phase: 'pitcher_post',
+    effect: {
+      type: 'add_mult', value: -2,
+      condition: { type: 'hand_in', values: ['Three of a Kind', 'Full House', 'Four of a Kind', 'Straight Flush', 'Royal Flush'] },
+    },
+  },
+  {
+    id: 'escape_artist',
+    name: 'Escape Artist',
+    description: 'Bases loaded -5 mult. Bases empty +1 mult.',
+    rarity: 'uncommon',
+    phase: 'pitcher_post',
+    effect: {
+      type: 'compound',
+      effects: [
+        { type: 'add_mult', value: -5, condition: { type: 'bases_loaded' } },
+        { type: 'add_mult', value: 1, condition: { type: 'bases_empty' } },
+      ],
+    },
+  },
+  // ── Expansion: Rare ──
+  {
+    id: 'frontline_ace',
+    name: 'Frontline Ace',
+    description: 'All mult scaled to 75% (big hands hurt most).',
+    rarity: 'rare',
+    phase: 'pitcher_post',
+    effect: { type: 'scale_mult', value: 0.75 },
+  },
+  {
+    id: 'rally_killer',
+    name: 'Rally Killer',
+    description: 'Runners on base -4 mult. But bases empty +2 peanuts.',
+    rarity: 'rare',
+    phase: 'pitcher_post',
+    effect: {
+      type: 'compound',
+      effects: [
+        { type: 'add_mult', value: -4, condition: { type: 'bases_occupied' } },
+        { type: 'add_peanuts', value: 2, condition: { type: 'bases_empty' } },
+      ],
+    },
   },
 ];

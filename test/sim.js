@@ -573,6 +573,42 @@ group('1f. Trait Effects via EffectEngine');
   const floored = EffectEngine.applyPost({ ...out }, { type: 'scale_mult', value: 0.75 }, {});
   assert(floored.mult === 1, 'scale_mult: mult 1 stays 1 (floor)');
 }
+group('1f-pitcher. Expanded Pitcher Traits');
+{
+  // 8 original + 12 new = 20, all unique ids
+  assert(PITCHER_TRAITS.length === 20, `PITCHER_TRAITS has 20 entries (got ${PITCHER_TRAITS.length})`);
+  const ids = PITCHER_TRAITS.map(t => t.id);
+  assert(new Set(ids).size === ids.length, 'PITCHER_TRAITS ids are all unique');
+
+  // Every trait has the required shape
+  const shapeOk = PITCHER_TRAITS.every(t =>
+    t.id && t.name && t.description && t.rarity &&
+    (t.phase === 'pitcher_pre' || t.phase === 'pitcher_post') && t.effect);
+  assert(shapeOk, 'Every pitcher trait has id/name/description/rarity/phase/effect');
+
+  // sinkerballer (double-edged): -2 mult on Pair, +2 peanuts on Straight
+  const sinkerballer = PITCHER_TRAITS.find(t => t.id === 'sinkerballer');
+  assert(!!sinkerballer, 'sinkerballer trait exists');
+  const pairRes = EffectEngine.applyPost(
+    { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 }, sinkerballer.effect, { outs: 0 });
+  assert(pairRes.mult === 1, 'sinkerballer: Pair mult 1.5 - 2 floors to 1');
+  const straightRes = EffectEngine.applyPost(
+    { outcome: 'Home Run', handName: 'Straight', peanuts: 4, mult: 4 }, sinkerballer.effect, { outs: 0 });
+  assert(straightRes.peanuts === 6, 'sinkerballer: Straight peanuts 4 + 2 = 6');
+
+  // rally_killer (double-edged): -4 mult when bases occupied, +2 peanuts when empty
+  const rallyKiller = PITCHER_TRAITS.find(t => t.id === 'rally_killer');
+  assert(!!rallyKiller, 'rally_killer trait exists');
+  const occupied = EffectEngine.applyPost(
+    { outcome: 'Double', handName: 'Flush', peanuts: 5, mult: 5 }, rallyKiller.effect,
+    { bases: [{ name: 'R' }, false, false] });
+  assert(occupied.mult === 1, 'rally_killer: mult 5 - 4 = 1 with a runner on (object runner)');
+  const empty = EffectEngine.applyPost(
+    { outcome: 'Double', handName: 'Flush', peanuts: 5, mult: 5 }, rallyKiller.effect,
+    { bases: [false, false, false] });
+  assert(empty.peanuts === 7, 'rally_killer: peanuts 5 + 2 = 7 with bases empty');
+  assert(empty.mult === 5, 'rally_killer: mult unchanged when bases empty');
+}
 {
   // Conditions: always
   assert(checkCondition({ type: 'always' }, {}, {}) === true, 'condition: always = true');
