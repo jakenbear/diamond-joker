@@ -1101,10 +1101,25 @@ export default class PitchingScene extends Phaser.Scene {
 
   /** Wait `ms`, then advance the stage. */
   _pauseThenAdvance(stage, pitchKey, ms) {
+    this._pendingStage = stage;
+    this._pendingPitch = pitchKey;
+    this.input.once('pointerdown', this._skipPause, this);
     this._advanceTimer = this.time.delayedCall(ms, () => {
+      this.input.off('pointerdown', this._skipPause, this);
       this._advanceTimer = null;
       this._advanceShowdownStage(stage, pitchKey);
     });
+  }
+
+  /** If a post-effect pause is pending, tapping skips the remaining wait. */
+  _skipPause() {
+    if (this._advanceTimer) {
+      const t = this._advanceTimer;
+      this._advanceTimer = null;
+      this.input.off('pointerdown', this._skipPause, this);
+      t.remove(false);
+      this._advanceShowdownStage(this._pendingStage, this._pendingPitch);
+    }
   }
 
   /** Map a pitch to an animation kind + the board row it affects. */
@@ -1296,21 +1311,31 @@ export default class PitchingScene extends Phaser.Scene {
     this._destroyPitchButtons();
     this._destroyTargeting();
     if (currentStage === 'flop') {
-      this._interStageTimer = this.time.delayedCall(300, () => this._dealShowdownTurn());
+      this._interStageTimer = this.time.delayedCall(150, () => this._dealShowdownTurn());
     } else if (currentStage === 'turn') {
-      this._interStageTimer = this.time.delayedCall(300, () => this._dealShowdownRiver());
+      this._interStageTimer = this.time.delayedCall(150, () => this._dealShowdownRiver());
     } else {
-      this._interStageTimer = this.time.delayedCall(300, () => this._resolveShowdown());
+      this._interStageTimer = this.time.delayedCall(150, () => this._resolveShowdown());
     }
   }
 
   _resolveShowdown() {
     this._destroyPitchButtons();
+    this._destroyTargeting();
     const result = this.showdownEngine.resolve();
 
     // Reveal batter cards on the existing board first
     this.showdownEngine._revealedBatterCards = [0, 1];
     this._renderShowdownBoard();
+
+    // Tension beat: pulse a "who won the hand" label at the winner's row.
+    const winnerY = result.winner === 'pitcher' ? 480 : 120;
+    const beat = this.add.text(760, winnerY, result.winner === 'pitcher' ? 'YOU WIN THE HAND' : 'BATTER WINS', {
+      fontSize: '14px', fontFamily: 'monospace',
+      color: result.winner === 'pitcher' ? '#69f0ae' : '#ff8a80', fontStyle: 'bold',
+    }).setOrigin(0, 0.5).setDepth(20);
+    this.tweens.add({ targets: beat, scaleX: 1.15, scaleY: 1.15, duration: 250, yoyo: true, repeat: 1,
+      onComplete: () => beat.destroy() });
 
     // After a beat, animate into the showdown comparison layout
     this.time.delayedCall(600, () => this._animateShowdownReveal(result));
