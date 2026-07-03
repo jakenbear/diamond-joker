@@ -819,6 +819,25 @@ export default class PitchingScene extends Phaser.Scene {
       const revealed = state.revealedBatterCards.includes(i);
       this._renderCardOnBoard(x, batterY, card, revealed, false, 'batter');
     });
+
+    this._renderHandRead();
+  }
+
+  /** Draw the live "who's winning" hand read near each hole row. */
+  _renderHandRead() {
+    if (!this.showdownEngine || !this.showdownEngine.community) return;
+    // Only meaningful once the flop is out
+    if (this.showdownEngine.community.length === 0) return;
+    const youName = this.showdownEngine.getBestHandName('pitcher');
+    const oppName = this.showdownEngine.getBestHandName('batter');
+    // YOU read — near the pitcher hole row (y 480)
+    this._boardElements.push(this.add.text(760, 480, `YOU: ${youName}`, {
+      fontSize: '13px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
+    }).setOrigin(0, 0.5).setDepth(6));
+    // OPP read — near the batter hole row (y 120). "(visible)" because hidden hole cards may understate it.
+    this._boardElements.push(this.add.text(760, 120, `OPP (visible): ${oppName}`, {
+      fontSize: '13px', fontFamily: 'monospace', color: '#ff8a80', fontStyle: 'bold',
+    }).setOrigin(0, 0.5).setDepth(6));
   }
 
   _renderCardOnBoard(x, y, card, faceUp, locked, owner) {
