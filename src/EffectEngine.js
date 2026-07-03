@@ -33,6 +33,9 @@ function checkCondition(cond, evalResult, gameState) {
     case 'bases_empty':
       return !gameState.bases[0] && !gameState.bases[1] && !gameState.bases[2];
 
+    case 'bases_occupied':
+      return !!(gameState.bases[0] || gameState.bases[1] || gameState.bases[2]);
+
     case 'outcome_is':
       return evalResult.outcome === cond.value;
 

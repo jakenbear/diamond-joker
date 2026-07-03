@@ -580,6 +580,12 @@ group('1f. Trait Effects via EffectEngine');
   assert(checkCondition({ type: 'winning_by', value: 1 }, {}, { playerScore: 2, opponentScore: 5 }) === false, 'condition: winning_by false when losing');
 }
 {
+  // Conditions: bases_occupied (truthiness — works for object runners, not just === true)
+  assert(checkCondition({ type: 'bases_occupied' }, {}, { bases: [true, false, false] }) === true, 'condition: bases_occupied true with a true runner');
+  assert(checkCondition({ type: 'bases_occupied' }, {}, { bases: [null, { name: 'Batter' }, null] }) === true, 'condition: bases_occupied true with an object runner');
+  assert(checkCondition({ type: 'bases_occupied' }, {}, { bases: [false, false, false] }) === false, 'condition: bases_occupied false when empty');
+}
+{
   // Empty Yard trait: +4 mult ONLY when bases are empty (regression: used to always fire)
   const emptyYard = BATTER_TRAITS.find(t => t.id === 'empty_yard');
   assert(!!emptyYard, 'Empty Yard trait exists');
