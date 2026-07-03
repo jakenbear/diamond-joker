@@ -568,6 +568,9 @@ Best 5-card hand from each side (2 hole + 5 community). Winner determined by han
 - **Batter wins** → Hit (Single / Double / Triple / HR based on margin)
 - **Tie** → Groundout (pitcher favored)
 
+### Pitcher Traits in the Showdown
+Every pitcher trait (see the Pitcher Traits table) is translated into showdown terms — either a flat/conditional bonus to the pitcher's hand score or a card manipulation (downgrade a batter hole card, scramble/swap community cards). Conditional traits read the live at-bat state: outs, inning, whether the pitcher's team leads, and whether runners are on base.
+
 ### Pitcher Stats
 - **Velocity** → Deck quality (higher ranks)
 - **Control** → Pitch effect accuracy

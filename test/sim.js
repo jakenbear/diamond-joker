@@ -4203,6 +4203,77 @@ group('25l. ShowdownEngine — start() accepts outs and inning');
   assert(sd.inning === 7, 'inning stored correctly');
 }
 
+group('25m. ShowdownEngine — start() accepts pitcherLeadBy and basesOccupied');
+{
+  const sd = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5 });
+  sd.start(null, 0, 1, 3, true);
+  assert(sd.pitcherLeadBy === 3, 'pitcherLeadBy stored correctly');
+  assert(sd.basesOccupied === true, 'basesOccupied stored correctly');
+  // Defaults when omitted
+  const sd2 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5 });
+  sd2.start();
+  assert(sd2.pitcherLeadBy === 0, 'pitcherLeadBy defaults to 0');
+  assert(sd2.basesOccupied === false, 'basesOccupied defaults to false');
+}
+
+group('25n. ShowdownEngine — expansion pitcher trait bonuses');
+{
+  // Helper: build an engine with given traits + state, deal full board, resolve.
+  const mk = (traits, { outs = 0, inning = 1, lead = 0, occupied = false } = {}) => {
+    const eng = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits });
+    eng.start(null, outs, inning, lead, occupied);
+    eng.dealFlop(); eng.dealTurn(); eng.dealRiver();
+    return eng.resolve().traitBonus;
+  };
+
+  // Flat bonuses
+  assert(mk(['cutter']) === 1, 'cutter = +1 flat');
+  assert(mk(['sinkerballer']) === 2, 'sinkerballer = +2 flat');
+  assert(mk(['junkballer']) === 2, 'junkballer = +2 flat');
+  assert(mk(['frontline_ace']) === 2, 'frontline_ace = +2 flat');
+
+  // fireballer: +2 in innings 1-3, 0 otherwise
+  assert(mk(['fireballer'], { inning: 2 }) === 2, 'fireballer inning 2 = +2');
+  assert(mk(['fireballer'], { inning: 6 }) === 0, 'fireballer inning 6 = 0');
+
+  // splitter: +2 at 2 outs, 0 otherwise
+  assert(mk(['splitter'], { outs: 2 }) === 2, 'splitter 2 outs = +2');
+  assert(mk(['splitter'], { outs: 0 }) === 0, 'splitter 0 outs = 0');
+
+  // bulldog: +3 when pitcher's team leads (lead >= 1), 0 otherwise
+  assert(mk(['bulldog'], { lead: 1 }) === 3, 'bulldog with lead = +3');
+  assert(mk(['bulldog'], { lead: 0 }) === 0, 'bulldog tied/behind = 0');
+
+  // escape_artist: +4 bases loaded (occupied), +1 empty
+  assert(mk(['escape_artist'], { occupied: true }) === 4, 'escape_artist bases occupied = +4');
+  assert(mk(['escape_artist'], { occupied: false }) === 1, 'escape_artist bases empty = +1');
+
+  // rally_killer: +3 when runners on, 0 when empty
+  assert(mk(['rally_killer'], { occupied: true }) === 3, 'rally_killer runners on = +3');
+  assert(mk(['rally_killer'], { occupied: false }) === 0, 'rally_killer bases empty = 0');
+
+  // RNG-based traits (sinker, backfoot_slider, wild_thing) return a numeric bonus without error
+  for (const t of ['sinker', 'backfoot_slider', 'wild_thing']) {
+    const eng = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: [t] });
+    eng.start();
+    eng.dealFlop(); eng.dealTurn(); eng.dealRiver();
+    const r = eng.resolve();
+    assert(typeof r.traitBonus === 'number' && !Number.isNaN(r.traitBonus), `${t} resolves with numeric traitBonus`);
+  }
+
+  // sinker actually downgrades the batter's best hole card sometimes (statistical, 100 tries)
+  let sinkerFired = 0;
+  for (let i = 0; i < 100; i++) {
+    const eng = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: ['sinker'] });
+    eng.start();
+    eng.batterHole = [{ rank: 14, suit: 'H' }, { rank: 13, suit: 'S' }];
+    eng.dealFlop(); eng.dealTurn(); eng.dealRiver();
+    eng.resolve();
+    if (eng.batterHole[0].rank < 14) sinkerFired++;
+  }
+  assert(sinkerFired > 5 && sinkerFired < 95, `sinker downgrades batter card ~30% of the time (got ${sinkerFired}/100)`);
+}
+
 // ═══════════════════════════════════════════════════════
 // 26. Home Run Descriptions
 // ═══════════════════════════════════════════════════════

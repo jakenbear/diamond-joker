@@ -645,7 +645,14 @@ export default class PitchingScene extends Phaser.Scene {
     const batter = this.rosterManager.opponentRoster[this.rosterManager.opponentBatterIndex];
 
     this.showdownEngine = new ShowdownEngine(pitcher);
-    this.showdownEngine.start(batter, this._pitchState.outs, this._pitchState.inning);
+    // Live game state for score/base-aware pitcher traits. The pitcher is MY team
+    // (on defense), so lead = playerScore - live opponent score.
+    const status = this.baseball.getStatus();
+    const liveOppScore = status.opponentScore + this._pitchState.runs;
+    const pitcherLeadBy = status.playerScore - liveOppScore;
+    const basesOccupied = this._pitchState.bases.some(b => b);
+    this.showdownEngine.start(
+      batter, this._pitchState.outs, status.inning, pitcherLeadBy, basesOccupied);
     if (this._pitchState.atBatNumber > 1) {
       this.showdownEngine.degradeDeck(this._pitchState.atBatNumber);
     }

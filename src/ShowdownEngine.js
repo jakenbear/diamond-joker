@@ -59,9 +59,13 @@ export default class ShowdownEngine {
     this.pitcherTraits = pitcher.traits || [];
   }
 
-  start(batterStats = null, outs = 0, inning = 1) {
+  start(batterStats = null, outs = 0, inning = 1, pitcherLeadBy = 0, basesOccupied = false) {
     this.outs = outs;
     this.inning = inning;
+    // pitcherLeadBy: how many runs the PITCHER'S team is ahead by (negative if behind).
+    // basesOccupied: whether any runner is on base this at-bat.
+    this.pitcherLeadBy = pitcherLeadBy;
+    this.basesOccupied = basesOccupied;
     this.pitcherDeck = ShowdownEngine.generateDeck(this.pitcher.velocity, this.pitcher.control);
     const batterVel = batterStats ? (batterStats.contact * 0.6 + batterStats.power * 0.4) : 5;
     this.batterDeck = ShowdownEngine.generateDeck(batterVel, 5);
@@ -208,7 +212,10 @@ export default class ShowdownEngine {
 
   /**
    * Calculate pitcher score bonus from traits.
-   * Translates batting-scene pitcher traits into showdown score bonuses.
+   * Translates every batting-scene pitcher trait into showdown terms — either a
+   * flat/conditional score bonus for the pitcher or a card manipulation. Conditional
+   * traits read this.outs / this.inning / this.pitcherLeadBy / this.basesOccupied,
+   * set in start().
    */
   _calcTraitBonus() {
     let bonus = 0;
@@ -239,6 +246,53 @@ export default class ShowdownEngine {
           if (this.community.length > 0) {
             const ci = Math.floor(Math.random() * this.community.length);
             this.community[ci].suit = SUITS[Math.floor(Math.random() * 4)];
+          }
+          break;
+
+        // ── Expansion traits (translated to showdown terms) ──
+        case 'cutter':        bonus += 1; break;
+        case 'sinkerballer':  bonus += 2; break;
+        case 'junkballer':    bonus += 2; break;
+        case 'frontline_ace': bonus += 2; break;
+        case 'fireballer':
+          if (this.inning >= 1 && this.inning <= 3) bonus += 2;
+          break;
+        case 'splitter':
+          if (this.outs === 2) bonus += 2;
+          break;
+        case 'bulldog':
+          // Pitcher's team is ahead → bear down
+          if (this.pitcherLeadBy >= 1) bonus += 3;
+          break;
+        case 'escape_artist':
+          bonus += this.basesOccupied ? 4 : 1;
+          break;
+        case 'rally_killer':
+          if (this.basesOccupied) bonus += 3;
+          break;
+        case 'sinker':
+          // 30% chance to downgrade batter's best hole card -2 (softer Curveball)
+          if (Math.random() < 0.3) {
+            const idx = this.batterHole[0].rank >= this.batterHole[1].rank ? 0 : 1;
+            this.batterHole[idx].rank = Math.max(2, this.batterHole[idx].rank - 2);
+          }
+          break;
+        case 'backfoot_slider':
+          // 30% chance to randomize one community card's suit (softer Knuckleball)
+          if (Math.random() < 0.3 && this.community.length > 0) {
+            const ci = Math.floor(Math.random() * this.community.length);
+            this.community[ci].suit = SUITS[Math.floor(Math.random() * 4)];
+          }
+          break;
+        case 'wild_thing':
+          // 50% chance to swap two community card ranks (chaos — can help the batter)
+          if (Math.random() < 0.5 && this.community.length >= 2) {
+            const a = Math.floor(Math.random() * this.community.length);
+            let b = Math.floor(Math.random() * (this.community.length - 1));
+            if (b >= a) b++;
+            const tmp = this.community[a].rank;
+            this.community[a].rank = this.community[b].rank;
+            this.community[b].rank = tmp;
           }
           break;
       }
