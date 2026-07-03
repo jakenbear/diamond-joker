@@ -855,6 +855,7 @@ export default class PitchingScene extends Phaser.Scene {
   // ── Pitch Ability Selection ─────────────────────────────
 
   _showPitchAbilities(stage) {
+    this._selectingPitch = false;
     this._destroyPitchButtons();
     this._pitchButtons = [];
 
@@ -1002,6 +1003,7 @@ export default class PitchingScene extends Phaser.Scene {
           });
         });
         cardBg.on('pointerdown', () => {
+          if (this._selectingPitch) return;
           // Mark wild as used for this at-bat
           this.showdownEngine.pitchesUsed.push('_wild');
           this._onShowdownPitchSelected(rolledKey, stage);
@@ -1033,6 +1035,11 @@ export default class PitchingScene extends Phaser.Scene {
   }
 
   _onShowdownPitchSelected(pitchKey, stage) {
+    // Guard against a double-click firing the selection twice before the
+    // buttons are destroyed / the stage advances. Reset in _showPitchAbilities.
+    if (this._selectingPitch) return;
+    this._selectingPitch = true;
+
     this._destroyPitchButtons();
     SoundManager.pitchSelect();
 

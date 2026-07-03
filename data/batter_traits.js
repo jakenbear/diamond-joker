@@ -366,12 +366,7 @@ export default [
     rarity: 'uncommon',
     phase: 'post',
     effect: {
-      type: 'compound',
-      effects: [
-        { type: 'add_mult', value: 4, condition: { type: 'and', conditions: [
-          { type: 'outs_neq', value: -1 },  // always true (trick to check no runners)
-        ]}},
-      ],
+      type: 'add_mult', value: 4, condition: { type: 'bases_empty' },
     },
   },
   {

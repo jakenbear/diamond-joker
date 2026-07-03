@@ -568,6 +568,22 @@ group('1f. Trait Effects via EffectEngine');
   assert(checkCondition({ type: 'bases_loaded' }, {}, { bases: [true, false, true] }) === false, 'condition: bases_loaded = false');
 }
 {
+  // Conditions: bases_empty
+  assert(checkCondition({ type: 'bases_empty' }, {}, { bases: [false, false, false] }) === true, 'condition: bases_empty = true when no runners');
+  assert(checkCondition({ type: 'bases_empty' }, {}, { bases: [false, true, false] }) === false, 'condition: bases_empty = false with a runner on 2nd');
+  assert(checkCondition({ type: 'bases_empty' }, {}, { bases: [true, true, true] }) === false, 'condition: bases_empty = false when loaded');
+}
+{
+  // Empty Yard trait: +4 mult ONLY when bases are empty (regression: used to always fire)
+  const emptyYard = BATTER_TRAITS.find(t => t.id === 'empty_yard');
+  assert(!!emptyYard, 'Empty Yard trait exists');
+  const evalResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 };
+  const empty = EffectEngine.applyPost({ ...evalResult }, emptyYard.effect, { bases: [false, false, false] });
+  assert(empty.mult === 5.5, 'Empty Yard: +4 mult when bases empty');
+  const occupied = EffectEngine.applyPost({ ...evalResult }, emptyYard.effect, { bases: [true, false, false] });
+  assert(occupied.mult === 1.5, 'Empty Yard: NO bonus when a runner is on base');
+}
+{
   // Conditions: or
   const cond = { type: 'or', conditions: [
     { type: 'outs_eq', value: 0 },
