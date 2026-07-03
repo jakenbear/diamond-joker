@@ -1209,6 +1209,11 @@ export default class GameScene extends Phaser.Scene {
     this.playBtn = this._makeButton(500, BUTTON_Y, 'PLAY', 0x2e7d32, () => this._onPlay());
     this.discardBtn = this._makeButton(640, BUTTON_Y, 'DISCARD', 0xf57f17, () => this._onDiscard());
 
+    // "X / max selected" counter — on the button row, left of PLAY, above the card layer
+    this.selectionCounterText = this.add.text(355, BUTTON_Y, '', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#b0bec5', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(20).setAlpha(0);
+
     // Hand reference "?" button
     const helpBg = this.add.rectangle(1240, BUTTON_Y, 40, 40, 0x333333)
       .setStrokeStyle(1, 0x555555)
@@ -1382,8 +1387,8 @@ export default class GameScene extends Phaser.Scene {
     savedSelection.forEach(idx => {
       const cs = this.cardSprites[idx];
       if (cs) {
-        cs.glow.setAlpha(0.7);
-        const lift = 20;
+        cs.glow.setAlpha(1.0);
+        const lift = 28;
         cs.bg.y = cs.y - lift;
         cs.rankText.y = cs.rankY - lift;
         cs.suitText.y = cs.suitY - lift;
@@ -1391,6 +1396,7 @@ export default class GameScene extends Phaser.Scene {
       }
     });
     this.selectedIndices = savedSelection;
+    this._updateSelectionCounter();
   }
 
   _clearCardsKeepSelection() {
@@ -1415,6 +1421,7 @@ export default class GameScene extends Phaser.Scene {
     this.cardSprites = [];
     this.selectedIndices.clear();
     this._displayToHand = {};
+    this._updateSelectionCounter();
   }
 
   _renderHand() {
@@ -1461,6 +1468,7 @@ export default class GameScene extends Phaser.Scene {
       if (this.inputLocked) return;
       this._toggleSelect(index);
     });
+    this._addCardHover(bg, index);
 
     const allParts = [bg, rankText, suitText, glow];
     allParts.forEach(p => {
@@ -1500,23 +1508,55 @@ export default class GameScene extends Phaser.Scene {
       if (this.inputLocked) return;
       this._toggleSelect(index);
     });
+    this._addCardHover(bg, index);
 
     const rankY = y - 20;
     const suitY = y + 25;
     this.cardSprites.push({ bg, rankText, suitText, glow, x, y, rankY, suitY });
   }
 
+  /** Hover feedback for a card's bg image. Skips when locked or already selected. */
+  _addCardHover(bg, index) {
+    const baseScaleX = bg.scaleX;
+    const baseScaleY = bg.scaleY;
+    bg.on('pointerover', () => {
+      // Skip while the card is still dealing in (alpha ramp) or locked/selected —
+      // killing the deal-in tween here would leave the card stuck faded.
+      if (this.inputLocked || this.selectedIndices.has(index) || bg.alpha < 1) return;
+      SoundManager.cardHover();
+      this.tweens.killTweensOf(bg);
+      this.tweens.add({
+        targets: bg,
+        scaleX: baseScaleX * 1.05, scaleY: baseScaleY * 1.05,
+        duration: 90, ease: 'Quad.easeOut',
+      });
+      bg.setTint(0xfff2b0);
+    });
+    bg.on('pointerout', () => {
+      if (this.selectedIndices.has(index) || bg.alpha < 1) return;
+      this.tweens.killTweensOf(bg);
+      this.tweens.add({
+        targets: bg,
+        scaleX: baseScaleX, scaleY: baseScaleY,
+        duration: 90, ease: 'Quad.easeOut',
+      });
+      bg.clearTint();
+    });
+  }
+
   _toggleSelect(index) {
     const cs = this.cardSprites[index];
-    const lift = 20;
+    const lift = 28;
+    const baseScaleX = CARD_W / 32;
+    const baseScaleY = CARD_H / 42;
 
     if (this.selectedIndices.has(index)) {
       this.selectedIndices.delete(index);
       SoundManager.cardDeselect();
       cs.glow.setAlpha(0);
-      const targets = [cs.bg, cs.rankText, cs.suitText, cs.glow];
-      this.tweens.add({ targets, y: '-=0', duration: 1 }); // kill existing tweens
-      this.tweens.add({ targets: cs.bg,       y: cs.y,      duration: 150, ease: 'Back.easeOut' });
+      cs.bg.clearTint();
+      this.tweens.killTweensOf([cs.bg, cs.rankText, cs.suitText, cs.glow]);
+      this.tweens.add({ targets: cs.bg,       y: cs.y,      scaleX: baseScaleX, scaleY: baseScaleY, duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.rankText,  y: cs.rankY,  duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.suitText,  y: cs.suitY,  duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.glow,      y: cs.y,      duration: 150, ease: 'Back.easeOut' });
@@ -1524,8 +1564,10 @@ export default class GameScene extends Phaser.Scene {
       if (this.selectedIndices.size >= (this.maxCardSelection || 5)) return;
       this.selectedIndices.add(index);
       SoundManager.cardSelect();
-      cs.glow.setAlpha(0.7);
-      // Bounce up with slight scale pop
+      cs.bg.clearTint();
+      cs.glow.setAlpha(1.0);
+      this.tweens.killTweensOf([cs.bg, cs.rankText, cs.suitText, cs.glow]);
+      // Bounce up with a scale pop
       this.tweens.add({ targets: cs.bg,       y: cs.y - lift,      duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.rankText,  y: cs.rankY - lift,  duration: 150, ease: 'Back.easeOut' });
       this.tweens.add({ targets: cs.suitText,  y: cs.suitY - lift,  duration: 150, ease: 'Back.easeOut' });
@@ -1533,16 +1575,32 @@ export default class GameScene extends Phaser.Scene {
       // Quick scale pop on the card
       const popTargets = [cs.rankText, cs.suitText, cs.glow];
       this.tweens.add({
-        targets: popTargets, scaleX: 1.08, scaleY: 1.08,
-        duration: 80, yoyo: true, ease: 'Quad.easeOut',
+        targets: popTargets, scaleX: 1.14, scaleY: 1.14,
+        duration: 90, yoyo: true, ease: 'Quad.easeOut',
       });
       this.tweens.add({
-        targets: cs.bg, scaleX: cs.bg.scaleX * 1.08, scaleY: cs.bg.scaleY * 1.08,
-        duration: 80, yoyo: true, ease: 'Quad.easeOut',
+        targets: cs.bg, scaleX: baseScaleX * 1.14, scaleY: baseScaleY * 1.14,
+        duration: 90, yoyo: true, ease: 'Quad.easeOut',
       });
     }
 
     this._updateHandPreview();
+    this._updateSelectionCounter();
+  }
+
+  /** Update the "X / max selected" counter above the PLAY button. */
+  _updateSelectionCounter() {
+    if (!this.selectionCounterText) return;
+    const count = this.selectedIndices.size;
+    const max = this.maxCardSelection || 5;
+    if (count === 0) {
+      this.selectionCounterText.setAlpha(0);
+      return;
+    }
+    const atMax = count >= max;
+    this.selectionCounterText.setText(`${count} / ${max} selected`);
+    this.selectionCounterText.setColor(atMax ? '#ffd600' : '#b0bec5');
+    this.selectionCounterText.setAlpha(1);
   }
 
   /** Live hand preview - shows what poker hand the selected cards form */
@@ -1861,6 +1919,8 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(300, () => {
         this._setResultText('HIT BY PITCH!', '', '#ffab40');
         this.resultText.setAlpha(1);
+        SoundManager.hbp();
+        this.cameras.main.shake(120, 0.003);
         this.tweens.add({
           targets: this.resultText,
           scale: { from: 1.3, to: 1 },
@@ -1913,21 +1973,29 @@ export default class GameScene extends Phaser.Scene {
     const batter = this.rosterManager.getCurrentBatter();
     const pitchResult = this.countManager.recordDiscard(pitcher.velocity, pitcher.control, batter.contact);
 
-    // Build callout text from count result
+    // Build callout text from count result — with distinct SFX + screen flash per outcome
     let calloutText = '';
     let calloutColor = '#ff5252';
     if (pitchResult.isBall) {
       calloutText = `BALL ${this.countManager.getCount().balls}!`;
       calloutColor = '#66bb6a';
+      SoundManager.ball();
+      this.cameras.main.flash(120, 40, 140, 40);
     } else if (pitchResult.isFoul) {
       calloutText = 'FOUL!';
       calloutColor = '#ffab40';
+      SoundManager.foul();
     } else if (pitchResult.isStrikeout) {
       calloutText = 'STRIKE 3!';
       calloutColor = '#ff5252';
+      SoundManager.strike();
+      this.cameras.main.flash(140, 160, 40, 40);
+      this.cameras.main.shake(150, 0.004);
     } else if (pitchResult.isStrike) {
       calloutText = `STRIKE ${this.countManager.getCount().strikes}!`;
       calloutColor = '#ff5252';
+      SoundManager.strike();
+      this.cameras.main.flash(120, 140, 40, 40);
     }
 
     this._setResultText(calloutText, '', calloutColor);
@@ -1955,6 +2023,7 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(800, () => {
         this._setResultText('WALK!', '', '#66bb6a');
         this.resultText.setAlpha(1);
+        SoundManager.walk();
         this.tweens.add({ targets: this.resultText, scale: { from: 1.3, to: 1 }, duration: 300, ease: 'Back.easeOut' });
 
         const walkBatter = this.rosterManager.getCurrentBatter();
@@ -2608,7 +2677,7 @@ export default class GameScene extends Phaser.Scene {
   /** Show scoring cascade: base hand → power → contact → trait → pitcher → staff → lineup → synergy → final */
   _showScoringCascade(handResult, bonuses, pitcherPenalty, batterTraitMsg, staffBonuses = null, lineupBonuses = null, synergyBonuses = null) {
     const steps = [];
-    const stepDelay = 350;
+    const stepDelay = 250;
     let runningPeanuts = handResult.peanuts - bonuses.powerPeanuts + pitcherPenalty.peanuts;
     let runningMult = handResult.mult - bonuses.contactMult + pitcherPenalty.mult;
 

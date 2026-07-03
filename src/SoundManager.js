@@ -121,6 +121,34 @@ const SoundManager = {
     setTimeout(() => tone(440, 0.2, 'sine', 0.04), 240);
   },
 
+  /** Hit-by-pitch — dull thud */
+  hbp() {
+    tone(140, 0.12, 'triangle', 0.06);
+    noise(0.06, 0.03);
+  },
+
+  /** Ball called — soft, low rising blip (batter lays off) */
+  ball() {
+    tone(360, 0.06, 'sine', 0.045);
+    setTimeout(() => tone(460, 0.06, 'sine', 0.04), 55);
+  },
+
+  /** Strike called — sharp high tick */
+  strike() {
+    tone(920, 0.05, 'square', 0.055);
+  },
+
+  /** Foul ball — quick noisy whoosh */
+  foul() {
+    tone(500, 0.07, 'triangle', 0.045);
+    noise(0.05, 0.025);
+  },
+
+  /** Card hover — very subtle tick */
+  cardHover() {
+    tone(720, 0.02, 'sine', 0.02);
+  },
+
   /** Casino spin tick — single beep at given pitch */
   spinTick(freq = 800) {
     tone(freq, 0.04, 'square', 0.06);
