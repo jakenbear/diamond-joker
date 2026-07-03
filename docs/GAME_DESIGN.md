@@ -387,16 +387,28 @@ Internal math always uses raw 1-10 values.
 
 These are assigned to the opposing pitcher and affect YOUR at-bats:
 
-| Trait | Effect |
-|-------|--------|
-| Heater | Low pairs auto-groundout; triples+ get +2 peanuts |
-| Curveball | 30% chance highest card loses 3 ranks |
-| Slider | -1 mult on all hands; -2 mult with 2 outs |
-| Knuckleball | Face cards (J/Q/K) lose 2 ranks |
-| Intimidation | -2 mult at 0 outs; +2 mult at 2 outs |
-| Painted Corner | High pairs/two pair get -1 peanut |
-| Changeup | 25% chance two cards swap ranks |
-| Closer's Instinct | -3 mult in innings 7–9 |
+| Trait | Rarity | Effect |
+|-------|--------|--------|
+| Heater | Common | Low pairs auto-groundout; triples+ get +2 peanuts |
+| Curveball | Uncommon | 30% chance highest card loses 3 ranks |
+| Slider | Common | -1 mult on all hands; -2 mult with 2 outs |
+| Knuckleball | Uncommon | Face cards (J/Q/K) lose 2 ranks |
+| Intimidation | Common | -2 mult at 0 outs; +2 mult at 2 outs |
+| Painted Corner | Uncommon | High pairs/two pair get -1 peanut |
+| Changeup | Rare | 25% chance two cards swap ranks |
+| Closer's Instinct | Rare | -3 mult in innings 7–9 |
+| Sinker | Common | 40% chance highest card loses 2 ranks |
+| Cutter | Common | -1 peanut on all hits |
+| Sinkerballer | Common | Pairs/Two Pair -2 mult; Straights/Flushes +2 peanuts |
+| Fireballer | Common | -2 mult in innings 1–3 |
+| Backfoot Slider | Common | Face cards lose 1 rank |
+| Junkballer | Uncommon | All mult capped at 4; every hit +1 peanut |
+| Bulldog | Uncommon | -3 mult when you have the lead |
+| Wild Thing | Uncommon | 50% chance two cards swap ranks |
+| Splitter | Uncommon | Three of a Kind+ get -2 mult |
+| Escape Artist | Uncommon | Bases loaded -5 mult; bases empty +1 mult |
+| Frontline Ace | Rare | All mult scaled to 75% |
+| Rally Killer | Rare | Runners on base -4 mult; bases empty +2 peanuts |
 
 ---
 
