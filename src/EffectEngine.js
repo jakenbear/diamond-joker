@@ -196,6 +196,12 @@ const POST_HANDLERS = {
     return { ...result, peanuts: Math.max(0, result.peanuts + effect.value) };
   },
 
+  /** Cap the multiplier at a ceiling (control pitcher limiting damage) */
+  cap_mult(result, effect, gameState) {
+    if (!checkCondition(effect.condition, result, gameState)) return result;
+    return { ...result, mult: Math.min(result.mult, effect.value) };
+  },
+
   /** Add peanuts per runner on base */
   per_runner_peanuts(result, effect, gameState) {
     const runners = gameState.bases.filter(b => b).length;

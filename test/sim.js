@@ -554,6 +554,16 @@ group('1f. Trait Effects via EffectEngine');
   assert(r2.mult === 5.5, 'compound: +4 mult at 2 outs');
 }
 {
+  // Post: cap_mult ceilings the mult, leaves lower mults alone
+  const high = { outcome: 'Home Run', handName: 'Straight', peanuts: 4, mult: 6 };
+  const capped = EffectEngine.applyPost({ ...high }, { type: 'cap_mult', value: 4 }, {});
+  assert(capped.mult === 4, 'cap_mult: mult 6 capped to 4');
+
+  const low = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 };
+  const uncapped = EffectEngine.applyPost({ ...low }, { type: 'cap_mult', value: 4 }, {});
+  assert(uncapped.mult === 1.5, 'cap_mult: mult 1.5 below cap is unchanged');
+}
+{
   // Conditions: always
   assert(checkCondition({ type: 'always' }, {}, {}) === true, 'condition: always = true');
 }
