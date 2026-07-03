@@ -4301,6 +4301,38 @@ group('25o. ShowdownEngine — getBestHandName');
   assert(sd.getBestHandName('batter') === 'Pair', `batter revealed 7 + community 7 = Pair (got ${sd.getBestHandName('batter')})`);
 }
 
+group('25p. ShowdownEngine — getSuggestedTarget');
+{
+  const sd = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5 });
+  sd.start();
+  sd.community = [{ rank: 5, suit: 'C' }, { rank: 13, suit: 'D' }, { rank: 9, suit: 'H' }];
+
+  // Community-target pitch → highest-rank unlocked, face-up index (the K at index 1)
+  assert(sd.getSuggestedTarget('slider') === 1, `slider suggests highest card idx 1 (got ${sd.getSuggestedTarget('slider')})`);
+
+  // Lock index 1 → next highest is the 9 at index 2
+  sd.lockedIndices = [1];
+  assert(sd.getSuggestedTarget('slider') === 2, `slider skips locked, suggests idx 2 (got ${sd.getSuggestedTarget('slider')})`);
+
+  // Face-down index 2 as well → only index 0 eligible
+  sd.faceDownIndices = [2];
+  assert(sd.getSuggestedTarget('slider') === 0, `slider skips locked+facedown, suggests idx 0 (got ${sd.getSuggestedTarget('slider')})`);
+
+  // All community ineligible → null
+  sd.lockedIndices = [0, 1, 2];
+  sd.faceDownIndices = [];
+  assert(sd.getSuggestedTarget('slider') === null, 'slider returns null when nothing eligible');
+
+  // fastball → weaker pitcher hole index
+  const sd2 = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5 });
+  sd2.start();
+  sd2.pitcherHole = [{ rank: 12, suit: 'H' }, { rank: 4, suit: 'S' }];
+  assert(sd2.getSuggestedTarget('fastball') === 1, `fastball suggests weaker hole idx 1 (got ${sd2.getSuggestedTarget('fastball')})`);
+
+  // Non-targeted pitch → null
+  assert(sd2.getSuggestedTarget('sinker') === null, 'non-targeted pitch returns null');
+}
+
 // ═══════════════════════════════════════════════════════
 // 26. Home Run Descriptions
 // ═══════════════════════════════════════════════════════

@@ -545,6 +545,30 @@ export default class ShowdownEngine {
     return best.originalHand || best.handName;
   }
 
+  /**
+   * Index the auto-picker would target for a pitch, or null if not targeted /
+   * nothing eligible. Community pitches → highest-rank unlocked, face-up card.
+   * fastball → weaker pitcher hole card index.
+   * @param {string} pitchKey
+   * @returns {number|null}
+   */
+  getSuggestedTarget(pitchKey) {
+    if (pitchKey === 'fastball') {
+      return this.pitcherHole[0].rank <= this.pitcherHole[1].rank ? 0 : 1;
+    }
+    const communityTargets = ['slider', 'cutter', 'splitter', 'twoseam', 'breaking'];
+    if (!communityTargets.includes(pitchKey)) return null;
+    let bestIdx = null, bestRank = -1;
+    this.community.forEach((c, i) => {
+      const eligible = !this.lockedIndices.includes(i) && !this.faceDownIndices.includes(i);
+      if (eligible && c.rank > bestRank) {
+        bestRank = c.rank;
+        bestIdx = i;
+      }
+    });
+    return bestIdx;
+  }
+
   // ── Helpers ─────────────────────────────────────────────
 
   _shuffle(arr) {
