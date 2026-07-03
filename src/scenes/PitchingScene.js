@@ -882,6 +882,7 @@ export default class PitchingScene extends Phaser.Scene {
 
   _showPitchAbilities(stage) {
     this._selectingPitch = false;
+    this._destroyTargeting();
     this._destroyPitchButtons();
     this._pitchButtons = [];
 
@@ -1061,37 +1062,25 @@ export default class PitchingScene extends Phaser.Scene {
   }
 
   _onShowdownPitchSelected(pitchKey, stage) {
-    // Guard against a double-click firing the selection twice before the
-    // buttons are destroyed / the stage advances. Reset in _showPitchAbilities.
     if (this._selectingPitch) return;
     this._selectingPitch = true;
-
     this._destroyPitchButtons();
     SoundManager.pitchSelect();
 
-    // For targeted effects, auto-pick a reasonable target
-    const state = this.showdownEngine.getState();
-    const opts = {};
-    if (['slider', 'cutter', 'splitter', 'twoseam', 'breaking'].includes(pitchKey)) {
-      // Target the community card that would help the batter most
-      // Simple heuristic: highest rank unlocked card
-      let bestIdx = 0, bestRank = -1;
-      state.community.forEach((c, i) => {
-        if (!state.lockedIndices.includes(i) && c.rank > bestRank) {
-          bestRank = c.rank;
-          bestIdx = i;
-        }
-      });
-      opts.targetIndex = bestIdx;
-    }
-    if (pitchKey === 'fastball') {
-      // Swap the weaker hole card
-      opts.swapIndex = state.pitcherHole[0].rank <= state.pitcherHole[1].rank ? 0 : 1;
-    }
+    const suggested = this.showdownEngine.getSuggestedTarget(pitchKey);
+    const isTargeted = suggested !== null &&
+      (pitchKey === 'fastball' || ['slider', 'cutter', 'splitter', 'twoseam', 'breaking'].includes(pitchKey));
 
+    if (isTargeted) {
+      this._enterTargeting(pitchKey, stage, suggested);
+    } else {
+      this._commitPitch(pitchKey, stage, {});
+    }
+  }
+
+  /** Commit a pitch with resolved options: apply, feedback, render, advance. */
+  _commitPitch(pitchKey, stage, opts) {
     const result = this.showdownEngine.applyPitch(pitchKey, opts);
-
-    // Show effect feedback
     const pitch = PITCH_TYPES[pitchKey];
     if (result.success) {
       this.handNameText.setText(`${pitch.name} — ${this._effectFeedback(pitchKey, result)}`);
@@ -1100,12 +1089,110 @@ export default class PitchingScene extends Phaser.Scene {
       this.handNameText.setText(`${pitch.name} failed: ${result.reason}`);
       this.handNameText.setColor('#ff5252');
     }
-
-    // Re-render board to show effect
     this._renderShowdownBoard();
+    this._pauseThenAdvance(stage, pitchKey, 800);
+  }
 
-    // Advance after brief pause
-    this.time.delayedCall(800, () => this._advanceShowdownStage(stage, pitchKey));
+  /** Wait `ms`, then advance the stage. */
+  _pauseThenAdvance(stage, pitchKey, ms) {
+    this._advanceTimer = this.time.delayedCall(ms, () => {
+      this._advanceTimer = null;
+      this._advanceShowdownStage(stage, pitchKey);
+    });
+  }
+
+  /** Show clickable target selection on the board with a suggested pick. */
+  _enterTargeting(pitchKey, stage, suggestedIdx) {
+    this._targeting = { pitchKey, stage, selectedIdx: suggestedIdx };
+    this._targetElements = [];
+
+    const isFastball = pitchKey === 'fastball';
+    const state = this.showdownEngine.getState();
+
+    this.resultText.setText(`${PITCH_TYPES[pitchKey].name} — pick a target, then CONFIRM`);
+    this.resultText.setColor('#ffe082');
+
+    const eligible = [];
+    if (isFastball) {
+      const holeStartX = 580, holeY = 480, holeSpacing = 120;
+      state.pitcherHole.forEach((c, i) => eligible.push({ i, x: holeStartX + i * holeSpacing, y: holeY }));
+    } else {
+      const commCount = state.community.length;
+      const commStartX = 640 - (commCount - 1) * 65, commY = 290;
+      state.community.forEach((c, i) => {
+        const locked = state.lockedIndices.includes(i);
+        const faceDown = state.faceDownIndices.includes(i);
+        if (!locked && !faceDown) eligible.push({ i, x: commStartX + i * 130, y: commY });
+      });
+    }
+
+    this._targetRings = {};
+    eligible.forEach(({ i, x, y }) => {
+      const ring = this.add.rectangle(x, y, 104, 134, 0x000000, 0)
+        .setStrokeStyle(3, 0x64b5f6).setDepth(8).setInteractive({ useHandCursor: true });
+      ring.on('pointerdown', () => this._selectTarget(i));
+      this._targetRings[i] = ring;
+      this._targetElements.push(ring);
+    });
+    this._paintTargetSelection();
+
+    const mkBtn = (x, label, color, cb) => {
+      const bg = this.add.rectangle(x, 650, 120, 40, color, 0.9).setDepth(9)
+        .setInteractive({ useHandCursor: true });
+      const txt = this.add.text(x, 650, label, {
+        fontSize: '15px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(10);
+      bg.on('pointerdown', cb);
+      this._targetElements.push(bg, txt);
+    };
+    mkBtn(560, 'CONFIRM', 0x2e7d32, () => this._confirmTarget());
+    mkBtn(720, 'CANCEL', 0x777777, () => this._cancelTargeting());
+  }
+
+  _selectTarget(idx) {
+    if (!this._targeting) return;
+    this._targeting.selectedIdx = idx;
+    this._paintTargetSelection();
+  }
+
+  /** Update ring colors: selected = gold pulse, others = blue. */
+  _paintTargetSelection() {
+    if (!this._targetRings) return;
+    Object.entries(this._targetRings).forEach(([i, ring]) => {
+      this.tweens.killTweensOf(ring);
+      ring.setScale(1);
+      if (Number(i) === this._targeting.selectedIdx) {
+        ring.setStrokeStyle(4, 0xffd600);
+        this.tweens.add({ targets: ring, scaleX: 1.06, scaleY: 1.06, duration: 400, yoyo: true, repeat: -1 });
+      } else {
+        ring.setStrokeStyle(3, 0x64b5f6);
+      }
+    });
+  }
+
+  _confirmTarget() {
+    if (!this._targeting) return;
+    const { pitchKey, stage, selectedIdx } = this._targeting;
+    const opts = pitchKey === 'fastball' ? { swapIndex: selectedIdx } : { targetIndex: selectedIdx };
+    this._destroyTargeting();
+    this._commitPitch(pitchKey, stage, opts);
+  }
+
+  _cancelTargeting() {
+    if (!this._targeting) return;
+    const stage = this._targeting.stage;
+    this._destroyTargeting();
+    this._selectingPitch = false;
+    this._showPitchAbilities(stage);
+  }
+
+  _destroyTargeting() {
+    if (this._targetElements) {
+      this._targetElements.forEach(el => { this.tweens.killTweensOf(el); el.destroy(); });
+      this._targetElements = null;
+    }
+    this._targetRings = null;
+    this._targeting = null;
   }
 
   _effectFeedback(key, result) {
@@ -1133,14 +1220,13 @@ export default class PitchingScene extends Phaser.Scene {
 
   _advanceShowdownStage(currentStage, pitchUsed) {
     this._destroyPitchButtons();
-
+    this._destroyTargeting();
     if (currentStage === 'flop') {
-      this.time.delayedCall(300, () => this._dealShowdownTurn());
+      this._interStageTimer = this.time.delayedCall(300, () => this._dealShowdownTurn());
     } else if (currentStage === 'turn') {
-      this.time.delayedCall(300, () => this._dealShowdownRiver());
+      this._interStageTimer = this.time.delayedCall(300, () => this._dealShowdownRiver());
     } else {
-      // River done — resolve
-      this.time.delayedCall(300, () => this._resolveShowdown());
+      this._interStageTimer = this.time.delayedCall(300, () => this._resolveShowdown());
     }
   }
 
