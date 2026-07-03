@@ -4274,6 +4274,33 @@ group('25n. ShowdownEngine — expansion pitcher trait bonuses');
   assert(sinkerFired > 5 && sinkerFired < 95, `sinker downgrades batter card ~30% of the time (got ${sinkerFired}/100)`);
 }
 
+group('25o. ShowdownEngine — getBestHandName');
+{
+  const sd = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5 });
+  sd.start();
+  sd.pitcherHole = [{ rank: 14, suit: 'H' }, { rank: 14, suit: 'S' }];
+  sd.batterHole = [{ rank: 7, suit: 'H' }, { rank: 2, suit: 'S' }];
+  sd.community = [
+    { rank: 14, suit: 'C' }, { rank: 9, suit: 'D' }, { rank: 5, suit: 'H' },
+    { rank: 3, suit: 'S' }, { rank: 8, suit: 'C' },
+  ];
+  // Pitcher has three Aces
+  assert(sd.getBestHandName('pitcher') === 'Three of a Kind', `pitcher best hand (got ${sd.getBestHandName('pitcher')})`);
+
+  // Batter read counts ONLY community when no hole cards revealed.
+  // Community alone: A,9,5,3,8 → High Card. Batter hole (7,2) hidden.
+  assert(sd.getBestHandName('batter') === 'High Card', `batter best hand hides hole cards (got ${sd.getBestHandName('batter')})`);
+
+  // Reveal batter hole card index 0 (the 7) → still High Card (A,9,8,7,5)
+  sd._revealedBatterCards = [0];
+  assert(sd.getBestHandName('batter') === 'High Card', 'batter read includes revealed hole card');
+
+  // Give batter a revealed pair with community: community includes a 7
+  sd.community = [{ rank: 7, suit: 'C' }, { rank: 9, suit: 'D' }, { rank: 5, suit: 'H' }];
+  sd._revealedBatterCards = [0]; // batterHole[0] is 7
+  assert(sd.getBestHandName('batter') === 'Pair', `batter revealed 7 + community 7 = Pair (got ${sd.getBestHandName('batter')})`);
+}
+
 // ═══════════════════════════════════════════════════════
 // 26. Home Run Descriptions
 // ═══════════════════════════════════════════════════════

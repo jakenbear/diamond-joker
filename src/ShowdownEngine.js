@@ -526,6 +526,25 @@ export default class ShowdownEngine {
     };
   }
 
+  /**
+   * Current best 5-card hand NAME for a side, from what is visible.
+   * Pitcher: full hole + community. Batter: only REVEALED hole cards + community.
+   * @param {'pitcher'|'batter'} owner
+   * @returns {string} handName (e.g. 'Pair', 'High Card')
+   */
+  getBestHandName(owner) {
+    let hole;
+    if (owner === 'pitcher') {
+      hole = this.pitcherHole;
+    } else {
+      hole = this.batterHole.filter((_, i) => this._revealedBatterCards.includes(i));
+    }
+    const best = ShowdownEngine.bestHand(hole, this.community);
+    if (!best) return 'High Card';
+    // CardEngine may convert Pair/etc to Groundout/Flyout; use originalHand if present
+    return best.originalHand || best.handName;
+  }
+
   // ── Helpers ─────────────────────────────────────────────
 
   _shuffle(arr) {
