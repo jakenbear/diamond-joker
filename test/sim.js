@@ -485,6 +485,36 @@ group('1f. Trait Effects via EffectEngine');
   assert(result[4].rank === 11, 'downgrade_highest: rank 14 → 11 (-3)');
 }
 {
+  // Pre: injected rng makes chance-based effects deterministic (preview == play).
+  const cards = makeCards([[3,'H'],[7,'D'],[10,'C'],[12,'S'],[14,'H']]);
+  const effect = { type: 'downgrade_highest', chance: 0.4, amount: 2 };
+  // rng always returns 0.1 (< 0.4) → the effect FIRES; two identical calls agree.
+  const fires = () => 0.1;
+  const r1 = EffectEngine.applyPre(cards, effect, fires);
+  const r2 = EffectEngine.applyPre(cards, effect, fires);
+  assert(r1[4].rank === 12, 'injected rng (fires): 14 → 12');
+  assert(r2[4].rank === 12, 'injected rng deterministic: same result on repeat');
+  // rng returns 0.9 (> 0.4) → effect does NOT fire.
+  const noFire = () => 0.9;
+  const r3 = EffectEngine.applyPre(cards, effect, noFire);
+  assert(r3[4].rank === 14, 'injected rng (no fire): 14 unchanged');
+}
+{
+  // Pre: swap_random with injected rng is deterministic
+  const cards = makeCards([[3,'H'],[7,'D'],[10,'C'],[12,'S'],[14,'H']]);
+  const effect = { type: 'swap_random', chance: 0.5 };
+  const noFire = () => 0.9; // > 0.5 → no swap
+  const r = EffectEngine.applyPre(cards, effect, noFire);
+  assert(r[0].rank === 3 && r[4].rank === 14, 'swap_random (no fire): order unchanged');
+}
+{
+  // Pre: omitting rng still works (defaults to Math.random) — deterministic chance=1.0
+  const cards = makeCards([[3,'H'],[7,'D'],[10,'C'],[12,'S'],[14,'H']]);
+  const effect = { type: 'downgrade_highest', chance: 1.0, amount: 3 };
+  const result = EffectEngine.applyPre(cards, effect); // no rng arg
+  assert(result[4].rank === 11, 'applyPre without rng still works');
+}
+{
   // Post: add_mult with outs_eq: 2 fires only at 2 outs
   const evalResult = { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 };
   const effect = { type: 'add_mult', value: 3, condition: { type: 'outs_eq', value: 2 } };

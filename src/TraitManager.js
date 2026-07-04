@@ -59,14 +59,14 @@ export default class TraitManager {
    * Build a pre-modifier function from traits with phase 'pre'.
    * Uses EffectEngine to interpret effect descriptors.
    */
-  static buildPreModifier(traits) {
+  static buildPreModifier(traits, rng) {
     const preTraits = traits.filter(t => t.phase === 'pre' && t.effect);
     if (preTraits.length === 0) return null;
 
     return (cards) => {
       let modified = cards;
       for (const trait of preTraits) {
-        modified = EffectEngine.applyPre(modified, trait.effect);
+        modified = EffectEngine.applyPre(modified, trait.effect, rng);
       }
       return modified;
     };
@@ -91,14 +91,14 @@ export default class TraitManager {
   /**
    * Build a pre-modifier from pitcher traits (phase 'pitcher_pre').
    */
-  static buildPitcherPreModifier(traits) {
+  static buildPitcherPreModifier(traits, rng) {
     const preTraits = traits.filter(t => t.phase === 'pitcher_pre' && t.effect);
     if (preTraits.length === 0) return null;
 
     return (cards) => {
       let modified = cards;
       for (const trait of preTraits) {
-        modified = EffectEngine.applyPre(modified, trait.effect);
+        modified = EffectEngine.applyPre(modified, trait.effect, rng);
       }
       return modified;
     };

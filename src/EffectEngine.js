@@ -131,8 +131,8 @@ const PRE_HANDLERS = {
   },
 
   /** Chance to upgrade lowest card's rank */
-  upgrade_lowest(cards, effect) {
-    if (Math.random() > (effect.chance || 0.2)) return cards;
+  upgrade_lowest(cards, effect, rng = Math.random) {
+    if (rng() > (effect.chance || 0.2)) return cards;
     let minIdx = 0;
     for (let i = 1; i < cards.length; i++) {
       if (cards[i].rank < cards[minIdx].rank) minIdx = i;
@@ -144,8 +144,8 @@ const PRE_HANDLERS = {
   },
 
   /** Chance to reduce highest card's rank */
-  downgrade_highest(cards, effect) {
-    if (Math.random() > (effect.chance || 0.3)) return cards;
+  downgrade_highest(cards, effect, rng = Math.random) {
+    if (rng() > (effect.chance || 0.3)) return cards;
     let maxIdx = 0;
     for (let i = 1; i < cards.length; i++) {
       if (cards[i].rank > cards[maxIdx].rank) maxIdx = i;
@@ -167,11 +167,11 @@ const PRE_HANDLERS = {
   },
 
   /** Chance to swap two random cards' ranks */
-  swap_random(cards, effect) {
-    if (Math.random() > (effect.chance || 0.25)) return cards;
+  swap_random(cards, effect, rng = Math.random) {
+    if (rng() > (effect.chance || 0.25)) return cards;
     if (cards.length < 2) return cards;
-    const i = Math.floor(Math.random() * cards.length);
-    let j = Math.floor(Math.random() * (cards.length - 1));
+    const i = Math.floor(rng() * cards.length);
+    let j = Math.floor(rng() * (cards.length - 1));
     if (j >= i) j++;
     const newCards = cards.map(c => ({ ...c }));
     const tmp = newCards[i].rank;
@@ -301,12 +301,15 @@ export default class EffectEngine {
    * Apply a pre-eval effect descriptor to cards.
    * @param {Object[]} cards - the cards array
    * @param {Object} effect - effect descriptor from data file
+   * @param {Function} [rng] - optional RNG (0..1) for chance-based effects.
+   *   Pass a seeded, per-at-bat RNG so the preview and the actual play roll
+   *   identically. Defaults to Math.random.
    * @returns {Object[]} modified cards
    */
-  static applyPre(cards, effect) {
+  static applyPre(cards, effect, rng = Math.random) {
     const handler = PRE_HANDLERS[effect.type];
     if (!handler) return cards;
-    return handler(cards, effect);
+    return handler(cards, effect, rng);
   }
 
   /**

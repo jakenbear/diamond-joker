@@ -132,6 +132,7 @@ Capped at 95% max out chance. Resets each half-inning.
 - `Pair of Kings → Single (62%)` — green (≥70%), gold (40–69%), orange (20–39%), red (<20%)
 - Percentage accounts for pitcher adjusts degradation automatically
 - Guaranteed hands (Four of a Kind+) show no percentage
+- If an opponent pitcher trait alters your cards before evaluation (e.g. Knuckleball, Sinker), the preview shows the **post-tamper** hand plus a `⚠ <TraitName>` tag so you know why. Chance-based pitcher/batter card traits are decided once per at-bat, so the preview always matches the actual play (no flicker). The survive/out roll remains uncertain — the preview only ever shows it as a percentage.
 
 ### Contact Rescue
 

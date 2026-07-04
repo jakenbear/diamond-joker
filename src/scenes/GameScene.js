@@ -1605,6 +1605,21 @@ export default class GameScene extends Phaser.Scene {
     this.selectionCounterText.setAlpha(1);
   }
 
+  /**
+   * Fresh deterministic RNG seeded from the current at-bat. Both the preview
+   * and the actual play call this to get identical chance-trait rolls, so the
+   * previewed hand always matches what gets played.
+   */
+  _makeAtBatRng() {
+    let a = (this._atBatSeed || 1) >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   /** Live hand preview - shows what poker hand the selected cards form */
   _updateHandPreview() {
     if (this.selectedIndices.size === 0) {
@@ -1638,8 +1653,10 @@ export default class GameScene extends Phaser.Scene {
     // Apply batter AND pitcher traits to preview so downgrade_face_cards etc. are reflected
     const batter = this.rosterManager.getCurrentBatter();
     const pitcher = this.rosterManager.getCurrentPitcher();
-    const batterPreMod = batter?.traits ? TraitManager.buildPreModifier(batter.traits) : null;
-    const pitcherPreMod = pitcher?.traits ? TraitManager.buildPitcherPreModifier(pitcher.traits) : null;
+    // Fresh per-at-bat RNG so chance-based traits preview exactly as they'll play.
+    const preRng = this._makeAtBatRng();
+    const batterPreMod = batter?.traits ? TraitManager.buildPreModifier(batter.traits, preRng) : null;
+    const pitcherPreMod = pitcher?.traits ? TraitManager.buildPitcherPreModifier(pitcher.traits, preRng) : null;
     const combinedPreMod = (batterPreMod || pitcherPreMod) ? (cards) => {
       let c = cards;
       if (pitcherPreMod) c = pitcherPreMod(c);
@@ -1648,6 +1665,22 @@ export default class GameScene extends Phaser.Scene {
     } : null;
     const result = CardEngine.evaluateHand(cards, combinedPreMod, null, evalState);
     const n = cards.length;
+
+    // Detect whether a pitcher pre-eval trait actually altered the selected cards,
+    // so we can warn the player their hand was tampered with. Uses a fresh RNG from
+    // the same at-bat seed → matches what evaluateHand just applied.
+    let pitcherTag = '';
+    if (pitcherPreMod) {
+      const detectMod = TraitManager.buildPitcherPreModifier(pitcher.traits, this._makeAtBatRng());
+      const modded = detectMod ? detectMod(cards.map(c => ({ ...c }))) : cards;
+      const changed = cards.some((c, i) => modded[i] && modded[i].rank !== c.rank);
+      if (changed) {
+        const traitNames = pitcher.traits
+          .filter(t => t.phase === 'pitcher_pre')
+          .map(t => t.name).join('/');
+        pitcherTag = `  ⚠ ${traitNames}`;
+      }
+    }
 
     // Resolve the true hand name (Groundout/Flyout → original hand)
     const trueHand = result.originalHand || result.handName;
@@ -1685,7 +1718,7 @@ export default class GameScene extends Phaser.Scene {
       else color = '#ff5252';                              // red — near-certain out
     }
 
-    this.handPreviewText.setText(preview);
+    this.handPreviewText.setText(preview + pitcherTag);
     this.handPreviewText.setColor(color);
     this.handPreviewText.setAlpha(1);
 
@@ -1852,6 +1885,11 @@ export default class GameScene extends Phaser.Scene {
   // ── Game Flow ─────────────────────────────────────────
 
   _startAtBat() {
+    // Seed for chance-based pre-eval traits (Sinker/Curveball/Changeup/Pinch Hitter).
+    // Preview and the actual play both build a fresh RNG from this seed, so the
+    // "did the downgrade fire" decision is fixed for the at-bat — no preview flicker,
+    // preview always matches play. (The survive/out roll is separate and stays uncertain.)
+    this._atBatSeed = Math.floor(Math.random() * 0x7fffffff) + 1;
     this._setResultText('');
     this.selectedIndices.clear();
     this.handPreviewText.setText('').setAlpha(0);
@@ -2171,17 +2209,24 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Build modifiers: batter traits + pitcher traits
-    const batterPreMod = TraitManager.buildPreModifier(batter.traits);
+    // Build modifiers: batter traits + pitcher traits.
+    // Chance-based pre-traits use a fresh RNG seeded from this at-bat so the result
+    // matches the preview. Each standalone invocation (detection, real eval) gets its
+    // own fresh RNG from the same seed; since the pitcher mod always runs first, all
+    // consumers draw identical rolls.
+    const playPreRng = this._makeAtBatRng();
+    const batterPreMod = TraitManager.buildPreModifier(batter.traits, playPreRng);
     const batterPostMod = TraitManager.buildPostModifier(batter.traits);
-    const pitcherPreMod = TraitManager.buildPitcherPreModifier(pitcher.traits);
+    const pitcherPreMod = TraitManager.buildPitcherPreModifier(pitcher.traits, playPreRng);
     const pitcherPostMod = TraitManager.buildPitcherPostModifier(pitcher.traits);
 
     // ── Detect pitcher pre-modifier effects for play-by-play ──
     const originalCards = selectedArr.map(i => this.cardEngine.hand[i]).filter(Boolean);
     let pitcherPreMessage = '';
-    if (pitcherPreMod) {
-      const modifiedCards = pitcherPreMod([...originalCards.map(c => ({ ...c }))]);
+    // Separate fresh RNG for the detection pass so it doesn't advance playPreRng.
+    const detectPitcherPreMod = TraitManager.buildPitcherPreModifier(pitcher.traits, this._makeAtBatRng());
+    if (detectPitcherPreMod) {
+      const modifiedCards = detectPitcherPreMod([...originalCards.map(c => ({ ...c }))]);
       const changes = [];
       for (let i = 0; i < originalCards.length; i++) {
         if (modifiedCards[i] && modifiedCards[i].rank !== originalCards[i].rank) {
