@@ -28,9 +28,10 @@ Inning Loop (per inning):
 ```
 
 ### End Conditions
-- After 9 innings: highest score wins
-- Tied after 9: extra innings until someone leads
-- Walk-off: if player takes the lead in bottom of 9th+, instant win
+- **Game length** is chosen at Team Select: **3, 5, 7, or 9 innings** (default 9).
+- After the chosen number of innings: highest score wins
+- Tied after regulation: extra innings until someone leads
+- Walk-off: if player takes the lead in the final regulation inning (or later), instant win
 
 ---
 

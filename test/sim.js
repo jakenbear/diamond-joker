@@ -931,6 +931,51 @@ group('1g. BaseballState');
   assert(bs.inning === 10, 'Inning is 10 (extras)');
 }
 {
+  // Configurable game length: default is 9 innings
+  const bs = new BaseballState();
+  assert(bs.totalInnings === 9, 'Default totalInnings is 9');
+}
+{
+  // 3-inning game ends after inning 3 (not 9)
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  for (let inning = 1; inning <= 3; inning++) {
+    bs.resolveOutcome('Strikeout');
+    bs.resolveOutcome('Strikeout');
+    bs.resolveOutcome('Strikeout');
+    bs.switchSide(inning === 2 ? 1 : 0); // opponent scores in inning 2 to break tie
+  }
+  assert(bs.state === 'GAME_OVER', '3-inning game: GAME_OVER after inning 3');
+  assert(bs.inning === 4, '3-inning game: inning counter is 4 (past 3)');
+}
+{
+  // 3-inning game tied after 3 → extras continue
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  for (let inning = 1; inning <= 3; inning++) {
+    bs.resolveOutcome('Strikeout');
+    bs.resolveOutcome('Strikeout');
+    bs.resolveOutcome('Strikeout');
+    bs.switchSide(0); // tied 0-0
+  }
+  assert(bs.state === 'BATTING', '3-inning game tied → extras continue');
+  assert(bs.inning === 4, '3-inning game tied: inning is 4 (extras)');
+}
+{
+  // Walk-off: short game, player takes the lead in final inning → GAME_OVER via walk-off
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  bs.inning = 3;
+  bs.half = 'top';
+  bs.opponentScore = 3;
+  bs.playerScore = 3;
+  bs.bases = [false, false, true]; // runner on 3rd scores on a single → 4-3 lead
+  const r = bs.resolveOutcome('Single');
+  assert(bs.playerScore === 4, 'walk-off: player took the lead 4-3');
+  assert(bs.state === 'GAME_OVER', 'walk-off in final inning of short game → GAME_OVER');
+  assert(/WALK-OFF/.test(r.description), 'walk-off description shown');
+}
+{
   // Double with runner on 1st → runner advances to 3rd (0+2=2), batter to 2nd
   const bs = new BaseballState();
   bs.bases = [true, false, false];

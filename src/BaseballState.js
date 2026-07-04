@@ -29,6 +29,7 @@ export default class BaseballState {
 
   reset() {
     this.inning = 1;
+    this.totalInnings = 9;   // Regulation length; set 3/5/7/9 at game start. Extras still apply if tied.
     this.half = 'top';       // 'top' = player bats, 'bottom' = opponent bats
     this.outs = 0;
     this.bases = [null, null, null]; // [1st, 2nd, 3rd] — null or batter object
@@ -100,7 +101,7 @@ export default class BaseballState {
    * Shop shows after every inning (except the last).
    */
   shouldShowShop() {
-    if (this.inning > 9) return false;
+    if (this.inning > this.totalInnings) return false;
     if (this.shopVisited.has(this.inning)) return false;
     return true;
   }
@@ -420,8 +421,8 @@ export default class BaseballState {
       this.straightsPlayedThisInning = 0;
       this.flushesPlayedThisInning = 0;
 
-      // Check game over after 9 innings
-      if (this.inning > 9 && this.playerScore !== this.opponentScore) {
+      // Check game over after regulation innings
+      if (this.inning > this.totalInnings && this.playerScore !== this.opponentScore) {
         this.state = 'GAME_OVER';
       } else {
         this.state = 'BATTING';
@@ -461,9 +462,9 @@ export default class BaseballState {
     return Math.min(runs, maxRuns);
   }
 
-  /** Check walk-off: bottom of 9th+, half is top (player), and player just took the lead */
+  /** Check walk-off: final regulation inning or later, player batting, and player just took the lead */
   _checkWalkOff() {
-    return this.inning >= 9 && this.half === 'top' && this.playerScore > this.opponentScore;
+    return this.inning >= this.totalInnings && this.half === 'top' && this.playerScore > this.opponentScore;
   }
 
   /** Get current game state summary */

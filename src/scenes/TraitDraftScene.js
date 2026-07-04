@@ -22,6 +22,7 @@ export default class TraitDraftScene extends Phaser.Scene {
     this.pitcherIndex = data.pitcherIndex;
     this.opponentTeam = data.opponentTeam;
     this.deckId = data.deckId || 'standard';
+    this.innings = data.innings || 9;
     this.picks = new Array(9).fill(null);
   }
 
@@ -194,6 +195,7 @@ export default class TraitDraftScene extends Phaser.Scene {
       pitcherIndex: this.pitcherIndex,
       opponentTeam: this.opponentTeam,
       deckId: this.deckId,
+      innings: this.innings,
       innateTraits: pickedTraits,
       showShowdowns: this._showShowdowns,
     });

@@ -34,6 +34,7 @@ export default class TeamSelectScene extends Phaser.Scene {
     this.selectedTeam = null;
     this.selectedPitcherIdx = 0;
     this.opponentTeam = null;
+    this.selectedInnings = 9;  // Game length: 3/5/7/9, chosen on the matchup screen
 
     this._showTeamCards();
   }
@@ -311,8 +312,38 @@ export default class TeamSelectScene extends Phaser.Scene {
     // Back button
     this._addBackButton(() => this._showOpponentPicker());
 
+    // ── Game length picker (3/5/7/9 innings) ──
+    const lenLabel = this.add.text(640, 452, 'GAME LENGTH', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#aaaaaa', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    this.elements.push(lenLabel);
+
+    const inningOptions = [3, 5, 7, 9];
+    const optW = 70, optGap = 12;
+    const rowW = inningOptions.length * optW + (inningOptions.length - 1) * optGap;
+    const optStartX = 640 - rowW / 2 + optW / 2;
+    this._inningButtons = [];
+    inningOptions.forEach((n, i) => {
+      const x = optStartX + i * (optW + optGap);
+      const bg = this.add.rectangle(x, 485, optW, 40, 0x1b3a24)
+        .setStrokeStyle(2, 0x4caf50)
+        .setInteractive({ useHandCursor: true });
+      const txt = this.add.text(x, 485, `${n}`, {
+        fontSize: '20px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+      }).setOrigin(0.5);
+      bg.on('pointerdown', () => {
+        this.selectedInnings = n;
+        this._paintInningButtons();
+      });
+      bg.on('pointerover', () => { if (this.selectedInnings !== n) bg.setFillStyle(0x2a5236); });
+      bg.on('pointerout', () => { if (this.selectedInnings !== n) bg.setFillStyle(0x1b3a24); });
+      this._inningButtons.push({ n, bg, txt });
+      this.elements.push(bg, txt);
+    });
+    this._paintInningButtons();
+
     // START GAME
-    const startY = 530;
+    const startY = 560;
     const startBg = this.add.rectangle(640, startY, 300, 60, 0x2e7d32)
       .setStrokeStyle(3, 0xffd600)
       .setInteractive({ useHandCursor: true });
@@ -328,6 +359,7 @@ export default class TeamSelectScene extends Phaser.Scene {
         team: this.selectedTeam,
         pitcherIndex: this.selectedPitcherIdx,
         opponentTeam: this.opponentTeam,
+        innings: this.selectedInnings,
       });
     });
 
@@ -335,6 +367,17 @@ export default class TeamSelectScene extends Phaser.Scene {
     this.elements.forEach((el, i) => {
       el.setAlpha(0);
       this.tweens.add({ targets: el, alpha: 1, duration: 250, delay: Math.min(i * 20, 400) });
+    });
+  }
+
+  /** Highlight the selected game-length button, dim the rest. */
+  _paintInningButtons() {
+    if (!this._inningButtons) return;
+    this._inningButtons.forEach(({ n, bg, txt }) => {
+      const active = n === this.selectedInnings;
+      bg.setFillStyle(active ? 0x2e7d32 : 0x1b3a24);
+      bg.setStrokeStyle(active ? 3 : 2, active ? 0xffd600 : 0x4caf50);
+      txt.setColor(active ? '#ffd600' : '#ffffff');
     });
   }
 

@@ -144,6 +144,8 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.cardEngine = new CardEngine();
       this.baseball = new BaseballState();
+      // Game length (3/5/7/9) chosen at Team Select; default 9.
+      this.baseball.totalInnings = this._initData.innings || 9;
       // Accept team + pitcher + opponent from TeamSelectScene
       const team = this._initData.team;
       const pitcherIdx = this._initData.pitcherIndex || 0;
@@ -3395,8 +3397,10 @@ export default class GameScene extends Phaser.Scene {
     const yourName = yourTeam ? yourTeam.id : 'YOU';
     const oppName = oppTeam ? oppTeam.id : 'OPP';
 
-    const totalInnings = 9;
+    // Show at least the regulation length, expanding if extras were played.
+    const regulation = this.baseball.totalInnings || 9;
     const playedInnings = status.playerRunsByInning.length;
+    const totalInnings = Math.max(regulation, playedInnings);
 
     // Layout
     const cellW = 36;
