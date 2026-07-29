@@ -31,7 +31,13 @@ Inning Loop (per inning):
 - **Game length** is chosen at Team Select: **3, 5, 7, or 9 innings** (default 9).
 - After the chosen number of innings: highest score wins
 - Tied after regulation: extra innings until someone leads
-- Walk-off: if player takes the lead in the final regulation inning (or later), instant win
+- The **player is the away team** and bats in the top half of every inning; the opponent (home team) bats last (bottom half). Real-baseball final-inning rules apply:
+  - **Player trailing after their final top half →** the home team has already won and does **not** bat. Game ends immediately (opponent win). This mirrors the home team not needing to bat in the bottom of the 9th.
+  - **Player tied or ahead after their final top half →** the opponent bats their bottom half:
+    - **Opponent takes the lead →** instant **walk-off** (opponent win), their half ends the moment they go ahead.
+    - **Opponent ties the game →** extra innings.
+    - **Opponent falls short →** game over, player wins.
+- Only the *opponent* can walk off, since they bat last. The player can never walk off — taking the lead in the top half always leaves the opponent a turn to respond.
 
 ---
 

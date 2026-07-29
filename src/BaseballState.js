@@ -187,7 +187,15 @@ export default class BaseballState {
       if (this.outs >= 3) {
         this.bases = [null, null, null];
         this.outs = 0;
-        this.state = 'SWITCH_SIDE';
+        // If the player's top half of the final inning (or later) ends with the
+        // player still trailing, the opponent (home team) has already won and does
+        // NOT bat — game over immediately, just like the home team not batting in
+        // the bottom of the 9th.
+        if (this.inning >= this.totalInnings && this.playerScore < this.opponentScore) {
+          this.state = 'GAME_OVER';
+        } else {
+          this.state = 'SWITCH_SIDE';
+        }
         // Side retired shown via inning transition, not in description
       } else {
         this.state = 'BATTING';
@@ -214,13 +222,10 @@ export default class BaseballState {
         }
       }
 
-      // Walk-off check: bottom of 9th (or later), player is ahead
-      if (this._checkWalkOff()) {
-        this.state = 'GAME_OVER';
-        description += ' WALK-OFF WIN!';
-      } else {
-        this.state = 'BATTING';
-      }
+      // No walk-off here: the player bats in the top half (away team), so play
+      // always continues to the opponent's bottom half. A walk-off can only be
+      // scored BY the opponent in their half (see switchSide).
+      this.state = 'BATTING';
     }
 
     this.lastResult = { runsScored, description, state: this.state, outcome };
@@ -406,11 +411,20 @@ export default class BaseballState {
       this.playerRunsByInning.push(this._currentInningPlayerRuns);
       this._currentInningPlayerRuns = 0;
 
+      // Snapshot before the opponent scores so we can detect a walk-off (opponent
+      // coming from tied/behind to take the lead in their final at-bat).
+      const opponentWasAheadBefore = this.opponentScore > this.playerScore;
+      const isFinalHalfOrLater = this.inning >= this.totalInnings;
+
       const opponentRuns = simRuns !== null ? simRuns : this._generateOpponentRuns();
       this.opponentScore += opponentRuns;
 
       // Record opponent's runs for this inning
       this.opponentRunsByInning.push(opponentRuns);
+
+      // Walk-off: opponent (home team) takes the lead in the bottom of the final
+      // regulation inning or later. They weren't already ahead, and now they are.
+      const walkOff = isFinalHalfOrLater && !opponentWasAheadBefore && this.opponentScore > this.playerScore;
 
       this.half = 'top';
       this.inning++;
@@ -421,16 +435,20 @@ export default class BaseballState {
       this.straightsPlayedThisInning = 0;
       this.flushesPlayedThisInning = 0;
 
-      // Check game over after regulation innings
-      if (this.inning > this.totalInnings && this.playerScore !== this.opponentScore) {
+      // Check game over after regulation innings (walk-off ends it immediately)
+      if (walkOff || (this.inning > this.totalInnings && this.playerScore !== this.opponentScore)) {
         this.state = 'GAME_OVER';
       } else {
         this.state = 'BATTING';
       }
 
+      let description = `Opponent scores ${opponentRuns} run${opponentRuns !== 1 ? 's' : ''} this inning.`;
+      if (walkOff) description += ' WALK-OFF!';
+
       return {
         opponentRuns,
-        description: `Opponent scores ${opponentRuns} run${opponentRuns !== 1 ? 's' : ''} this inning.`,
+        walkOff,
+        description,
         state: this.state,
       };
     }
@@ -460,11 +478,6 @@ export default class BaseballState {
     }
 
     return Math.min(runs, maxRuns);
-  }
-
-  /** Check walk-off: final regulation inning or later, player batting, and player just took the lead */
-  _checkWalkOff() {
-    return this.inning >= this.totalInnings && this.half === 'top' && this.playerScore > this.opponentScore;
   }
 
   /** Get current game state summary */

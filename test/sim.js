@@ -992,18 +992,106 @@ group('1g. BaseballState');
   assert(bs.inning === 4, '3-inning game tied: inning is 4 (extras)');
 }
 {
-  // Walk-off: short game, player takes the lead in final inning → GAME_OVER via walk-off
+  // Player (away team) leading in the top of the final inning does NOT end the game —
+  // the opponent still bats in the bottom half. (Regression: reported walk-off bug.)
   const bs = new BaseballState();
   bs.totalInnings = 3;
   bs.inning = 3;
   bs.half = 'top';
-  bs.opponentScore = 3;
-  bs.playerScore = 3;
-  bs.bases = [false, false, true]; // runner on 3rd scores on a single → 4-3 lead
+  bs.opponentScore = 0;
+  bs.playerScore = 2;
+  bs.bases = [false, false, true]; // runner on 3rd scores on a single → 3-0 lead
   const r = bs.resolveOutcome('Single');
-  assert(bs.playerScore === 4, 'walk-off: player took the lead 4-3');
-  assert(bs.state === 'GAME_OVER', 'walk-off in final inning of short game → GAME_OVER');
-  assert(/WALK-OFF/.test(r.description), 'walk-off description shown');
+  assert(bs.playerScore === 3, 'player extends lead 3-0 in top of final inning');
+  assert(bs.state !== 'GAME_OVER', 'player leading in top of final inning does NOT end the game');
+  assert(!/WALK-OFF/.test(r.description), 'no player-side walk-off shown');
+}
+{
+  // Opponent walk-off: tied entering bottom of final inning, opponent scores → GAME_OVER (player loses)
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  bs.inning = 3;
+  bs.half = 'top';
+  bs.playerScore = 3;
+  bs.opponentScore = 3;
+  bs.outs = 3; // trigger switch to opponent's half
+  bs.resolveOutcome('Strikeout'); bs.resolveOutcome('Strikeout'); bs.resolveOutcome('Strikeout');
+  bs.playerScore = 3; bs.opponentScore = 3; // keep tied after the (out) at-bats
+  const r = bs.switchSide(1); // opponent scores 1 in bottom of 3rd → 4-3
+  assert(bs.opponentScore === 4, 'opponent takes the lead 4-3 in bottom of final inning');
+  assert(r.walkOff === true, 'switchSide reports walkOff');
+  assert(bs.state === 'GAME_OVER', 'opponent walk-off ends the game');
+  assert(bs.playerScore < bs.opponentScore, 'player loses on the walk-off');
+}
+{
+  // Opponent already ahead entering their half is NOT a walk-off (game just ends normally)
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  bs.inning = 3;
+  bs.half = 'top';
+  bs.playerScore = 1;
+  bs.opponentScore = 2;
+  const r = bs.switchSide(1); // opponent adds a run, was already leading
+  assert(r.walkOff === false, 'not a walk-off when opponent was already ahead');
+  assert(bs.state === 'GAME_OVER', 'game still ends after final inning with a leader');
+}
+{
+  // Player leads after full final inning (opponent fails to catch up) → GAME_OVER, player wins
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  bs.inning = 3;
+  bs.half = 'top';
+  bs.playerScore = 2;
+  bs.opponentScore = 0;
+  const r = bs.switchSide(0); // opponent scores 0 in bottom of final → player wins 2-0
+  assert(r.walkOff === false, 'player win is not a walk-off');
+  assert(bs.state === 'GAME_OVER', 'game ends after opponent bats in final inning');
+  assert(bs.playerScore > bs.opponentScore, 'player wins 2-0');
+}
+{
+  // Player STILL TRAILING after their top half of the final inning → opponent has already won
+  // and does NOT bat (like the home team not needing to bat in the bottom of the 9th).
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  bs.inning = 3;
+  bs.half = 'top';
+  bs.playerScore = 1;
+  bs.opponentScore = 4;
+  const oppBefore = bs.opponentScore;
+  const oppInningsBefore = bs.opponentRunsByInning.length;
+  bs.resolveOutcome('Strikeout');
+  bs.resolveOutcome('Strikeout');
+  const r = bs.resolveOutcome('Strikeout'); // 3rd out of player's final top half
+  assert(bs.state === 'GAME_OVER', 'player trailing after final top half → GAME_OVER (opponent does not bat)');
+  assert(bs.opponentScore === oppBefore, 'opponent score unchanged — they never batted');
+  assert(bs.opponentRunsByInning.length === oppInningsBefore, 'no bottom half recorded for the opponent');
+  assert(bs.playerScore < bs.opponentScore, 'opponent wins without batting');
+}
+{
+  // Player trailing before the final inning still plays on (opponent bats normally)
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  bs.inning = 2;
+  bs.half = 'top';
+  bs.playerScore = 0;
+  bs.opponentScore = 5;
+  bs.resolveOutcome('Strikeout');
+  bs.resolveOutcome('Strikeout');
+  bs.resolveOutcome('Strikeout');
+  assert(bs.state === 'SWITCH_SIDE', 'trailing in a non-final inning → opponent still bats (SWITCH_SIDE)');
+}
+{
+  // Player TIED after their top half of the final inning → opponent still bats (walk-off chance)
+  const bs = new BaseballState();
+  bs.totalInnings = 3;
+  bs.inning = 3;
+  bs.half = 'top';
+  bs.playerScore = 4;
+  bs.opponentScore = 4;
+  bs.resolveOutcome('Strikeout');
+  bs.resolveOutcome('Strikeout');
+  bs.resolveOutcome('Strikeout');
+  assert(bs.state === 'SWITCH_SIDE', 'tied after final top half → opponent bats (SWITCH_SIDE), not game over');
 }
 {
   // Double with runner on 1st → runner advances to 3rd (0+2=2), batter to 2nd
@@ -1186,7 +1274,7 @@ group('1f-extra. Trait Combo Interactions');
 group('1g-extra. Walk-Off Wins');
 
 {
-  // Inning 9: player scores Home Run to take lead → GAME_OVER (walk-off)
+  // Inning 9: player takes the lead in the TOP half — game does NOT end; opponent still bats.
   const bs = new BaseballState();
   bs.inning = 9;
   bs.half = 'top';
@@ -1195,50 +1283,66 @@ group('1g-extra. Walk-Off Wins');
   bs.outs = 0;
   bs.state = 'BATTING';
   const r = bs.resolveOutcome('Home Run');
-  assert(r.runsScored >= 1, 'Walk-off HR scores at least 1 run');
+  assert(r.runsScored >= 1, 'HR scores at least 1 run');
   assert(bs.playerScore > bs.opponentScore, 'Player takes lead');
-  assert(bs.state === 'GAME_OVER', 'Walk-off HR → GAME_OVER');
+  assert(bs.state !== 'GAME_OVER', 'Player lead in top half does NOT end the game');
 }
 {
-  // Inning 9 tied, opponent scores in switchSide → extras (inning 10)
+  // Inning 9 tied, opponent walks the player off in the bottom half → GAME_OVER.
   const bs = new BaseballState();
   bs.inning = 9;
   bs.half = 'top';
   bs.playerScore = 3;
   bs.opponentScore = 3;
   bs.outs = 0;
-  // 3 outs to trigger SWITCH_SIDE
   bs.resolveOutcome('Strikeout');
   bs.resolveOutcome('Strikeout');
   bs.resolveOutcome('Strikeout');
-  // Opponent scores 1 to tie-break... but then check extras logic
+  bs.playerScore = 3; bs.opponentScore = 3; // ensure tied entering opponent's half
+  const r = bs.switchSide(2); // opponent scores → 5-3
+  assert(r.walkOff === true, 'Opponent walk-off in bottom of 9th');
+  assert(bs.state === 'GAME_OVER', 'Opponent walk-off → GAME_OVER');
+  assert(bs.playerScore < bs.opponentScore, 'Player loses on the walk-off');
+}
+{
+  // Inning 9 tied, opponent scores 0 → extras (inning 10)
+  const bs = new BaseballState();
+  bs.inning = 9;
+  bs.half = 'top';
+  bs.playerScore = 3;
+  bs.opponentScore = 3;
+  bs.outs = 0;
+  bs.resolveOutcome('Strikeout');
+  bs.resolveOutcome('Strikeout');
+  bs.resolveOutcome('Strikeout');
   bs.switchSide(0); // opponent scores 0, still tied
   assert(bs.state === 'BATTING', 'Tied after 9 → extras continue');
   assert(bs.inning === 10, 'Inning advances to 10');
 }
 {
-  // Inning 10+ walk-off works
+  // Inning 10+ opponent walk-off works
   const bs = new BaseballState();
   bs.inning = 10;
   bs.half = 'top';
   bs.playerScore = 4;
   bs.opponentScore = 4;
   bs.outs = 0;
-  bs.state = 'BATTING';
-  const r = bs.resolveOutcome('Home Run');
-  assert(bs.state === 'GAME_OVER', 'Walk-off in extras (inning 10) → GAME_OVER');
+  const r = bs.switchSide(1); // opponent scores in extras → 5-4
+  assert(r.walkOff === true, 'Walk-off in extras (inning 10)');
+  assert(bs.state === 'GAME_OVER', 'Walk-off in extras → GAME_OVER');
 }
 {
-  // Walk-off only triggers on hits, not outs
+  // Player leading entering opponent's final half: opponent falls short → player wins, not a walk-off.
   const bs = new BaseballState();
   bs.inning = 9;
   bs.half = 'top';
   bs.playerScore = 5;
   bs.opponentScore = 3;
   bs.outs = 0;
-  bs.state = 'BATTING';
-  const r = bs.resolveOutcome('Strikeout');
-  assert(bs.state !== 'GAME_OVER', 'Outs do not trigger walk-off even when leading');
+  const r = bs.switchSide(1); // opponent scores 1 → 5-4, still behind
+  assert(r.walkOff === false, 'Opponent falling short is not a walk-off');
+  assert(bs.state === 'GAME_OVER', 'Game ends after final inning with player ahead');
+  assert(bs.playerScore > bs.opponentScore, 'Player wins');
 }
 
 // ── 1g-extra. Shop Flow ──────────────────────────────────

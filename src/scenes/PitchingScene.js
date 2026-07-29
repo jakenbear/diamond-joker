@@ -1533,7 +1533,9 @@ export default class PitchingScene extends Phaser.Scene {
     // Check end conditions
     const status = this.baseball.getStatus();
     const liveOppScore = status.opponentScore + ps.runs;
-    if (status.inning >= 9 && liveOppScore > status.playerScore) {
+    // Walk-off: in the final inning (or extras), the moment the opponent takes the
+    // lead their half ends immediately.
+    if (status.inning >= this.baseball.totalInnings && liveOppScore > status.playerScore) {
       this.time.delayedCall(800, () => this._finishOpponentHalf());
     } else if (ps.outs >= 3) {
       this.time.delayedCall(800, () => this._finishOpponentHalf());
@@ -1608,7 +1610,7 @@ export default class PitchingScene extends Phaser.Scene {
 
     const status = this.baseball.getStatus();
     const liveOppScore = status.opponentScore + ps.runs;
-    if (status.inning >= 9 && liveOppScore > status.playerScore) {
+    if (status.inning >= this.baseball.totalInnings && liveOppScore > status.playerScore) {
       this.time.delayedCall(800, () => this._finishOpponentHalf());
     } else if (ps.outs >= 3) {
       this.time.delayedCall(800, () => this._finishOpponentHalf());
@@ -1748,14 +1750,17 @@ export default class PitchingScene extends Phaser.Scene {
 
     // Switch side with accumulated runs
     const runsThisHalf = ps.runs;
-    this.baseball.switchSide(runsThisHalf);
+    const switchResult = this.baseball.switchSide(runsThisHalf);
     ps.runs = 0; // Reset so scoreboard doesn't double-count
     this._addGameLog(`--- End of half: ${runsThisHalf} run${runsThisHalf !== 1 ? 's' : ''} ---`, '#4caf50');
 
     // Show summary
-    const summary = runsThisHalf === 0
+    let summary = runsThisHalf === 0
       ? `${ps.myPitcher.name} shuts them down!`
       : `${ps.oppLabel} score${runsThisHalf === 1 ? 's' : ''} ${runsThisHalf} run${runsThisHalf !== 1 ? 's' : ''}`;
+    if (switchResult && switchResult.walkOff) {
+      summary = `${ps.oppLabel} WALK-OFF! Game over.`;
+    }
     this.resultText.setText(summary);
     this.resultText.setColor(ps.runs > 0 ? '#ff8a80' : '#69f0ae');
     this.handNameText.setText('');
