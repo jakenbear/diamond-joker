@@ -5522,6 +5522,56 @@ group('35. The Triple Is Sacred (GDD invariant)');
   }
 }
 
+// ── 36. getResult().innings reports innings PLAYED ─────
+
+group('36. getResult().innings counts innings actually played');
+
+{
+  // switchSide() increments `inning` before it decides GAME_OVER, so the raw
+  // counter points at the next, unplayed inning. The box-score arrays are the
+  // source of truth: one entry per half-inning that was actually played.
+  // GameOverScene prints "N innings played" from this, so it must match the
+  // number of linescore columns it draws.
+  const cases = [
+    { total: 3, label: '3-inning game' },
+    { total: 5, label: '5-inning game' },
+    { total: 9, label: '9-inning game' },
+  ];
+
+  for (const { total, label } of cases) {
+    const bs = new BaseballState();
+    bs.totalInnings = total;
+    let guard = 0;
+    while (!bs.isGameOver() && guard++ < 200) {
+      bs.outs = 3;
+      bs.switchSide(Math.random() < 0.5 ? 1 : 0);
+    }
+    const res = bs.getResult();
+    const columns = Math.max(res.playerRunsByInning.length, res.opponentRunsByInning.length);
+    assert(res.innings === columns,
+      `${label}: reported innings (${res.innings}) matches linescore columns (${columns})`);
+    assert(res.innings >= total,
+      `${label}: played at least regulation length (${res.innings} >= ${total})`);
+  }
+
+  // A tie broken in extras: still no phantom inning on the end screen.
+  {
+    const bs = new BaseballState();
+    bs.totalInnings = 3;
+    // Innings 1-3 score even, then the player wins it in the 4th.
+    bs.outs = 3; bs.switchSide(0);
+    bs.outs = 3; bs.switchSide(0);
+    bs.outs = 3; bs.switchSide(0);
+    bs.playerScore += 2;
+    bs.outs = 3; bs.switchSide(0);
+    const res = bs.getResult();
+    assert(bs.isGameOver(), 'extra-inning game ends once the tie is broken');
+    assert(res.innings === res.playerRunsByInning.length,
+      `extras: reported innings (${res.innings}) matches halves played (${res.playerRunsByInning.length})`);
+    assert(res.innings === 4, `extras: a game decided in the 4th reports 4, not 5 (got ${res.innings})`);
+  }
+}
+
 console.log('\n' + '═'.repeat(50));
 console.log(`\x1b[1m  RESULTS: \x1b[32m${passed} passed\x1b[0m, \x1b[${failed > 0 ? '31' : '32'}m${failed} failed\x1b[0m`);
 if (failures.length > 0) {

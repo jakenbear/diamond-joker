@@ -102,8 +102,8 @@ export default class GameOverScene extends Phaser.Scene {
     const nameColW = 70;
     const totalColW = 44;
     // Columns = innings actually played (from the box-score arrays), min 3 for layout.
-    // `totalInnings` (final inning counter) is a fallback if the arrays are empty.
-    const playedInnings = Math.max(playerRuns.length, oppRuns.length, totalInnings - 1);
+    // `totalInnings` is getResult().innings, already innings-played, so no -1 here.
+    const playedInnings = Math.max(playerRuns.length, oppRuns.length, totalInnings);
     const numInnings = Math.max(3, playedInnings);
     const gridW = nameColW + numInnings * cellW + totalColW;
     const gridH = cellH * 3;

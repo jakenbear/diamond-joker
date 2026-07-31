@@ -39,6 +39,15 @@ Inning Loop (per inning):
     - **Opponent falls short →** game over, player wins.
 - Only the *opponent* can walk off, since they bat last. The player can never walk off — taking the lead in the top half always leaves the opponent a turn to respond.
 
+### Innings Played (Box Score)
+The end-of-game screen reports **innings actually played**, counted from the per-inning
+run arrays (`playerRunsByInning` / `opponentRunsByInning`) rather than the live `inning`
+counter. The counter advances past the last played inning as part of the half-inning
+transition, so reading it directly reported one inning too many — a 3-inning game decided
+in the 4th claimed "5 innings played" beside a 4-column linescore. Every half-inning that
+is played pushes exactly one entry, including the final top half of a game that ends with
+the player trailing (where the opponent never bats).
+
 ---
 
 ## Card System

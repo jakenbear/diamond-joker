@@ -192,6 +192,11 @@ export default class BaseballState {
         // NOT bat — game over immediately, just like the home team not batting in
         // the bottom of the 9th.
         if (this.inning >= this.totalInnings && this.playerScore < this.opponentScore) {
+          // The top half WAS played, but switchSide() — which normally records it —
+          // never runs on this path, so bank the runs here or the final inning
+          // vanishes from the linescore.
+          this.playerRunsByInning.push(this._currentInningPlayerRuns);
+          this._currentInningPlayerRuns = 0;
           this.state = 'GAME_OVER';
         } else {
           this.state = 'SWITCH_SIDE';
@@ -510,7 +515,11 @@ export default class BaseballState {
       playerScore: this.playerScore,
       opponentScore: this.opponentScore,
       won: this.playerScore > this.opponentScore,
-      innings: this.inning,
+      // Innings PLAYED, not the raw counter. switchSide() bumps `inning` before it
+      // decides GAME_OVER, so `this.inning` points at the next, unplayed inning —
+      // a 3-inning game decided in the 4th used to report "5 innings played" next
+      // to a 4-column linescore. The box-score arrays are the source of truth.
+      innings: Math.max(this.playerRunsByInning.length, this.opponentRunsByInning.length),
       totalPeanuts: this.totalPeanuts,
       playerRunsByInning: [...this.playerRunsByInning],
       opponentRunsByInning: [...this.opponentRunsByInning],
