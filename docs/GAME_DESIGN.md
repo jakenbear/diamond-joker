@@ -60,19 +60,61 @@ Listed strongest to weakest. The ladder is **monotonic**: going down the table, 
 | Hand | Baseball Outcome | Peanuts | Mult | Score |
 |------|-----------------|-------|------|-------|
 | Royal Flush | Home Run (guaranteed) | 15 | 20 | 300 |
-| Straight Flush | 80% HR / 15% Triple / 5% Double | 10 | 10 | 100 |
+| Straight Flush | 85% HR / 15% Triple | 10 | 10 | 100 |
 | Four of a Kind | Home Run | 10 | 6 | 60 |
 | Full House | Home Run | 8 | 5 | 40 |
-| Flush | Triple | 5 | 5 | 25 |
-| Straight | Triple | 4 | 4 | 16 |
+| Flush | Double | 5 | 5 | 25 |
+| Straight | Double | 4 | 4 | 16 |
 | Three of a Kind | Double | 3 | 3 | 9 |
-| Two Pair | Double | 2 | 2 | 4 |
+| Two Pair | Single | 2 | 2 | 4 |
 | Pair | Single | 1 | 1.5 | 1.5 |
 | High Card | Strikeout | 0 | 1 | 0 |
 
 **Score = floor(Peanuts × Mult)** — this becomes your peanut income for the shop.
 
 **Monotonicity is an invariant, not a coincidence.** It is enforced by tests in `test/sim.js`. When rebalancing, keep both `peanuts × mult` and the outcome's base value non-increasing down the table. (Previously a Straight paid a Home Run while Four of a Kind paid only a Triple, and a Full House scored 7.5 against a Flush's 25 — so building a stronger hand could actively cost you.)
+
+### The Triple Is Sacred
+
+In real baseball a triple is the **rarest hit** — rarer than a home run, and the play
+that gets a crowd on its feet. The outcome mapping protects that.
+
+Three narrow paths produce a triple on a player at-bat:
+
+1. **Stretch Triple** — `SituationalEngine._checkStretchTriple` turns a Double into a
+   Triple. Chance is `15% + (speed - 5) * 3.5%`, floored at 4%. This is the main path.
+2. **Straight Flush roll** — 15% of Straight Flushes become a Triple instead of a HR.
+3. **Leg It Out** trait — upgrades a Double to a Triple on a Straight.
+
+**No hand class maps directly to Triple.** That is a design constraint, not a tuning
+value. Flush and Straight used to, and because both are common in a 7-card draw, triples
+ran at ~6.9% of at-bats against a real-world ~0.5% — they were the second-most-common hit
+and nearly 3× more frequent than home runs, which drained them of all drama.
+
+The stretch is deliberately driven by **speed, not power**: legging out a triple is a
+wheels play, whereas power turns a would-be triple into a home run. This is what makes
+the speed stat matter at the plate.
+
+Measured profile per at-bat, no traits or staff, speed-5 batter:
+
+| Outcome | Ours | MLB |
+|---------|------|-----|
+| Single | 25.0% | 14.6% |
+| Double | 8.6% | 4.5% |
+| Triple | 1.7% | 0.5% |
+| Home Run | 2.8% | 3.2% |
+| Strikeout | 15.6% | 22.4% |
+| Groundout / Flyout | 42.9% | 44% |
+| Error / Dropped 3rd K | 3.5% | — |
+
+Triples by speed: **0.4%** at speed 1, **1.6%** at speed 5, **3.3%** at speed 10 — roughly
+a 9× swing, so a burner is worth building around. The overall 1.7% is ~3× the real-world
+rate on purpose: a triple is the most exciting hit in baseball, and at true MLB frequency
+a player would essentially never see one. It is still the rarest hit in the game.
+
+Batting average sits near .415 — well above MLB. **That is intentional.** Scoring is the
+fun of this game; the goal is a baseball-shaped *distribution* of hits, not a suppressed
+one. Do not "fix" the hit rate without a deliberate decision to reduce offense.
 
 ### Hand Evaluation Rules
 - Straights and Flushes require exactly 5 cards

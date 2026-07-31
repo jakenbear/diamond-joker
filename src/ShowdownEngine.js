@@ -285,7 +285,10 @@ export default class ShowdownEngine {
 
   static _batterOutcome(margin) {
     if (margin >= 15) return 'Home Run';
-    if (margin >= 8) return Math.random() < 0.5 ? 'Triple' : 'Double';
+    // Triples stay rare even on a big margin (see "The Triple Is Sacred" in the GDD).
+    // A blowout margin is far more likely to be a double than the rarest hit in
+    // baseball, so this is a 15% roll rather than a coin flip.
+    if (margin >= 8) return Math.random() < 0.15 ? 'Triple' : 'Double';
     if (margin >= 3) return 'Double';
     return 'Single';
   }

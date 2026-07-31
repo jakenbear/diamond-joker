@@ -41,6 +41,15 @@ export default class SituationalEngine {
       if (d3kResult) return d3kResult;
     }
 
+    // Stretch a double into a triple — the ONLY common path to a triple.
+    // Deliberately speed-driven, not power-driven: legging out a triple is a wheels
+    // play, whereas power turns a would-be triple into a home run. Tuned so triples
+    // land near ~0.5% of at-bats (see "The Triple Is Sacred" in the GDD).
+    if (outcome === 'Double') {
+      const stretchResult = SituationalEngine._checkStretchTriple(batterSpeed);
+      if (stretchResult) return stretchResult;
+    }
+
     // Productive groundout: runner on 2nd/3rd advances, batter still out
     if (outcome === 'Groundout' && gameState.outs < 2 && (gameState.bases[1] || gameState.bases[2])) {
       const productiveChance = 0.40 + (batterSpeed || 5) * 0.03;
@@ -65,6 +74,29 @@ export default class SituationalEngine {
         transformed: true,
         type: 'dropped_third_strike',
         description: 'Dropped third strike! Batter races to first!',
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Stretch Triple: turns a Double into a Triple.
+   * Chance = 15% + (speed - 5) * 3.5%, floored at 4%.
+   *   Speed 1 → 4.0%   Speed 5 → 15.0%   Speed 10 → 32.5%
+   * Doubles are ~10% of at-bats, so this yields ~0.4% (plodder) to ~3.3%
+   * (burner) of at-bats. Deliberately ~3x the real-world ~0.5%: a triple is the
+   * most exciting hit in baseball and at true MLB frequency a player would
+   * almost never see one. Still the rarest hit, and still a wheels play — a
+   * burner legs out ~8x as many as a plodder.
+   */
+  static _checkStretchTriple(batterSpeed) {
+    const chance = Math.max(0.04, 0.15 + ((batterSpeed || 5) - 5) * 0.035);
+    if (Math.random() < chance) {
+      return {
+        outcome: 'Triple',
+        transformed: true,
+        type: 'stretch_triple',
+        description: 'He\'s not stopping at second — triple!',
       };
     }
     return null;

@@ -330,13 +330,17 @@ export default class RosterManager {
       }
     }
 
-    // Hit — apply XBH multiplier
+    // Hit — apply XBH multiplier.
+    // Triples are deliberately rare (see "The Triple Is Sacred" in the GDD) and are
+    // driven by SPEED, not power — legging out a triple is a wheels play, whereas
+    // power turns a would-be triple into a home run.
     const hitRoll = Math.random();
     const powerFactor = batter.power / 10;
+    const speedFactor = (batter.speed || 5) / 10;
 
     const hrChance = (0.01 + powerFactor * 0.03) * pitch.xbhMult;
-    const tripleChance = (0.05 + powerFactor * 0.08) * pitch.xbhMult;
-    const doubleChance = (0.20 + powerFactor * 0.12) * pitch.xbhMult;
+    const tripleChance = hrChance + (0.005 + speedFactor * 0.02) * pitch.xbhMult;
+    const doubleChance = tripleChance + (0.20 + powerFactor * 0.12) * pitch.xbhMult;
 
     if (hitRoll < hrChance) {
       return { outcome: 'Home Run', isOut: false, basesGained: 4 };
@@ -564,18 +568,22 @@ export default class RosterManager {
       }
     }
 
-    // Hit - type based on batter power
+    // Hit — type based on batter power, with triples driven by speed.
+    // Thresholds are cumulative. Triples stay rare on purpose (see "The Triple Is
+    // Sacred" in the GDD): a triple is the rarest hit in real baseball.
     const hitRoll = Math.random();
     const powerFactor = batter.power / 10;
+    const speedFactor = (batter.speed || 5) / 10;
 
-    if (hitRoll < 0.01 + powerFactor * 0.03) {
-      // Home run: ~1-4% chance on a hit
+    const hrChance = 0.01 + powerFactor * 0.03;             // ~1-4% of hits
+    const tripleChance = hrChance + 0.005 + speedFactor * 0.02;  // ~+0.7-2.5%
+    const doubleChance = tripleChance + 0.20 + powerFactor * 0.12; // ~+20-32%
+
+    if (hitRoll < hrChance) {
       return { outcome: 'Home Run', isOut: false, basesGained: 4 };
-    } else if (hitRoll < 0.05 + powerFactor * 0.08) {
-      // Triple: ~4-13%
+    } else if (hitRoll < tripleChance) {
       return { outcome: 'Triple', isOut: false, basesGained: 3 };
-    } else if (hitRoll < 0.20 + powerFactor * 0.12) {
-      // Double: ~15-32%
+    } else if (hitRoll < doubleChance) {
       return { outcome: 'Double', isOut: false, basesGained: 2 };
     } else {
       return { outcome: 'Single', isOut: false, basesGained: 1 };

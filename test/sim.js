@@ -5401,6 +5401,87 @@ group('34. BonusEngine — Resolution Order (GDD contract)');
 
 // ═══════════════════════════════════════════════════════
 
+
+// ═══════════════════════════════════════════════════════
+group('35. The Triple Is Sacred (GDD invariant)');
+{
+  // No hand class may map directly to Triple — the whole point of the invariant.
+  const direct = HAND_TABLE.filter(e => e.outcome === 'Triple');
+  assert(direct.length === 0,
+    `no hand class maps directly to Triple (found: ${direct.map(e => e.handName).join(', ') || 'none'})`);
+
+  // Straight Flush is the only hand that rolls its outcome, and it may only
+  // produce Home Run or Triple — never a Double, which would pay worse than a Flush.
+  const rollers = HAND_TABLE.filter(e => e.rollOutcome);
+  assert(rollers.length === 1 && rollers[0].handName === 'Straight Flush',
+    'Straight Flush is the only rollOutcome hand');
+  {
+    const sf = makeCards([[9, 'H'], [8, 'H'], [7, 'H'], [6, 'H'], [5, 'H']]);
+    const seen = new Set();
+    for (let i = 0; i < 400; i++) seen.add(CardEngine.evaluateHand(sf).outcome);
+    assert(seen.size === 2 && seen.has('Home Run') && seen.has('Triple'),
+      `Straight Flush rolls only HR or Triple (saw ${[...seen].sort().join('/')})`);
+  }
+
+  // ── Stretch Triple: the main path, and it must be speed-driven ──
+  const gs = { outs: 1, bases: [false, false, false], inning: 3 };
+  const stretchRate = (speed, n = 20000) => {
+    let t = 0;
+    for (let i = 0; i < n; i++) {
+      if (SituationalEngine.check('Double', gs, speed).outcome === 'Triple') t++;
+    }
+    return t / n;
+  };
+
+  const slow = stretchRate(1);
+  const mid = stretchRate(5);
+  const fast = stretchRate(10);
+
+  assertClose(slow * 100, 2.5, 5.5, `speed 1 stretches ~4% of doubles (got ${(slow * 100).toFixed(1)}%)`);
+  assertClose(mid * 100, 13, 17, `speed 5 stretches ~15% of doubles (got ${(mid * 100).toFixed(1)}%)`);
+  assertClose(fast * 100, 30, 35, `speed 10 stretches ~32.5% of doubles (got ${(fast * 100).toFixed(1)}%)`);
+  assert(fast > mid && mid > slow, 'stretch chance is monotonic in speed');
+  assert(fast / slow > 5, `a burner legs out many more triples than a plodder (${(fast / slow).toFixed(1)}x)`);
+
+  // Speed, not power: a Double is the only outcome that can be stretched.
+  for (const o of ['Single', 'Home Run', 'Groundout', 'Flyout', 'Strikeout']) {
+    let stretched = false;
+    for (let i = 0; i < 2000; i++) {
+      if (SituationalEngine.check(o, gs, 10).outcome === 'Triple') stretched = true;
+    }
+    assert(!stretched, `${o} never becomes a Triple`);
+  }
+
+  // A missing speed stat must not throw or hand out free triples.
+  {
+    let ok = true;
+    try {
+      for (let i = 0; i < 500; i++) SituationalEngine.check('Double', gs, undefined);
+    } catch (e) { ok = false; }
+    assert(ok, 'undefined speed defaults safely (treated as 5)');
+  }
+
+  // Triples must stay the rarest hit in the game.
+  {
+    const counts = {};
+    const N = 6000;
+    for (let i = 0; i < N; i++) {
+      const eng = new CardEngine('standard');
+      eng.newAtBat();
+      const r = eng.playHand(null, null, null, { baseballState: null }, 0);
+      const sit = SituationalEngine.check(r.outcome, gs, 5);
+      counts[sit.outcome] = (counts[sit.outcome] || 0) + 1;
+    }
+    const trip = (counts['Triple'] || 0) / N;
+    const dbl = (counts['Double'] || 0) / N;
+    const sgl = (counts['Single'] || 0) / N;
+    assert(trip < dbl, `triples are rarer than doubles (${(trip * 100).toFixed(2)}% vs ${(dbl * 100).toFixed(2)}%)`);
+    assert(trip < sgl, `triples are rarer than singles (${(trip * 100).toFixed(2)}% vs ${(sgl * 100).toFixed(2)}%)`);
+    assert(trip > 0, 'triples still happen — the outcome is reachable');
+    assert(trip < 0.05, `triples stay rare, under 5% of at-bats (got ${(trip * 100).toFixed(2)}%)`);
+  }
+}
+
 console.log('\n' + '═'.repeat(50));
 console.log(`\x1b[1m  RESULTS: \x1b[32m${passed} passed\x1b[0m, \x1b[${failed > 0 ? '31' : '32'}m${failed} failed\x1b[0m`);
 if (failures.length > 0) {

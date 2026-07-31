@@ -139,15 +139,15 @@ export default class CardEngine {
 
     let entry = { ...HAND_TABLE[handIdx] };
 
-    // ── Straight Flush probability roll: 80% HR, 15% Triple, 5% Double ──
+    // ── Straight Flush probability roll: 85% HR, 15% Triple ──
+    // This roll is the only hand-class path to a Triple (see hand_table.js).
+    // There is no Double branch: with Flush mapping to Double, a Straight Flush
+    // rolling a Double would pay a *worse* outcome than the weaker hand.
     if (entry.rollOutcome) {
-      const roll = Math.random();
-      if (roll < 0.05) {
-        entry.outcome = 'Double';
-      } else if (roll < 0.20) {
+      if (Math.random() < 0.15) {
         entry.outcome = 'Triple';
       }
-      // else stays Home Run (80%)
+      // else stays Home Run (85%)
     }
 
     // ── Rank-scaled quality — out chances for Pair through Full House ──

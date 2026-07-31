@@ -457,11 +457,15 @@ console.log('\n  ═════════════════════
 
 // ── Quick health check ──────────────────────────────────
 
+// NOTE: high scoring is a DELIBERATE design decision, not a bug — see "The Triple
+// Is Sacred" in docs/GAME_DESIGN.md. Scoring runs is the fun of this game, so these
+// bounds are wide guardrails against a *degenerate* sim (nobody scores / infinite
+// innings), not a push toward real MLB run totals. ~25-30 runs/game is expected.
 const warnings = [];
-if (parseFloat(avgRuns) > 25) warnings.push(`AVG RUNS TOO HIGH (${avgRuns}) — target 10-20`);
-if (parseFloat(avgRuns) < 5) warnings.push(`AVG RUNS TOO LOW (${avgRuns}) — target 10-20`);
-if (parseFloat(outRate) < 40) warnings.push(`OUT RATE TOO LOW (${outRate}%) — target 45-65%`);
-if (parseFloat(outRate) > 75) warnings.push(`OUT RATE TOO HIGH (${outRate}%) — target 45-65%`);
+if (parseFloat(avgRuns) > 45) warnings.push(`AVG RUNS EXTREME (${avgRuns}) — expected 20-35`);
+if (parseFloat(avgRuns) < 10) warnings.push(`AVG RUNS TOO LOW (${avgRuns}) — expected 20-35`);
+if (parseFloat(outRate) < 30) warnings.push(`OUT RATE TOO LOW (${outRate}%) — expected 38-55%`);
+if (parseFloat(outRate) > 75) warnings.push(`OUT RATE TOO HIGH (${outRate}%) — expected 38-55%`);
 if (maxRuns > 60) warnings.push(`MAX RUNS EXTREME (${maxRuns}) — possible degenerate strategy`);
 
 if (warnings.length > 0) {
