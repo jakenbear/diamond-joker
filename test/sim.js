@@ -4105,6 +4105,46 @@ group('25a. ShowdownEngine — Deck generation');
     lowSum += avgRank(ShowdownEngine.generateDeck(4, 5));
   }
   assert(highSum / 50 > lowSum / 50, 'High velocity decks have higher avg rank than low velocity');
+
+  // ── A deck is a DECK: no card may appear twice ──
+  // Regression: generateDeck drew 20 independent random rank+suit pairs with no
+  // uniqueness check, so 99.9% of decks contained a duplicate and 46.5% of
+  // showdowns put a visibly impossible duplicate card on the board (e.g. K♦ in
+  // the community AND in the pitcher's hole). It also fabricated hands — a "Full
+  // House" built on the same physical King twice.
+  for (const vel of [1, 5, 10]) {
+    let dupDecks = 0;
+    for (let i = 0; i < 200; i++) {
+      const d = ShowdownEngine.generateDeck(vel, 5);
+      const ids = d.map(c => `${c.rank}${c.suit}`);
+      if (new Set(ids).size !== ids.length) dupDecks++;
+    }
+    assert(dupDecks === 0, `velocity ${vel}: no deck contains a duplicate card (${dupDecks}/200 did)`);
+  }
+
+  // The dealt board must never show the same card twice.
+  {
+    let dupBoards = 0;
+    for (let i = 0; i < 300; i++) {
+      const e = new ShowdownEngine({ velocity: 9, control: 5, stamina: 6, traits: [] });
+      e.start({ contact: 7, power: 5 }, 0, 1, 0, false);
+      e.dealFlop(); e.dealTurn(); e.dealRiver();
+      const shown = [...e.pitcherHole, ...e.community].map(c => `${c.rank}${c.suit}`);
+      if (new Set(shown).size !== shown.length) dupBoards++;
+    }
+    assert(dupBoards === 0, `no showdown board shows a duplicate card (${dupBoards}/300 did)`);
+  }
+
+  // Pitcher and batter draw from SEPARATE decks, so the same card appearing in
+  // both hole hands is legal by design — but each deck must be internally clean.
+  {
+    const e = new ShowdownEngine({ velocity: 8, control: 6, stamina: 6, traits: [] });
+    e.start({ contact: 6, power: 6 }, 0, 1, 0, false);
+    const ids = [...e.pitcherDeck, ...e.pitcherHole].map(c => `${c.rank}${c.suit}`);
+    assert(new Set(ids).size === ids.length,
+      'dealing hole cards does not duplicate cards left in the deck');
+    assert(e.pitcherDeck.length === 18, 'two hole cards were REMOVED from the 20-card deck');
+  }
 }
 
 group('25b. ShowdownEngine — Board state & stages');

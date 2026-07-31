@@ -1091,9 +1091,13 @@ export default class GameScene extends Phaser.Scene {
     this.rosterOverlayVisible = true;
     const els = this.rosterOverlayElements;
 
-    // Full-screen overlay
+    // Full-screen overlay. Interactive so it swallows clicks on the scene beneath
+    // it, and it closes on click: without a handler it silently ate every click,
+    // so a player who clicked anywhere but the small CLOSE button looked
+    // soft-locked (PLAY/DISCARD were unreachable behind it).
     const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.92)
       .setDepth(50).setInteractive();
+    overlay.on('pointerdown', () => this._toggleRosterOverlay());
     els.push(overlay);
 
     // Close button
@@ -2449,11 +2453,14 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Pitch Resolution Animation (cinematic overlay) ──
     const showResult = () => {
-      this._showPlayResult(handResult, isOut, batter, pitcher, count,
+      this._showPlayResult({
+        handResult, isOut, batter, pitcher, count,
         pitcherPreMessage, pitcherPostMessage, batterPostMessage,
         batterBonuses, pitcherPostPenalty, staffBonuses, lineupBonuses,
-        synergyBonuses, situational, situationalMessage, sacrificeFlyRun,
-        productiveRuns, blackSheep, savedPairsPlayed, batterPostMod);
+        synergyBonuses, situational, situationalMessage,
+        sacrificeFlyRun, productiveRuns,
+        blackSheep, savedPairsPlayed, batterPostMod,
+      });
     };
 
     if (this.showShowdowns) {
@@ -2479,12 +2486,31 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Post-animation result display — everything that was Phase 0+ in _onPlay */
-  _showPlayResult(handResult, isOut, batter, pitcher, count,
-    pitcherPreMessage, pitcherPostMessage, batterPostMessage,
-    batterBonuses, pitcherPostPenalty, staffBonuses, lineupBonuses,
-    synergyBonuses, situational, situationalMessage, sacrificeFlyRun,
-    productiveRuns, blackSheep, savedPairsPlayed, batterPostMod) {
+  /**
+   * Post-animation result display — everything that was Phase 0+ in _onPlay.
+   *
+   * Takes a single `atBatResult` object rather than a positional argument list.
+   * This used to be 20 positional parameters, which made call sites unreadable
+   * and a mis-ordered argument silently type-correct. Destructured into the same
+   * local names so the body below reads unchanged.
+   *
+   * @param {Object} atBatResult - everything _onPlay resolved for this at-bat
+   */
+  _showPlayResult(atBatResult) {
+    const {
+      // The play itself
+      handResult, isOut, batter, pitcher, count,
+      // Trait activation messages, shown in sequence
+      pitcherPreMessage, pitcherPostMessage, batterPostMessage,
+      // Bonus objects from each resolution pass (see BonusEngine)
+      batterBonuses, pitcherPostPenalty, staffBonuses, lineupBonuses, synergyBonuses,
+      // Situational transformation (DP, FC, error, stretch triple, ...)
+      situational, situationalMessage,
+      // Runs scored outside the primary outcome
+      sacrificeFlyRun, productiveRuns,
+      // Misc carry-through
+      blackSheep, savedPairsPlayed, batterPostMod,
+    } = atBatResult;
 
     // ── Phase 0: Show pitcher pre-trait activation if any ──
     let pitcherDelay = 0;

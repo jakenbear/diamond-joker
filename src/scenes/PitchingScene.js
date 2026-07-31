@@ -330,8 +330,13 @@ export default class PitchingScene extends Phaser.Scene {
     this.rosterOverlayVisible = true;
     const els = this.rosterOverlayElements;
 
+    // The backdrop is interactive so it swallows clicks on the scene beneath it
+    // (otherwise DEAL/IBB stay clickable through the overlay). It also closes the
+    // overlay: without a handler it silently ate every click, so a player who
+    // clicked anywhere but the small CLOSE button appeared to be soft-locked.
     const overlay = this.add.rectangle(640, 360, 1280, 720, 0x000000, 0.92)
       .setDepth(50).setInteractive();
+    overlay.on('pointerdown', () => this._toggleRosterOverlay());
     els.push(overlay);
 
     const closeBg = this.add.rectangle(1220, 40, 80, 32, 0x8b0000)
