@@ -8,6 +8,7 @@ import COACHES from '../../data/coaches.js';
 import MASCOTS from '../../data/mascots.js';
 import SynergyEngine from '../SynergyEngine.js';
 import StatDisplay from '../StatDisplay.js';
+import { itemDescription } from '../EffectEngine.js';
 
 const RARITY_COLORS = {
   common:   { fill: 0x4caf50, border: 0x66bb6a, label: '#81c784' },
@@ -141,7 +142,7 @@ export default class ShopScene extends Phaser.Scene {
       fontSize: '18px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.add.text(x, y - 20, trait.description, {
+    this.add.text(x, y - 20, itemDescription(trait, this.baseball.totalInnings), {
       fontSize: '12px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center', wordWrap: { width: 200 },
     }).setOrigin(0.5);
@@ -282,7 +283,7 @@ export default class ShopScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Description
-    this.add.text(x, y + 40, item.description, {
+    this.add.text(x, y + 40, itemDescription(item, this.baseball.totalInnings), {
       fontSize: '11px', fontFamily: 'monospace', color: '#aaaaaa',
       align: 'center', wordWrap: { width: 200 },
     }).setOrigin(0.5);
@@ -336,7 +337,7 @@ export default class ShopScene extends Phaser.Scene {
       fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0, 0.5);
 
-    this.add.text(650, y, item.description, {
+    this.add.text(650, y, itemDescription(item, this.baseball.totalInnings), {
       fontSize: '11px', fontFamily: 'monospace', color: '#aaaaaa',
     }).setOrigin(0, 0.5);
 

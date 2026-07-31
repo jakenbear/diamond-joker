@@ -7,7 +7,7 @@ import CardEngine from '../src/CardEngine.js';
 import BaseballState from '../src/BaseballState.js';
 import RosterManager, { PITCH_TYPES } from '../src/RosterManager.js';
 import TraitManager from '../src/TraitManager.js';
-import EffectEngine, { checkCondition } from '../src/EffectEngine.js';
+import EffectEngine, { checkCondition, scaleInningWindow, describeInningWindow, itemDescription } from '../src/EffectEngine.js';
 import HAND_TABLE from '../data/hand_table.js';
 import TEAMS from '../data/teams.js';
 import BATTER_TRAITS from '../data/batter_traits.js';
@@ -5569,6 +5569,153 @@ group('36. getResult().innings counts innings actually played');
     assert(res.innings === res.playerRunsByInning.length,
       `extras: reported innings (${res.innings}) matches halves played (${res.playerRunsByInning.length})`);
     assert(res.innings === 4, `extras: a game decided in the 4th reports 4, not 5 (got ${res.innings})`);
+  }
+}
+
+// ── 37. Inning windows scale with game length ──────────
+
+group('37. Inning windows scale with game length');
+
+{
+  // Windows are authored on a 9-inning canvas: "innings 7-9" means "the last third
+  // of the game". At any other length they rescale, or every window above the
+  // chosen length is a dead card the player can still be sold.
+  const fires = (min, max, inning, totalInnings) =>
+    checkCondition({ type: 'inning_range', min, max }, {}, { inning, totalInnings });
+
+  // Baseline: 9-inning games are unchanged — authored values ARE the 9-inning values.
+  assert(!fires(7, 9, 6, 9), '9 inn: 7-9 does not fire in the 6th');
+  assert(fires(7, 9, 7, 9), '9 inn: 7-9 fires in the 7th');
+  assert(fires(7, 9, 9, 9), '9 inn: 7-9 fires in the 9th');
+  assert(fires(1, 3, 3, 9), '9 inn: 1-3 fires in the 3rd');
+  assert(!fires(1, 3, 4, 9), '9 inn: 1-3 does not fire in the 4th');
+  assert(fires(4, 6, 5, 9), '9 inn: 4-6 fires in the 5th');
+  assert(!fires(4, 6, 7, 9), '9 inn: 4-6 does not fire in the 7th');
+
+  // The bug: a 3-inning game sold "innings 7-9" traits that could never fire.
+  assert(fires(7, 9, 3, 3), '3 inn: late-game window fires in the 3rd (was dead)');
+  assert(fires(8, 9, 3, 3), '3 inn: last-two window fires in the 3rd (was dead)');
+  assert(fires(9, 9, 3, 3), '3 inn: final-inning window fires in the 3rd (was dead)');
+  assert(fires(7, 7, 3, 3), '3 inn: single mid-late window fires (was dead)');
+  assert(fires(4, 6, 2, 3), '3 inn: middle-third window fires in the 2nd (was dead)');
+  assert(fires(1, 3, 1, 3), '3 inn: first-third window fires in the 1st');
+
+  // ...and a late window must NOT bleed into the early game.
+  assert(!fires(7, 9, 1, 3), '3 inn: late-game window does not fire in the 1st');
+  assert(!fires(7, 9, 2, 3), '3 inn: late-game window does not fire in the 2nd');
+  assert(!fires(1, 3, 3, 3), '3 inn: first-third window does not fire in the 3rd');
+  assert(!fires(4, 6, 1, 3), '3 inn: middle window does not fire in the 1st');
+  assert(!fires(4, 6, 3, 3), '3 inn: middle window does not fire in the 3rd');
+
+  // 5- and 7-inning games land on the documented bands.
+  assert(fires(7, 9, 4, 5) && fires(7, 9, 5, 5), '5 inn: late window covers 4-5');
+  assert(!fires(7, 9, 3, 5), '5 inn: late window does not reach the 3rd');
+  assert(fires(7, 9, 5, 7) && fires(7, 9, 7, 7), '7 inn: late window covers 5-7');
+  assert(!fires(7, 9, 4, 7), '7 inn: late window does not reach the 4th');
+  assert(fires(1, 3, 2, 5) && !fires(1, 3, 3, 5), '5 inn: first-third window covers 1-2');
+
+  // Open-ended: a window reaching inning 9 must also cover EXTRA innings, so a
+  // "Closer" still fires in the 12th of a tied game.
+  for (const total of [3, 5, 7, 9]) {
+    assert(fires(7, 9, total + 3, total),
+      `${total} inn: late window still fires in extras (inning ${total + 3})`);
+    assert(fires(9, 9, total + 1, total),
+      `${total} inn: final-inning window still fires in extras`);
+  }
+  // A window that does NOT reach 9 stays closed and must not leak into extras.
+  assert(!fires(4, 6, 12, 9), 'a middle-third window does not fire in extra innings');
+
+  // Every window is reachable at every supported length — no dead cards, ever.
+  const AUTHORED = [[7, 9], [8, 9], [9, 9], [7, 7], [4, 6], [1, 3], [5, 9]];
+  for (const total of [3, 5, 7, 9]) {
+    for (const [min, max] of AUTHORED) {
+      let hits = 0;
+      for (let inn = 1; inn <= total; inn++) if (fires(min, max, inn, total)) hits++;
+      assert(hits > 0, `${total} inn: window ${min}-${max} fires in at least one inning`);
+    }
+  }
+
+  // Windows must stay ORDERED: a later authored window can't start before an earlier one.
+  for (const total of [3, 5, 7, 9]) {
+    const firstOf = (min, max) => {
+      for (let inn = 1; inn <= total; inn++) if (fires(min, max, inn, total)) return inn;
+      return 99;
+    };
+    const early = firstOf(1, 3), mid = firstOf(4, 6), late = firstOf(7, 9);
+    assert(early <= mid && mid <= late,
+      `${total} inn: windows stay ordered (early ${early} <= mid ${mid} <= late ${late})`);
+  }
+
+  // Missing totalInnings must not break anything — default to the 9-inning canvas.
+  assert(checkCondition({ type: 'inning_range', min: 7, max: 9 }, {}, { inning: 8 }),
+    'no totalInnings: falls back to literal 9-inning behaviour');
+  assert(!checkCondition({ type: 'inning_range', min: 7, max: 9 }, {}, { inning: 2 }),
+    'no totalInnings: literal window still excludes early innings');
+
+  // Real trait data, not just synthetic windows: the Closer must work in a short game.
+  {
+    const closer = BATTER_TRAITS.find(t => t.id === 'closer');
+    assert(!!closer, 'Closer trait exists');
+    const cond = closer.effect.condition;
+    assert(checkCondition(cond, {}, { inning: 3, totalInnings: 3 }),
+      'Closer fires in the 3rd of a 3-inning game');
+    assert(!checkCondition(cond, {}, { inning: 1, totalInnings: 3 }),
+      'Closer does not fire in the 1st of a 3-inning game');
+  }
+
+  // Descriptions must not promise a window the game can't honour.
+  {
+    const desc = describeInningWindow('+5 mult in innings 7-9', 7, 9, 3);
+    assert(!desc.includes('7-9'), `3-inning description drops "7-9" (got "${desc}")`);
+    assert(desc.includes('3'), `3-inning description names the real inning (got "${desc}")`);
+    const same = describeInningWindow('+5 mult in innings 7-9', 7, 9, 9);
+    assert(same === '+5 mult in innings 7-9', '9-inning description is left untouched');
+  }
+
+  // itemDescription drives every display site — traits, staff, lineup effects.
+  {
+    const closer = BATTER_TRAITS.find(t => t.id === 'closer');
+    assert(!itemDescription(closer, 3).includes('7-9'),
+      'itemDescription rescales a trait card in a 3-inning game');
+    assert(itemDescription(closer, 9) === closer.description,
+      'itemDescription leaves 9-inning text alone');
+
+    // No inning condition at all: passed straight through, never crashes.
+    const plain = BATTER_TRAITS.find(t => t.effect && !t.effect.condition);
+    if (plain) {
+      assert(itemDescription(plain, 3) === plain.description,
+        'itemDescription passes through traits with no inning window');
+    }
+    assert(itemDescription(null, 3) === '', 'itemDescription handles a null item');
+
+    // "Late innings" encoded in the effect TYPE, not a condition object, and read
+    // off a non-default field. This is the bonus-player lineup effect.
+    const late = BONUS_PLAYERS.find(p => p.lineupEffect &&
+      p.lineupEffect.type === 'team_late_inning_peanuts');
+    assert(!!late, 'a bonus player with a late-inning lineup effect exists');
+    const lateDesc = itemDescription(late, 3, 'lineupDescription');
+    assert(!lateDesc.includes('7-9'),
+      `lineup effect prose rescales too (got "${lateDesc}")`);
+    assert(itemDescription(late, 9, 'lineupDescription') === late.lineupDescription,
+      'lineup effect prose is untouched at 9 innings');
+  }
+
+  // The BonusEngine has its own inning-window path for staff — it must agree with
+  // the trait evaluator, or a staff card fires on a different schedule than its text.
+  {
+    const staffLate = { name: 'Test Coach', effect: { type: 'add_mult', value: 5,
+      condition: { type: 'inning_range', min: 7, max: 9 } } };
+    for (const total of [3, 5, 7, 9]) {
+      for (let inn = 1; inn <= total; inn++) {
+        const gs = { inning: inn, totalInnings: total, bases: [null, null, null],
+          outs: 0, playerScore: 0, opponentScore: 0 };
+        const hand = { peanuts: 10, mult: 1, score: 10, outcome: 'Single', handName: 'Pair' };
+        const applied = BonusEngine.applyStaff(hand, gs, { staff: [staffLate] }).multBonus > 0;
+        const expected = checkCondition(staffLate.effect.condition, {}, gs);
+        assert(applied === expected,
+          `${total} inn, inning ${inn}: staff window matches trait window`);
+      }
+    }
   }
 }
 

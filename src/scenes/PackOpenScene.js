@@ -11,6 +11,7 @@
 import BONUS_PLAYERS from '../../data/bonus_players.js';
 import BATTER_TRAITS from '../../data/batter_traits.js';
 import StatDisplay from '../StatDisplay.js';
+import { itemDescription } from '../EffectEngine.js';
 
 const RARITY_COLORS = {
   common:   { fill: 0x4caf50, border: 0x66bb6a, label: '#81c784' },
@@ -177,7 +178,7 @@ export default class PackOpenScene extends Phaser.Scene {
       fontSize: '12px', fontFamily: 'monospace', color: '#69f0ae', fontStyle: 'bold',
     }).setOrigin(0.5));
 
-    const traitDesc = trait ? trait.description : '';
+    const traitDesc = trait ? itemDescription(trait, this.baseball?.totalInnings) : '';
     front.add(this.add.text(0, 20, traitDesc, {
       fontSize: '10px', fontFamily: 'monospace', color: '#81c784',
       align: 'center', wordWrap: { width: cardW - 30 },
@@ -190,7 +191,7 @@ export default class PackOpenScene extends Phaser.Scene {
     front.add(this.add.text(0, 65, 'LINEUP EFFECT', {
       fontSize: '10px', fontFamily: 'monospace', color: '#ffab40', fontStyle: 'bold',
     }).setOrigin(0.5));
-    front.add(this.add.text(0, 85, player.lineupDescription, {
+    front.add(this.add.text(0, 85, itemDescription(player, this.baseball?.totalInnings, 'lineupDescription'), {
       fontSize: '11px', fontFamily: 'monospace', color: '#ffe082',
       align: 'center', wordWrap: { width: cardW - 30 },
     }).setOrigin(0.5));
@@ -331,7 +332,7 @@ export default class PackOpenScene extends Phaser.Scene {
         fontStyle: 'bold', align: 'center',
       }).setOrigin(0.5).setDepth(21);
 
-    const effectText = this.add.text(640, 400, bonus.lineupDescription, {
+    const effectText = this.add.text(640, 400, itemDescription(bonus, this.baseball?.totalInnings, 'lineupDescription'), {
       fontSize: '16px', fontFamily: 'monospace', color: '#ffe082',
       fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(21);

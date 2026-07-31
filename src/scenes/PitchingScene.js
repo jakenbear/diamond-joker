@@ -10,6 +10,7 @@ import SoundManager from '../SoundManager.js';
 import SynergyEngine from '../SynergyEngine.js';
 import ShowdownEngine from '../ShowdownEngine.js';
 import StatDisplay from '../StatDisplay.js';
+import { itemDescription } from '../EffectEngine.js';
 
 const TEAM_SPRITE_KEY = { 'Canada': 'canada', 'USA': 'usa', 'Japan': 'japan', 'Mexico': 'mexico' };
 
@@ -281,7 +282,7 @@ export default class PitchingScene extends Phaser.Scene {
         fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       }).setDepth(2);
 
-      this.add.text(stackX + 28, cardY + 16, item.description, {
+      this.add.text(stackX + 28, cardY + 16, itemDescription(item, this.baseball.totalInnings), {
         fontSize: '8px', fontFamily: 'monospace', color: '#aaaaaa',
         wordWrap: { width: stackW - 40 },
       }).setDepth(2);

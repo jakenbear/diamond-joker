@@ -5,6 +5,7 @@
 
 import BATTER_TRAITS from '../../data/batter_traits.js';
 import StatDisplay from '../StatDisplay.js';
+import { itemDescription } from '../EffectEngine.js';
 
 const RARITY_COLORS = {
   common:   { fill: '#81c784', bg: 0x1a2a3a },
@@ -92,7 +93,7 @@ export default class TraitDraftScene extends Phaser.Scene {
         fontSize: '10px', fontFamily: 'monospace', color: colors.fill,
       }).setOrigin(0.5);
 
-      const desc = this.add.text(tx, y + 10, trait.description, {
+      const desc = this.add.text(tx, y + 10, itemDescription(trait, this.innings), {
         fontSize: '11px', fontFamily: 'monospace', color: '#999999',
         wordWrap: { width: 310 },
       }).setOrigin(0.5);

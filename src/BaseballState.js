@@ -489,6 +489,9 @@ export default class BaseballState {
   getStatus() {
     return {
       inning: this.inning,
+      // Trait/staff inning windows rescale against this — without it they fall
+      // back to literal 9-inning behaviour and go dead in short games.
+      totalInnings: this.totalInnings,
       half: this.half,
       outs: this.outs,
       bases: [...this.bases],

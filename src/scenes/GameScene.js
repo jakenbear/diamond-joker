@@ -13,6 +13,7 @@ import SoundManager from '../SoundManager.js';
 import SynergyEngine from '../SynergyEngine.js';
 import StatDisplay from '../StatDisplay.js';
 import BonusEngine from '../BonusEngine.js';
+import { itemDescription } from '../EffectEngine.js';
 
 const RANK_NAMES = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const CARD_ASSET_RANKS = { 2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'j',12:'q',13:'k',14:'a' };
@@ -504,7 +505,7 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '11px', fontFamily: 'monospace', color: rarityColor, fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(3);
 
-    const desc = this.add.text(cx, cy + 8, trait.description, {
+    const desc = this.add.text(cx, cy + 8, itemDescription(trait, this.baseball.totalInnings), {
       fontSize: '9px', fontFamily: 'monospace', color: '#999999',
       align: 'center', wordWrap: { width: w - 10 },
     }).setOrigin(0.5).setDepth(3);
@@ -996,7 +997,7 @@ export default class GameScene extends Phaser.Scene {
         fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
       }).setDepth(2);
 
-      this.add.text(stackX + 38, cardY + 16, item.description, {
+      this.add.text(stackX + 38, cardY + 16, itemDescription(item, this.baseball.totalInnings), {
         fontSize: '8px', fontFamily: 'monospace', color: '#aaaaaa',
         wordWrap: { width: stackW - 50 },
       }).setDepth(2);

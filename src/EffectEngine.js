@@ -6,6 +6,81 @@
  * Adding a new effect type = add a handler here + use it in data files.
  */
 
+// ── Inning Windows ──────────────────────────────────────
+
+/** The canvas trait inning windows are authored against. */
+const CANON_INNINGS = 9;
+
+/**
+ * Rescale an authored inning window to the actual game length.
+ *
+ * Windows in `data/` are written for a 9-inning game, but a game can be 3, 5, 7,
+ * or 9 innings. Read literally, "innings 7-9" is a DEAD CARD in a 3-inning game —
+ * the player can be sold a 35-peanut Closer that can never fire. So a window means
+ * a *fraction of the game*: 7-9 is "the last third", 1-3 is "the first third".
+ *
+ * A window whose max reaches the final canonical inning stays open-ended, so it
+ * also covers extra innings — a Closer should fire in the 12th of a tied game.
+ *
+ * @returns {{min: number, max: number}} max is Infinity for open-ended windows.
+ */
+function scaleInningWindow(min, max, totalInnings) {
+  const total = totalInnings || CANON_INNINGS;
+  // Late windows stay open-ended so extra innings keep them live.
+  const openEnded = max >= CANON_INNINGS;
+  if (total === CANON_INNINGS) {
+    return { min, max: openEnded ? Infinity : max };
+  }
+
+  // Map the authored boundaries onto the shorter schedule. floor+1 on the low end
+  // and ceil on the high end keep short windows from collapsing to nothing.
+  const lo = Math.floor((min - 1) * total / CANON_INNINGS) + 1;
+  const hi = Math.ceil(max * total / CANON_INNINGS);
+  return {
+    min: Math.min(lo, total),
+    max: openEnded ? Infinity : Math.max(lo, hi),
+  };
+}
+
+/**
+ * Rewrite a trait description so it names the innings the window ACTUALLY covers.
+ * A card that says "innings 7-9" in a 3-inning game is lying to the player.
+ * Leaves 9-inning games untouched — the authored text is already correct there.
+ */
+function describeInningWindow(description, min, max, totalInnings) {
+  const total = totalInnings || CANON_INNINGS;
+  if (total === CANON_INNINGS || !description) return description;
+
+  const w = scaleInningWindow(min, max, total);
+  const hi = w.max === Infinity ? total : Math.min(w.max, total);
+  const label = w.min >= hi ? `inning ${w.min}` : `innings ${w.min}-${hi}`;
+
+  // Match the authored phrasing: "innings 7-9", "inning 9".
+  return description.replace(/innings?\s+\d+(\s*-\s*\d+)?/i, label);
+}
+
+/**
+ * Display description for any trait-like item (trait, staff, mascot, lineup effect),
+ * with its inning window rewritten to the actual game length. Safe to call on items
+ * that have no inning condition — returns the description unchanged.
+ */
+function itemDescription(item, totalInnings, field = 'description') {
+  if (!item) return '';
+  const text = item[field];
+  const cond = item.effect && item.effect.condition;
+  if (cond && cond.type === 'inning_range') {
+    return describeInningWindow(text, cond.min, cond.max, totalInnings);
+  }
+  // Some effects encode "late innings" in their type rather than a condition
+  // object (e.g. team_late_inning_peanuts), but still say "innings 7-9" in prose.
+  const type = item.effect && item.effect.type;
+  const lineupType = item.lineupEffect && item.lineupEffect.type;
+  if (type === 'team_late_inning_peanuts' || lineupType === 'team_late_inning_peanuts') {
+    return describeInningWindow(text, 7, 9, totalInnings);
+  }
+  return text;
+}
+
 // ── Condition Evaluators ────────────────────────────────
 
 function checkCondition(cond, evalResult, gameState) {
@@ -21,8 +96,12 @@ function checkCondition(cond, evalResult, gameState) {
     case 'outs_neq':
       return gameState.outs !== cond.value;
 
-    case 'inning_range':
-      return gameState.inning >= cond.min && gameState.inning <= cond.max;
+    case 'inning_range': {
+      // Authored on a 9-inning canvas; rescaled to the real game length so short
+      // games don't sell traits that can never fire. See scaleInningWindow.
+      const w = scaleInningWindow(cond.min, cond.max, gameState.totalInnings);
+      return gameState.inning >= w.min && gameState.inning <= w.max;
+    }
 
     case 'runner_on':
       // Truthiness, not `=== true`: BaseballState stores the actual batter object
@@ -328,4 +407,4 @@ export default class EffectEngine {
   }
 }
 
-export { checkCondition };
+export { checkCondition, scaleInningWindow, describeInningWindow, itemDescription, CANON_INNINGS };

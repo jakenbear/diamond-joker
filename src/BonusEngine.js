@@ -13,6 +13,7 @@
  */
 
 import StatDisplay from './StatDisplay.js';
+import { scaleInningWindow } from './EffectEngine.js';
 
 /** Outcomes that record an out — not a hit. */
 const OUT_OUTCOMES = ['Strikeout', 'Groundout', 'Flyout', 'Double Play', "Fielder's Choice"];
@@ -63,7 +64,10 @@ export default class BonusEngine {
           let applies = true;
           if (eff.condition) {
             if (eff.condition.type === 'inning_range') {
-              applies = gameState.inning >= eff.condition.min && gameState.inning <= eff.condition.max;
+              // Same 9-inning-canvas rescaling as trait conditions, so staff
+              // windows aren't dead in short games either.
+              const w = scaleInningWindow(eff.condition.min, eff.condition.max, gameState.totalInnings);
+              applies = gameState.inning >= w.min && gameState.inning <= w.max;
             } else if (eff.condition.type === 'bases_empty') {
               applies = !gameState.bases.some(b => b);
             }
@@ -250,7 +254,9 @@ export default class BonusEngine {
           break;
         }
         case 'team_late_inning_peanuts': {
-          if (gameState.inning >= 7) {
+          // "Late innings" = the last third of the game, not literally 7+, which
+          // never arrives in a 3/5-inning game.
+          if (gameState.inning >= scaleInningWindow(7, 9, gameState.totalInnings).min) {
             bonuses.peanutBonus += eff.value;
             bonuses.messages.push({ text: `+${eff.value} peanuts (late inning)`, color: '#ffd600' });
           }

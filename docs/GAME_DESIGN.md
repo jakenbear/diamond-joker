@@ -408,6 +408,34 @@ Internal math always uses raw 1-10 values.
 - **Pre-eval:** Modifies cards before hand evaluation (e.g., making adjacent ranks count as pairs)
 - **Post-eval:** Modifies the result after evaluation (e.g., +mult, outcome upgrades)
 
+### Inning Windows Scale With Game Length
+
+Trait conditions are authored as `{ type: 'inning_range', min, max }` against a
+**9-inning canvas** — "innings 7-9" means *the last third of the game*, not literally
+innings 7 through 9. At any other game length the window is rescaled proportionally, so
+a late-game trait is always live for roughly the final third no matter how long the game
+is.
+
+Without this, every window above the chosen length was a **dead card**: a 3-inning game
+would offer "Closer: +5 mult in innings 7-9" for 35 peanuts and it could never fire.
+
+| Authored | 9 inn | 7 inn | 5 inn | 3 inn |
+|----------|-------|-------|-------|-------|
+| 7-9 (last third) | 7-9 | 5-7 | 4-5 | 3 |
+| 8-9 (last two)   | 8-9 | 6-7 | 4-5 | 3 |
+| 9 (final only)   | 9 | 7 | 5 | 3 |
+| 7 (single, mid-late) | 7 | 5-6 | 4 | 3 |
+| 4-6 (middle third) | 4-6 | 3-5 | 2-4 | 2 |
+| 1-3 (first third) | 1-3 | 1-3 | 1-2 | 1 |
+
+Rules:
+- A window whose `max` reaches 9 stays **open-ended**, so it also covers extra innings.
+  A "Closer" trait fires in the 12th inning of a tied game, as it should.
+- A window never collapses to nothing — `min` is clamped so it can always fire at least
+  one inning.
+- Trait **descriptions are rewritten to match** the actual game length, so the card never
+  promises a window it won't honour.
+
 ### Rarity & Pricing
 
 | Rarity | Weight | Price |
