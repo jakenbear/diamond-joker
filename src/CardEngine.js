@@ -373,6 +373,37 @@ export default class CardEngine {
   }
 
   /**
+   * Classify cards as a poker hand — PURE. No RNG, no mutation, no game state.
+   *
+   * This is the evaluator to use whenever you need to compare hands (e.g. the
+   * pitching showdown). `evaluateHand` is NOT suitable for comparison: it rolls
+   * the batting out-chance and rewrites a made hand's score to 0, so the same
+   * cards can yield different scores on repeated calls.
+   *
+   * `strength` follows poker order (higher = better hand), independent of the
+   * peanuts/mult REWARD values in hand_table.js.
+   *
+   * @param {Array<{rank:number,suit:string}>} cards
+   * @returns {{handIdx:number, handName:string, strength:number, bestCards:Array, pairRank:number}}
+   */
+  static classify(cards) {
+    if (!cards || cards.length === 0) {
+      return { handIdx: 9, handName: 'High Card', strength: 0, bestCards: [], pairRank: 0 };
+    }
+    const { handIdx, bestCards } = CardEngine._bestSubHand(cards);
+    const freq = {};
+    for (const c of bestCards) freq[c.rank] = (freq[c.rank] || 0) + 1;
+    return {
+      handIdx,
+      handName: HAND_TABLE[handIdx].handName,
+      // handIdx 0 = best, 9 = worst → invert so higher strength = stronger hand.
+      strength: HAND_TABLE.length - 1 - handIdx,
+      bestCards,
+      pairRank: CardEngine._getPairRank(freq),
+    };
+  }
+
+  /**
    * Find the best poker hand among all subsets of the given cards.
    * Tries all C(n,k) combinations for k = n down to 1 and returns the
    * best (lowest handIdx). For ≤5 cards this is at most 31 subsets.

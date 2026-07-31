@@ -9,8 +9,23 @@
  */
 
 import CardEngine from './CardEngine.js';
+import HAND_TABLE from '../data/hand_table.js';
 
 const SUITS = ['H', 'D', 'C', 'S'];
+
+// Weight of one hand-class step when collapsing a hand to a comparable number.
+// Within-class tiebreaks are base-15 over 5 rank slots, maxing at WITHIN_CLASS_MAX,
+// so one class step must be worth more than that to stay strictly dominant.
+const CLASS_POWER = 1_000_000;
+const WITHIN_CLASS_MAX = Math.pow(15, 5); // 759,375
+
+// How much one point of pitcher trait bonus is worth, and the hard ceiling on
+// their total contribution. Two hands one class apart can differ by as little as
+// CLASS_POWER - WITHIN_CLASS_MAX (best-ranked low class vs worst-ranked high
+// class), so the cap must stay under that gap. Traits then sway close calls
+// WITHIN a hand class but can never let a worse hand class beat a better one.
+const TRAIT_POWER_MAX = CLASS_POWER - WITHIN_CLASS_MAX - 1; // 240,624
+const TRAIT_POWER_PER_POINT = 6_000;
 
 // Stamina cost per pitch (from PITCH_TYPES, simplified for showdown)
 const PITCH_STAMINA = {
@@ -114,28 +129,85 @@ export default class ShowdownEngine {
   /**
    * Find best 5-card hand from 2 hole + up to 5 community.
    * Tries all C(n,5) combinations.
+   *
+   * Uses CardEngine.classify (PURE — no RNG) to rank combos. Do NOT use
+   * evaluateHand here: it rolls the batting out-chance and zeroes a made hand's
+   * score, which made this function non-deterministic and caused real
+   * flushes/straights to lose to a lesser combo from the same cards.
+   *
+   * Ties on hand class are broken by the ranks involved (pair rank first, then
+   * remaining cards high-to-low), so a pair of Aces beats a pair of 3s.
+   *
+   * @returns {{handName, strength, score, cards, pairRank, tiebreak, _highCard}}
    */
   static bestHand(hole, community) {
     const all = [...hole, ...community];
-    if (all.length < 5) {
-      // Not enough cards — evaluate what we have
-      return CardEngine.evaluateHand(all);
+    if (all.length === 0) {
+      return { handName: 'High Card', strength: 0, score: 0, cards: [], pairRank: 0, tiebreak: [], _highCard: 0 };
     }
+
+    const combos = all.length < 5
+      ? [all]                                        // not enough cards — judge what we have
+      : ShowdownEngine._combinations(all, 5);
+
     let best = null;
-    let bestScore = -1;
-    const combos = ShowdownEngine._combinations(all, 5);
     for (const combo of combos) {
-      const result = CardEngine.evaluateHand(combo);
-      if (result.score > bestScore) {
-        best = result;
-        best.cards = combo;
-        bestScore = result.score;
-      }
+      const c = CardEngine.classify(combo);
+      const cand = {
+        handName: c.handName,
+        strength: c.strength,
+        pairRank: c.pairRank,
+        tiebreak: ShowdownEngine._tiebreak(c),
+        cards: combo,
+      };
+      if (!best || ShowdownEngine._compare(cand, best) > 0) best = cand;
     }
-    if (best && bestScore === 0) {
-      best._highCard = Math.max(...all.map(c => c.rank));
-    }
+
+    // `score` keeps the reward value from hand_table for display/peanuts, but it
+    // is NOT what ranks hands — `strength` + `tiebreak` do that.
+    const entry = HAND_TABLE.find(h => h.handName === best.handName);
+    best.score = entry ? Math.round(entry.peanuts * entry.mult) : 0;
+    best._highCard = Math.max(...all.map(c => c.rank));
     return best;
+  }
+
+  /**
+   * Ordered rank list for breaking ties within the same hand class:
+   * grouped ranks first (by group size, then rank), then kickers high-to-low.
+   */
+  static _tiebreak(classified) {
+    const freq = {};
+    for (const c of classified.bestCards) freq[c.rank] = (freq[c.rank] || 0) + 1;
+    return Object.entries(freq)
+      .map(([rank, count]) => ({ rank: parseInt(rank, 10), count }))
+      .sort((a, b) => b.count - a.count || b.rank - a.rank)
+      .map(g => g.rank);
+  }
+
+  /**
+   * Collapse a hand into a single comparable number. The hand class dominates;
+   * the tiebreak ranks refine within a class via base-15 positional weighting
+   * (ranks are 2..14, so 5 slots max out just under one CLASS_POWER step).
+   */
+  static _power(hand) {
+    let within = 0;
+    const tb = hand.tiebreak || [];
+    for (let i = 0; i < 5; i++) {
+      within = within * 15 + (tb[i] || 0);
+    }
+    return (hand.strength || 0) * CLASS_POWER + within;
+  }
+
+  /** Compare two candidate hands. >0 if a is better, <0 if b is better, 0 if equal. */
+  static _compare(a, b) {
+    if (a.strength !== b.strength) return a.strength - b.strength;
+    const len = Math.max(a.tiebreak.length, b.tiebreak.length);
+    for (let i = 0; i < len; i++) {
+      const ar = a.tiebreak[i] ?? 0;
+      const br = b.tiebreak[i] ?? 0;
+      if (ar !== br) return ar - br;
+    }
+    return 0;
   }
 
   static _combinations(arr, k) {
@@ -160,25 +232,35 @@ export default class ShowdownEngine {
     const pHand = ShowdownEngine.bestHand(this.pitcherHole, this.community);
     const bHand = ShowdownEngine.bestHand(this.batterHole, this.community);
 
-    // Apply pitcher trait bonuses
+    // Apply pitcher trait bonuses (may mutate the board / batter hole cards, so
+    // this runs before the hands are turned into comparable power values).
     const traitBonus = this._calcTraitBonus();
 
-    const pScore = pHand.score + traitBonus;
-    const bScore = bHand.score;
+    // WINNER is decided by poker hand strength (class first, then ranks) — never
+    // by the peanuts/mult reward value, which is not ordered by hand strength.
+    // Traits add weight WITHIN a hand class: they can break a close call but
+    // cannot make a worse hand class beat a better one.
+    const traitPower = Math.max(-TRAIT_POWER_MAX,
+      Math.min(TRAIT_POWER_MAX, traitBonus * TRAIT_POWER_PER_POINT));
+    const pPower = ShowdownEngine._power(pHand) + traitPower;
+    const bPower = ShowdownEngine._power(bHand);
 
-    let winner, margin;
-    if (pScore > bScore) {
+    let winner;
+    if (pPower > bPower) {
       winner = 'pitcher';
-      margin = pScore - bScore;
-    } else if (bScore > pScore) {
+    } else if (bPower > pPower) {
       winner = 'batter';
-      margin = bScore - pScore;
     } else {
       const pHigh = Math.max(...this.pitcherHole.map(c => c.rank));
       const bHigh = Math.max(...this.batterHole.map(c => c.rank));
       winner = pHigh >= bHigh ? 'pitcher' : 'batter';
-      margin = 0;
     }
+
+    // MARGIN stays on the reward-score scale, which is what the outcome
+    // thresholds in _pitcherOutcome/_batterOutcome are calibrated against.
+    const pScore = pHand.score + traitBonus;
+    const bScore = bHand.score;
+    const margin = Math.abs(pScore - bScore);
 
     const outcome = winner === 'pitcher'
       ? ShowdownEngine._pitcherOutcome(margin)
