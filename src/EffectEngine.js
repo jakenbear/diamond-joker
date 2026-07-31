@@ -25,7 +25,9 @@ function checkCondition(cond, evalResult, gameState) {
       return gameState.inning >= cond.min && gameState.inning <= cond.max;
 
     case 'runner_on':
-      return gameState.bases[cond.base] === true;
+      // Truthiness, not `=== true`: BaseballState stores the actual batter object
+      // on a base (`bases[0] = batter || true`), so a strict check misses real runners.
+      return !!gameState.bases[cond.base];
 
     case 'bases_loaded':
       return gameState.bases[0] && gameState.bases[1] && gameState.bases[2];
