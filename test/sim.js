@@ -18,6 +18,7 @@ import BONUS_PLAYERS from '../data/bonus_players.js';
 import SYNERGIES from '../data/synergies.js';
 import SynergyEngine from '../src/SynergyEngine.js';
 import StatDisplay from '../src/StatDisplay.js';
+import BonusEngine from '../src/BonusEngine.js';
 
 // Baseline gameState with discardCount=1 (no bonus/penalty) for out-rate tests
 const BASELINE_STATE = { discardCount: 1 };
@@ -77,14 +78,14 @@ group('1a. Hand Evaluation');
   const foak = makeCards([[7,'H'],[7,'D'],[7,'C'],[7,'S'],[3,'H']]);
   const r = CardEngine.evaluateHand(foak);
   assert(r.handName === 'Four of a Kind', 'Four of a Kind detected');
-  assert(r.peanuts === 6 && r.mult === 6, 'Four of a Kind peanuts/mult');
+  assert(r.peanuts === HAND_TABLE[2].peanuts && r.mult === HAND_TABLE[2].mult, 'Four of a Kind peanuts/mult');
 }
 {
   const fh = makeCards([[9,'H'],[9,'D'],[9,'C'],[4,'S'],[4,'H']]);
   const r = CardEngine.evaluateHand(fh, null, null, BASELINE_STATE);
   const fhName = r.originalHand || r.handName;
   assert(fhName === 'Full House', 'Full House detected');
-  assert(r.peanuts === 3 && r.mult === 2.5 || r.originalHand === 'Full House', 'Full House peanuts/mult');
+  assert((r.peanuts === HAND_TABLE[3].peanuts && r.mult === HAND_TABLE[3].mult) || r.originalHand === 'Full House', 'Full House peanuts/mult');
 }
 {
   // Flush/Straight have 10% out chance — check detection via originalHand fallback
@@ -670,6 +671,66 @@ group('1f-pitcher. Expanded Pitcher Traits');
   assert(checkCondition({ type: 'bases_occupied' }, {}, { bases: [true, false, false] }) === true, 'condition: bases_occupied true with a true runner');
   assert(checkCondition({ type: 'bases_occupied' }, {}, { bases: [null, { name: 'Batter' }, null] }) === true, 'condition: bases_occupied true with an object runner');
   assert(checkCondition({ type: 'bases_occupied' }, {}, { bases: [false, false, false] }) === false, 'condition: bases_occupied false when empty');
+}
+{
+  // Conditions: runner_on must be truthiness-based, not `=== true`.
+  // BaseballState stores the actual batter OBJECT on a base (`bases[0] = batter || true`),
+  // and GameScene always passes a real batter — so a strict `=== true` check silently
+  // failed in the real game while passing against `[true, ...]` test fixtures.
+  assert(checkCondition({ type: 'runner_on', base: 0 }, {}, { bases: [true, null, null] }) === true, 'condition: runner_on true with a true sentinel runner');
+  assert(checkCondition({ type: 'runner_on', base: 0 }, {}, { bases: [{ name: 'Batter' }, null, null] }) === true, 'condition: runner_on true with an OBJECT runner on 1st');
+  assert(checkCondition({ type: 'runner_on', base: 2 }, {}, { bases: [null, null, { name: 'Batter' }] }) === true, 'condition: runner_on true with an OBJECT runner on 3rd');
+  assert(checkCondition({ type: 'runner_on', base: 0 }, {}, { bases: [null, { name: 'Batter' }, null] }) === false, 'condition: runner_on false when the runner is on a different base');
+  assert(checkCondition({ type: 'runner_on', base: 0 }, {}, { bases: [null, null, null] }) === false, 'condition: runner_on false when bases empty');
+}
+{
+  // End-to-end: the five traits that depend on runner_on must fire against REAL
+  // BaseballState bases (object runners), not just hand-built `true` fixtures.
+  const batter = { name: 'Slugger', contact: 7, power: 8, speed: 5 };
+
+  const bs1 = new BaseballState();
+  bs1.resolveOutcome('Single', 0, batter); // runner (object) now on 1st
+  const withRunnerOn1st = bs1.getStatus();
+
+  const stolenBase = BATTER_TRAITS.find(t => t.id === 'stolen_base');
+  assert(!!stolenBase, 'Stolen Base trait exists');
+  const sbRes = EffectEngine.applyPost(
+    { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 },
+    stolenBase.effect, withRunnerOn1st);
+  assert(sbRes.stolenBase === true, 'Stolen Base: flag fires with a real object runner on 1st');
+
+  const hitAndRun = BATTER_TRAITS.find(t => t.id === 'hit_and_run');
+  assert(!!hitAndRun, 'Hit and Run trait exists');
+  const harRes = EffectEngine.applyPost(
+    { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 },
+    hitAndRun.effect, withRunnerOn1st);
+  assert(harRes.mult === 3.5, `Hit and Run: +2 mult with a real object runner on 1st (got ${harRes.mult})`);
+
+  // Sacrifice Fly: strikeout with a real object runner on 3rd scores a run
+  const bs2 = new BaseballState();
+  bs2.bases = [null, null, batter];
+  const sacFly = BATTER_TRAITS.find(t => t.id === 'sacrifice_fly');
+  assert(!!sacFly, 'Sacrifice Fly trait exists');
+  const sfRes = EffectEngine.applyPost(
+    { outcome: 'Strikeout', handName: 'High Card', peanuts: 0, mult: 1 },
+    sacFly.effect, bs2.getStatus());
+  assert(sfRes.sacrificeFly === true, 'Sacrifice Fly: flag fires with a real object runner on 3rd');
+
+  // Scoring Position: runner on 2nd or 3rd
+  const scoringPosition = BATTER_TRAITS.find(t => t.id === 'scoring_position');
+  assert(!!scoringPosition, 'Scoring Position trait exists');
+  const spRes = EffectEngine.applyPost(
+    { outcome: 'Single', handName: 'Pair', peanuts: 1, mult: 1.5 },
+    scoringPosition.effect, bs2.getStatus());
+  assert(spRes.mult > 1.5, `Scoring Position: mult increases with a real object runner on 3rd (got ${spRes.mult})`);
+
+  // Squeeze Play: strikeout with a runner on 3rd sets the sacrificeFly flag
+  const squeezePlay = BATTER_TRAITS.find(t => t.id === 'squeeze_play');
+  assert(!!squeezePlay, 'Squeeze Play trait exists');
+  const sqRes = EffectEngine.applyPost(
+    { outcome: 'Strikeout', handName: 'High Card', peanuts: 0, mult: 1 },
+    squeezePlay.effect, bs2.getStatus());
+  assert(sqRes.sacrificeFly === true, 'Squeeze Play: flag fires with a real object runner on 3rd');
 }
 {
   // Empty Yard trait: +4 mult ONLY when bases are empty (regression: used to always fire)
@@ -3876,6 +3937,25 @@ group('19. Hand Table Integrity');
 
   // Better hands have better outcomes (higher peanuts or better outcome)
   assert(HAND_TABLE[0].peanuts >= HAND_TABLE[9].peanuts, 'Royal Flush peanuts >= High Card peanuts');
+
+  // The reward ladder must be MONOTONIC in hand strength: a rarer hand may never
+  // pay less than a more common one, in score or in bases. Regression guard for
+  // Straight paying a Home Run while Four of a Kind paid only a Triple, and for
+  // Full House (7.5) scoring below Flush (25).
+  const OUTCOME_BASES = {
+    'Strikeout': 0, 'Groundout': 0, 'Flyout': 0,
+    'Single': 1, 'Double': 2, 'Triple': 3, 'Home Run': 4,
+  };
+  for (let i = 0; i < HAND_TABLE.length - 1; i++) {
+    const better = HAND_TABLE[i];
+    const worse = HAND_TABLE[i + 1];
+    const bScore = better.peanuts * better.mult;
+    const wScore = worse.peanuts * worse.mult;
+    assert(bScore >= wScore,
+      `hand table score is monotonic: ${better.handName} (${bScore}) >= ${worse.handName} (${wScore})`);
+    assert(OUTCOME_BASES[better.outcome] >= OUTCOME_BASES[worse.outcome],
+      `hand table outcome is monotonic: ${better.handName} (${better.outcome}) >= ${worse.handName} (${worse.outcome})`);
+  }
 }
 
 // ── 20. Team Data Integrity ─────────────────────────────
@@ -4047,6 +4127,111 @@ group('25b. ShowdownEngine — Board state & stages');
   sd.dealRiver();
   assert(sd.community.length === 5, 'River deals 5th community card');
   assert(sd.stage === 'river', 'Stage is river');
+}
+
+group('25b2. ShowdownEngine — bestHand is a pure, deterministic evaluator');
+{
+  // bestHand must be a pure function of the cards. It previously ranked candidate
+  // 5-card combos by `evaluateHand().score`, but evaluateHand ROLLS the batting
+  // out-chance and rewrites a made hand to score 0 — so a real flush/straight
+  // randomly scored 0 and lost to a worse combo. Same cards must give same answer.
+  const runOnce = (hole, community) => {
+    const b = ShowdownEngine.bestHand(
+      hole.map(c => ({ ...c })), community.map(c => ({ ...c })));
+    return `${b.originalHand || b.handName}`;
+  };
+
+  // A board containing exactly one made flush (5 hearts) plus a pair of 9s.
+  const flushHole = [{ rank: 2, suit: 'H' }, { rank: 5, suit: 'H' }];
+  const flushBoard = [
+    { rank: 7, suit: 'H' }, { rank: 9, suit: 'H' }, { rank: 13, suit: 'H' },
+    { rank: 9, suit: 'S' }, { rank: 3, suit: 'C' },
+  ];
+  const flushAnswers = new Set();
+  for (let i = 0; i < 500; i++) flushAnswers.add(runOnce(flushHole, flushBoard));
+  assert(flushAnswers.size === 1, `bestHand is deterministic on a flush board (got ${flushAnswers.size} distinct answers: ${[...flushAnswers]})`);
+  assert(flushAnswers.has('Flush'), `bestHand finds the Flush, not a lesser hand (got ${[...flushAnswers]})`);
+
+  // A made straight (5-6-7-8-9) alongside a pair of 2s.
+  const strHole = [{ rank: 5, suit: 'H' }, { rank: 6, suit: 'D' }];
+  const strBoard = [
+    { rank: 7, suit: 'C' }, { rank: 8, suit: 'S' }, { rank: 9, suit: 'H' },
+    { rank: 2, suit: 'D' }, { rank: 2, suit: 'C' },
+  ];
+  const strAnswers = new Set();
+  for (let i = 0; i < 500; i++) strAnswers.add(runOnce(strHole, strBoard));
+  assert(strAnswers.size === 1, `bestHand is deterministic on a straight board (got ${strAnswers.size} distinct: ${[...strAnswers]})`);
+  assert(strAnswers.has('Straight'), `bestHand finds the Straight, not the Pair (got ${[...strAnswers]})`);
+
+  // bestHand must not mutate the cards it is handed.
+  const holeBefore = [{ rank: 14, suit: 'H' }, { rank: 13, suit: 'S' }];
+  const boardBefore = [
+    { rank: 7, suit: 'C' }, { rank: 9, suit: 'D' }, { rank: 10, suit: 'H' },
+    { rank: 5, suit: 'S' }, { rank: 2, suit: 'C' },
+  ];
+  const holeSnapshot = JSON.stringify(holeBefore);
+  const boardSnapshot = JSON.stringify(boardBefore);
+  ShowdownEngine.bestHand(holeBefore, boardBefore);
+  assert(JSON.stringify(holeBefore) === holeSnapshot, 'bestHand does not mutate the hole cards');
+  assert(JSON.stringify(boardBefore) === boardSnapshot, 'bestHand does not mutate the community cards');
+}
+
+group('25b3. ShowdownEngine — stronger poker hands beat weaker ones');
+{
+  // The showdown compares sides by hand strength. Because it used to compare
+  // `peanuts * mult` (a REWARD value, not a rank), a Full House (7.5) lost to
+  // Three of a Kind (9) and to a Flush (25). Strength must follow poker order.
+  const strengthOf = (cards) => {
+    const b = ShowdownEngine.bestHand(cards.slice(0, 2), cards.slice(2));
+    return b.strength;
+  };
+  const royal    = [{rank:14,suit:'H'},{rank:13,suit:'H'},{rank:12,suit:'H'},{rank:11,suit:'H'},{rank:10,suit:'H'}];
+  const strFlush = [{rank:9,suit:'S'},{rank:8,suit:'S'},{rank:7,suit:'S'},{rank:6,suit:'S'},{rank:5,suit:'S'}];
+  const quads    = [{rank:8,suit:'H'},{rank:8,suit:'D'},{rank:8,suit:'C'},{rank:8,suit:'S'},{rank:3,suit:'H'}];
+  const fullHse  = [{rank:8,suit:'H'},{rank:8,suit:'D'},{rank:8,suit:'C'},{rank:3,suit:'S'},{rank:3,suit:'H'}];
+  const flush    = [{rank:13,suit:'H'},{rank:9,suit:'H'},{rank:7,suit:'H'},{rank:5,suit:'H'},{rank:2,suit:'H'}];
+  const straight = [{rank:9,suit:'H'},{rank:8,suit:'D'},{rank:7,suit:'C'},{rank:6,suit:'S'},{rank:5,suit:'H'}];
+  const trips    = [{rank:4,suit:'H'},{rank:4,suit:'D'},{rank:4,suit:'C'},{rank:9,suit:'S'},{rank:2,suit:'H'}];
+  const twoPair  = [{rank:4,suit:'H'},{rank:4,suit:'D'},{rank:9,suit:'C'},{rank:9,suit:'S'},{rank:2,suit:'H'}];
+  const onePair  = [{rank:4,suit:'H'},{rank:4,suit:'D'},{rank:9,suit:'C'},{rank:7,suit:'S'},{rank:2,suit:'H'}];
+  const highCard = [{rank:14,suit:'H'},{rank:9,suit:'D'},{rank:7,suit:'C'},{rank:5,suit:'S'},{rank:2,suit:'H'}];
+
+  const ladder = [
+    ['Royal Flush', royal], ['Straight Flush', strFlush], ['Four of a Kind', quads],
+    ['Full House', fullHse], ['Flush', flush], ['Straight', straight],
+    ['Three of a Kind', trips], ['Two Pair', twoPair], ['Pair', onePair], ['High Card', highCard],
+  ];
+  for (let i = 0; i < ladder.length - 1; i++) {
+    const [betterName, betterCards] = ladder[i];
+    const [worseName, worseCards] = ladder[i + 1];
+    const bs = strengthOf(betterCards), ws = strengthOf(worseCards);
+    assert(bs > ws, `showdown strength: ${betterName} (${bs}) beats ${worseName} (${ws})`);
+  }
+}
+
+group('25b4. ShowdownEngine — traits cannot overturn a better hand class');
+{
+  // Pitcher traits add weight within a hand class only. Even stacking EVERY
+  // positive-bonus trait must not let a High Card beat a real Pair.
+  const allTraits = PITCHER_TRAITS.map(t => t.id);
+  let overturned = 0;
+  for (let i = 0; i < 200; i++) {
+    const g = new ShowdownEngine({ velocity: 5, control: 5, stamina: 5, traits: allTraits });
+    // inning 8 + bases occupied + 0 outs maximises the conditional bonuses
+    g.start({ contact: 5, power: 5 }, 0, 8, 3, true);
+    // Pitcher holds junk; batter holds a genuine pair. Board gives the pitcher nothing.
+    g.pitcherHole = [{ rank: 4, suit: 'H' }, { rank: 7, suit: 'D' }];
+    g.batterHole = [{ rank: 8, suit: 'H' }, { rank: 8, suit: 'D' }];
+    g.community = [
+      { rank: 2, suit: 'C' }, { rank: 5, suit: 'S' }, { rank: 9, suit: 'H' },
+      { rank: 11, suit: 'D' }, { rank: 13, suit: 'C' },
+    ];
+    const r = g.resolve();
+    // Traits may scramble the board; only judge the cases where the batter still
+    // holds the strictly better hand class.
+    if (r.batterHand.strength > r.pitcherHand.strength && r.winner === 'pitcher') overturned++;
+  }
+  assert(overturned === 0, `max trait stack never beats a better hand class (overturned ${overturned}/200)`);
 }
 
 group('25c. ShowdownEngine — Resolution');
@@ -4622,6 +4807,596 @@ group('28. Stat Display Conversion');
   assert(line.includes('AVG:'), `statLine has AVG: ${line}`);
   assert(line.includes('HR:'), `statLine has HR: ${line}`);
   assert(line.includes('SB:'), `statLine has SB: ${line}`);
+}
+
+
+// ═══════════════════════════════════════════════════════
+
+group('29. BonusEngine — Staff Effects');
+{
+  // Baseline state helper: no runners, inning 1, no inning runs
+  const st = (over = {}) => ({
+    inning: 1, outs: 0, bases: [null, null, null],
+    currentInningPlayerRuns: 0, playerScore: 0, opponentScore: 0,
+    ...over,
+  });
+  const res = (over = {}) => ({
+    handName: 'Pair', outcome: 'Single', peanuts: 4, mult: 2, score: 8, ...over,
+  });
+
+  // ── add_mult, unconditional ──
+  {
+    const r = res();
+    const b = BonusEngine.applyStaff(r, st(), {
+      staff: [{ name: 'Hype Man', effect: { type: 'add_mult', value: 2 } }],
+    });
+    assert(b.multBonus === 2, 'add_mult accumulates multBonus');
+    assert(r.mult === 4, `add_mult mutates result mult 2→4 (got ${r.mult})`);
+    assert(r.score === 16, `add_mult recomputes score (got ${r.score})`);
+    assert(b.messages.length === 1 && b.messages[0].text.includes('Hype Man'),
+      'add_mult message names the staff card');
+  }
+
+  // ── add_mult, inning_range condition ──
+  {
+    const eff = { type: 'add_mult', value: 3, condition: { type: 'inning_range', min: 7, max: 9 } };
+    const inside = res();
+    BonusEngine.applyStaff(inside, st({ inning: 8 }), { staff: [{ name: 'Closer', effect: eff }] });
+    assert(inside.mult === 5, `inning_range applies inside window (got ${inside.mult})`);
+
+    const outside = res();
+    BonusEngine.applyStaff(outside, st({ inning: 3 }), { staff: [{ name: 'Closer', effect: eff }] });
+    assert(outside.mult === 2, `inning_range skipped outside window (got ${outside.mult})`);
+  }
+
+  // ── add_mult, bases_empty condition ──
+  {
+    const eff = { type: 'add_mult', value: 1, condition: { type: 'bases_empty' } };
+    const empty = res();
+    BonusEngine.applyStaff(empty, st(), { staff: [{ name: 'Solo', effect: eff }] });
+    assert(empty.mult === 3, `bases_empty applies with no runners (got ${empty.mult})`);
+
+    const occupied = res();
+    BonusEngine.applyStaff(occupied, st({ bases: [{}, null, null] }), { staff: [{ name: 'Solo', effect: eff }] });
+    assert(occupied.mult === 2, `bases_empty skipped with a runner on (got ${occupied.mult})`);
+  }
+
+  // ── mult_per_inning_run ──
+  {
+    const r = res();
+    const b = BonusEngine.applyStaff(r, st({ currentInningPlayerRuns: 3 }), {
+      staff: [{ name: 'Rally Cap', effect: { type: 'mult_per_inning_run', value: 2 } }],
+    });
+    assert(b.multBonus === 6, `mult_per_inning_run scales by runs (got ${b.multBonus})`);
+
+    const none = res();
+    BonusEngine.applyStaff(none, st({ currentInningPlayerRuns: 0 }), {
+      staff: [{ name: 'Rally Cap', effect: { type: 'mult_per_inning_run', value: 2 } }],
+    });
+    assert(none.mult === 2, 'mult_per_inning_run is inert with 0 inning runs');
+  }
+
+  // ── flat_peanuts_per_ab ──
+  {
+    const r = res();
+    const b = BonusEngine.applyStaff(r, st(), {
+      staff: [{ name: 'Vendor', effect: { type: 'flat_peanuts_per_ab', value: 3 } }],
+    });
+    assert(b.peanutBonus === 3, 'flat_peanuts_per_ab accumulates');
+    assert(r.peanuts === 7 && r.score === 14, `flat_peanuts commits (got ${r.peanuts}/${r.score})`);
+  }
+
+  // ── per_runner_peanuts ──
+  {
+    const r = res();
+    const b = BonusEngine.applyStaff(r, st({ bases: [{}, null, {}] }), {
+      staff: [{ name: 'Usher', effect: { type: 'per_runner_peanuts', value: 2 } }],
+    });
+    assert(b.peanutBonus === 4, `per_runner_peanuts counts 2 runners (got ${b.peanutBonus})`);
+
+    const none = res();
+    BonusEngine.applyStaff(none, st(), {
+      staff: [{ name: 'Usher', effect: { type: 'per_runner_peanuts', value: 2 } }],
+    });
+    assert(none.peanuts === 4, 'per_runner_peanuts inert with empty bases');
+  }
+
+  // ── double_peanuts on matching outcome ──
+  {
+    const eff = { type: 'double_peanuts', condition: { type: 'outcome_is', value: 'Home Run' } };
+    const hr = res({ outcome: 'Home Run', peanuts: 5, mult: 3 });
+    BonusEngine.applyStaff(hr, st(), { staff: [{ name: 'Slugger Fan', effect: eff }] });
+    assert(hr.peanuts === 10, `double_peanuts doubles on match (got ${hr.peanuts})`);
+
+    const single = res({ outcome: 'Single', peanuts: 5 });
+    BonusEngine.applyStaff(single, st(), { staff: [{ name: 'Slugger Fan', effect: eff }] });
+    assert(single.peanuts === 5, 'double_peanuts skipped on non-matching outcome');
+  }
+
+  // ── team_convert_high_card ──
+  {
+    const eff = { type: 'team_convert_high_card', peanuts: 2, mult: 1.5 };
+    const hc = res({ handName: 'High Card', outcome: 'Strikeout', peanuts: 0, mult: 1, score: 0 });
+    const b = BonusEngine.applyStaff(hc, st(), { staff: [{ name: 'Bunt Coach', effect: eff }] });
+    assert(hc.outcome === 'Single', 'team_convert_high_card turns K into Single');
+    assert(hc.peanuts === 2 && hc.mult === 1.5, `converted values applied (got ${hc.peanuts}/${hc.mult})`);
+    assert(hc.score === 3, `converted score recomputed (got ${hc.score})`);
+    assert(b.outcomeChanged === true, 'team_convert_high_card flags outcomeChanged');
+
+    // Must NOT fire on a failed pair that became an out
+    const groundout = res({ handName: 'Groundout', outcome: 'Groundout', peanuts: 0, mult: 1 });
+    BonusEngine.applyStaff(groundout, st(), { staff: [{ name: 'Bunt Coach', effect: eff }] });
+    assert(groundout.outcome === 'Groundout', 'team_convert_high_card ignores non-High-Card outs');
+  }
+
+  // ── strikeout_to_walk (chance-based, injected RNG) ──
+  {
+    const eff = { type: 'strikeout_to_walk', chance: 0.5 };
+    const hit = res({ outcome: 'Strikeout' });
+    const b = BonusEngine.applyStaff(hit, st(), {
+      staff: [{ name: 'Ump Whisperer', effect: eff }], rng: () => 0.1,
+    });
+    assert(hit.outcome === 'Walk', 'strikeout_to_walk fires when roll under chance');
+    assert(b.outcomeChanged === true, 'strikeout_to_walk flags outcomeChanged');
+
+    const miss = res({ outcome: 'Strikeout' });
+    BonusEngine.applyStaff(miss, st(), {
+      staff: [{ name: 'Ump Whisperer', effect: eff }], rng: () => 0.9,
+    });
+    assert(miss.outcome === 'Strikeout', 'strikeout_to_walk skipped when roll over chance');
+
+    // Never converts a non-strikeout
+    const single = res({ outcome: 'Single' });
+    BonusEngine.applyStaff(single, st(), {
+      staff: [{ name: 'Ump Whisperer', effect: eff }], rng: () => 0,
+    });
+    assert(single.outcome === 'Single', 'strikeout_to_walk only touches strikeouts');
+  }
+
+  // ── error_multiplier is multiplicative, not additive ──
+  {
+    const b = BonusEngine.applyStaff(res(), st(), {
+      staff: [
+        { name: 'Sly Fox', effect: { type: 'error_multiplier', value: 2 } },
+        { name: 'Sly Fox II', effect: { type: 'error_multiplier', value: 3 } },
+      ],
+    });
+    assert(b.errorMult === 6, `error_multiplier stacks multiplicatively (got ${b.errorMult})`);
+  }
+
+  // ── Neutral defaults with no staff ──
+  {
+    const b = BonusEngine.applyStaff(res(), st(), { staff: [] });
+    assert(b.errorMult === 1, 'errorMult defaults to 1 with no staff');
+    assert(b.extraBaseBonus === 0, 'extraBaseBonus defaults to 0');
+    assert(b.outcomeChanged === false, 'outcomeChanged defaults to false');
+  }
+
+  // ── team_extra_base accumulates ──
+  {
+    const b = BonusEngine.applyStaff(res(), st(), {
+      staff: [{ name: 'Wheels', effect: { type: 'team_extra_base', value: 0.15 } }],
+    });
+    assertClose(b.extraBaseBonus, 0.149, 0.151, 'team_extra_base accumulates');
+  }
+
+  // ── Deferred/elsewhere effect types are no-ops, not crashes ──
+  {
+    const deferred = ['team_stat_boost', 'team_add_discard', 'add_hand_draw',
+      'shop_extra_cards', 'unlock_staff_slot', 'pitcher_hit_reduction',
+      'pitcher_fatigue_delay', 'bonus_draw_on_discard', 'strikeout_redraw',
+      'ignore_pair_penalty'];
+    let clean = true;
+    for (const type of deferred) {
+      const r = res();
+      const b = BonusEngine.applyStaff(r, st(), { staff: [{ name: 'X', effect: { type, value: 5 } }] });
+      if (r.peanuts !== 4 || r.mult !== 2 || b.messages.length !== 0) clean = false;
+    }
+    assert(clean, 'deferred effect types leave the result untouched');
+  }
+
+  // ── Staff with no effect field, and missing context, are safe ──
+  {
+    const r = res();
+    const b = BonusEngine.applyStaff(r, st(), { staff: [{ name: 'Bench Warmer' }] });
+    assert(r.peanuts === 4 && b.messages.length === 0, 'staff without an effect is skipped');
+
+    const r2 = res();
+    BonusEngine.applyStaff(r2, st(), {});
+    assert(r2.peanuts === 4, 'missing staff context is safe');
+  }
+
+  // ── Multiple staff stack ──
+  {
+    const r = res({ peanuts: 2, mult: 1, score: 2 });
+    BonusEngine.applyStaff(r, st(), {
+      staff: [
+        { name: 'A', effect: { type: 'flat_peanuts_per_ab', value: 3 } },
+        { name: 'B', effect: { type: 'add_mult', value: 2 } },
+      ],
+    });
+    assert(r.peanuts === 5 && r.mult === 3, `staff stack (got ${r.peanuts}/${r.mult})`);
+    assert(r.score === 15, `stacked score = 5*3 (got ${r.score})`);
+  }
+}
+
+group('30. BonusEngine — Lineup Effects');
+{
+  const st = (over = {}) => ({
+    inning: 1, outs: 0, bases: [null, null, null],
+    currentInningPlayerRuns: 0, ...over,
+  });
+  const res = (over = {}) => ({
+    handName: 'Pair', outcome: 'Single', peanuts: 4, mult: 2, score: 8, ...over,
+  });
+  const batter = (over = {}) => ({ name: 'Test Guy', power: 5, contact: 5, speed: 5, bats: 'R', ...over });
+
+  // ── team_add_peanuts_on_xbh ──
+  {
+    const eff = [{ type: 'team_add_peanuts_on_xbh', value: 2 }];
+    for (const outcome of ['Double', 'Triple', 'Home Run']) {
+      const r = res({ outcome });
+      BonusEngine.applyLineup(r, st(), { effects: eff, batter: batter() });
+      assert(r.peanuts === 6, `XBH peanuts fire on ${outcome} (got ${r.peanuts})`);
+    }
+    const single = res({ outcome: 'Single' });
+    BonusEngine.applyLineup(single, st(), { effects: eff, batter: batter() });
+    assert(single.peanuts === 4, 'XBH peanuts do not fire on a Single');
+  }
+
+  // ── team_add_mult_on_hit — hit vs out classification ──
+  {
+    const eff = [{ type: 'team_add_mult_on_hit', value: 1 }];
+    for (const outcome of ['Single', 'Double', 'Triple', 'Home Run', 'Walk']) {
+      const r = res({ outcome });
+      BonusEngine.applyLineup(r, st(), { effects: eff, batter: batter() });
+      assert(r.mult === 3, `on_hit fires for ${outcome} (got ${r.mult})`);
+    }
+    for (const outcome of ['Strikeout', 'Groundout', 'Flyout', 'Double Play', "Fielder's Choice"]) {
+      const r = res({ outcome });
+      BonusEngine.applyLineup(r, st(), { effects: eff, batter: batter() });
+      assert(r.mult === 2, `on_hit skipped for ${outcome} (got ${r.mult})`);
+    }
+  }
+
+  // ── team_power_mult, threshold gated ──
+  {
+    const eff = [{ type: 'team_power_mult', value: 2, threshold: 8 }];
+    const strong = res({ mult: 3 });
+    BonusEngine.applyLineup(strong, st(), { effects: eff, batter: batter({ power: 9 }) });
+    assert(strong.mult === 6, `power_mult doubles mult over threshold (got ${strong.mult})`);
+
+    const weak = res({ mult: 3 });
+    BonusEngine.applyLineup(weak, st(), { effects: eff, batter: batter({ power: 7 }) });
+    assert(weak.mult === 3, `power_mult skipped under threshold (got ${weak.mult})`);
+
+    // Boundary: power exactly at threshold applies
+    const exact = res({ mult: 3 });
+    BonusEngine.applyLineup(exact, st(), { effects: eff, batter: batter({ power: 8 }) });
+    assert(exact.mult === 6, 'power_mult applies at exactly the threshold');
+
+    // Missing batter must not throw
+    const noBatter = res({ mult: 3 });
+    BonusEngine.applyLineup(noBatter, st(), { effects: eff });
+    assert(noBatter.mult === 3, 'power_mult is safe with no batter in context');
+  }
+
+  // ── team_strikeout_peanuts ──
+  {
+    const eff = [{ type: 'team_strikeout_peanuts', value: 3 }];
+    const k = res({ outcome: 'Strikeout' });
+    BonusEngine.applyLineup(k, st(), { effects: eff, batter: batter() });
+    assert(k.peanuts === 7, `strikeout peanuts fire on K (got ${k.peanuts})`);
+
+    const go = res({ outcome: 'Groundout' });
+    BonusEngine.applyLineup(go, st(), { effects: eff, batter: batter() });
+    assert(go.peanuts === 4, 'strikeout peanuts do not fire on a groundout');
+  }
+
+  // ── team_first_pitch_mult keys off discardCount ──
+  {
+    const eff = [{ type: 'team_first_pitch_mult', value: 2 }];
+    const first = res();
+    BonusEngine.applyLineup(first, st(), { effects: eff, batter: batter(), discardCount: 0 });
+    assert(first.mult === 4, `first_pitch_mult fires at 0 discards (got ${first.mult})`);
+
+    const later = res();
+    BonusEngine.applyLineup(later, st(), { effects: eff, batter: batter(), discardCount: 1 });
+    assert(later.mult === 2, 'first_pitch_mult skipped after a discard');
+
+    // Omitted discardCount should behave as 0 (first pitch)
+    const omitted = res();
+    BonusEngine.applyLineup(omitted, st(), { effects: eff, batter: batter() });
+    assert(omitted.mult === 4, 'omitted discardCount defaults to first pitch');
+  }
+
+  // ── team_runner_mult scales with runners ──
+  {
+    const eff = [{ type: 'team_runner_mult', value: 1 }];
+    const loaded = res();
+    BonusEngine.applyLineup(loaded, st({ bases: [{}, {}, {}] }), { effects: eff, batter: batter() });
+    assert(loaded.mult === 5, `runner_mult adds 1 per runner, 3 on (got ${loaded.mult})`);
+
+    const empty = res();
+    BonusEngine.applyLineup(empty, st(), { effects: eff, batter: batter() });
+    assert(empty.mult === 2, 'runner_mult inert with empty bases');
+  }
+
+  // ── team_late_inning_peanuts, inning 7+ ──
+  {
+    const eff = [{ type: 'team_late_inning_peanuts', value: 2 }];
+    const late = res();
+    BonusEngine.applyLineup(late, st({ inning: 7 }), { effects: eff, batter: batter() });
+    assert(late.peanuts === 6, `late inning peanuts fire in the 7th (got ${late.peanuts})`);
+
+    const early = res();
+    BonusEngine.applyLineup(early, st({ inning: 6 }), { effects: eff, batter: batter() });
+    assert(early.peanuts === 4, 'late inning peanuts skipped in the 6th');
+  }
+
+  // ── Pass-through accumulators do not touch the result ──
+  {
+    const r = res();
+    const b = BonusEngine.applyLineup(r, st(), {
+      effects: [
+        { type: 'team_pair_out_reduction', value: 0.1 },
+        { type: 'team_extra_base_chance', value: 0.2 },
+        { type: 'team_contact_save_boost', value: 0.3 },
+      ],
+      batter: batter(),
+    });
+    assertClose(b.pairOutReduction, 0.09, 0.11, 'pairOutReduction accumulates');
+    assertClose(b.extraBaseBonus, 0.19, 0.21, 'lineup extraBaseBonus accumulates');
+    assertClose(b.contactSaveBoost, 0.29, 0.31, 'contactSaveBoost accumulates');
+    assert(r.peanuts === 4 && r.mult === 2, 'pass-through effects leave peanuts/mult alone');
+  }
+
+  // ── Empty / missing effects ──
+  {
+    const r = res();
+    const b = BonusEngine.applyLineup(r, st(), { effects: [], batter: batter() });
+    assert(r.peanuts === 4 && b.messages.length === 0, 'empty lineup effects are a no-op');
+    const r2 = res();
+    BonusEngine.applyLineup(r2, st(), {});
+    assert(r2.peanuts === 4, 'missing lineup context is safe');
+  }
+}
+
+group('31. BonusEngine — Synergy Effects');
+{
+  const st = (over = {}) => ({ inning: 1, outs: 0, bases: [null, null, null], ...over });
+  const res = (over = {}) => ({
+    handName: 'Pair', outcome: 'Single', peanuts: 4, mult: 2, score: 8, ...over,
+  });
+  const batter = (over = {}) => ({ name: 'Test Guy', power: 5, bats: 'R', ...over });
+  const syn = (bonus, name = 'Test Synergy') => ({ name, bonus });
+
+  // ── add_mult_all / add_peanuts_all are unconditional ──
+  {
+    const r = res();
+    BonusEngine.applySynergies(r, st(), {
+      synergies: [syn({ type: 'add_mult_all', value: 2 })], batter: batter(),
+    });
+    assert(r.mult === 4, `add_mult_all applies (got ${r.mult})`);
+
+    const r2 = res();
+    BonusEngine.applySynergies(r2, st(), {
+      synergies: [syn({ type: 'add_peanuts_all', value: 3 })], batter: batter(),
+    });
+    assert(r2.peanuts === 7, `add_peanuts_all applies (got ${r2.peanuts})`);
+  }
+
+  // ── add_mult_on_hr ──
+  {
+    const s = [syn({ type: 'add_mult_on_hr', value: 5 })];
+    const hr = res({ outcome: 'Home Run' });
+    BonusEngine.applySynergies(hr, st(), { synergies: s, batter: batter() });
+    assert(hr.mult === 7, `add_mult_on_hr fires on a HR (got ${hr.mult})`);
+
+    const triple = res({ outcome: 'Triple' });
+    BonusEngine.applySynergies(triple, st(), { synergies: s, batter: batter() });
+    assert(triple.mult === 2, 'add_mult_on_hr does not fire on a Triple');
+  }
+
+  // ── add_mult_lefty keys off batter handedness ──
+  {
+    const s = [syn({ type: 'add_mult_lefty', value: 2 })];
+    const lefty = res();
+    BonusEngine.applySynergies(lefty, st(), { synergies: s, batter: batter({ bats: 'L' }) });
+    assert(lefty.mult === 4, `add_mult_lefty fires for L (got ${lefty.mult})`);
+
+    const righty = res();
+    BonusEngine.applySynergies(righty, st(), { synergies: s, batter: batter({ bats: 'R' }) });
+    assert(righty.mult === 2, 'add_mult_lefty skipped for R');
+
+    const noBatter = res();
+    BonusEngine.applySynergies(noBatter, st(), { synergies: s });
+    assert(noBatter.mult === 2, 'add_mult_lefty is safe with no batter');
+  }
+
+  // ── add_peanuts_on_xbh — synergy version excludes Doubles ──
+  {
+    const s = [syn({ type: 'add_peanuts_on_xbh', value: 2 })];
+    for (const outcome of ['Triple', 'Home Run']) {
+      const r = res({ outcome });
+      BonusEngine.applySynergies(r, st(), { synergies: s, batter: batter() });
+      assert(r.peanuts === 6, `synergy XBH fires on ${outcome} (got ${r.peanuts})`);
+    }
+    // Deliberate divergence from the lineup version, which counts Doubles
+    const dbl = res({ outcome: 'Double' });
+    BonusEngine.applySynergies(dbl, st(), { synergies: s, batter: batter() });
+    assert(dbl.peanuts === 4, 'synergy XBH excludes Doubles (unlike lineup XBH)');
+  }
+
+  // ── Pass-through accumulators ──
+  {
+    const r = res();
+    const b = BonusEngine.applySynergies(r, st(), {
+      synergies: [
+        syn({ type: 'team_pair_out_reduction', value: 0.1 }),
+        syn({ type: 'team_extra_base_chance', value: 0.2 }),
+      ],
+      batter: batter(),
+    });
+    assertClose(b.pairOutReduction, 0.09, 0.11, 'synergy pairOutReduction accumulates');
+    assertClose(b.extraBaseBonus, 0.19, 0.21, 'synergy extraBaseBonus accumulates');
+    assert(r.mult === 2, 'synergy pass-throughs leave mult alone');
+  }
+
+  // ── Effects handled in other scenes are no-ops here ──
+  {
+    const r = res();
+    const b = BonusEngine.applySynergies(r, st(), {
+      synergies: [
+        syn({ type: 'pitcher_control_reduction', value: 2 }),
+        syn({ type: 'bonus_player_stat_boost', value: 1 }),
+      ],
+      batter: batter(),
+    });
+    assert(r.peanuts === 4 && r.mult === 2 && b.messages.length === 0,
+      'synergies owned by other scenes are inert here');
+  }
+
+  // ── Empty / missing synergies ──
+  {
+    const r = res();
+    BonusEngine.applySynergies(r, st(), { synergies: [], batter: batter() });
+    assert(r.peanuts === 4, 'empty synergies are a no-op');
+    const r2 = res();
+    BonusEngine.applySynergies(r2, st(), {});
+    assert(r2.peanuts === 4, 'missing synergy context is safe');
+  }
+}
+
+group('32. BonusEngine — Real Data Files Are Handled');
+{
+  const st = { inning: 5, outs: 1, bases: [{}, null, {}], currentInningPlayerRuns: 1 };
+  const batter = { name: 'Real Guy', power: 9, contact: 6, speed: 7, bats: 'L' };
+
+  // Every coach and mascot effect in the data files must run without throwing
+  // and must leave a numerically sane result.
+  let sane = true;
+  const offenders = [];
+  for (const card of [...COACHES, ...MASCOTS]) {
+    const r = { handName: 'Pair', outcome: 'Single', peanuts: 4, mult: 2, score: 8 };
+    try {
+      const b = BonusEngine.applyStaff(r, { ...st, bases: [...st.bases] }, { staff: [card] });
+      if (!Number.isFinite(r.peanuts) || !Number.isFinite(r.mult) || !Number.isFinite(r.score)
+          || r.peanuts < 0 || r.mult < 0 || !Number.isFinite(b.errorMult)) {
+        sane = false; offenders.push(card.name);
+      }
+    } catch (e) {
+      sane = false; offenders.push(`${card.name} threw: ${e.message}`);
+    }
+  }
+  assert(sane, `all ${COACHES.length + MASCOTS.length} coaches/mascots produce sane results${offenders.length ? ': ' + offenders.join(', ') : ''}`);
+
+  // Every synergy bonus in the data file must run without throwing
+  let synSane = true;
+  const synOffenders = [];
+  for (const s of SYNERGIES) {
+    const r = { handName: 'Pair', outcome: 'Home Run', peanuts: 4, mult: 2, score: 8 };
+    try {
+      BonusEngine.applySynergies(r, { ...st, bases: [...st.bases] }, { synergies: [s], batter });
+      if (!Number.isFinite(r.peanuts) || !Number.isFinite(r.mult) || r.peanuts < 0) {
+        synSane = false; synOffenders.push(s.name);
+      }
+    } catch (e) {
+      synSane = false; synOffenders.push(`${s.name} threw: ${e.message}`);
+    }
+  }
+  assert(synSane, `all ${SYNERGIES.length} synergies produce sane results${synOffenders.length ? ': ' + synOffenders.join(', ') : ''}`);
+}
+
+group('33. BonusEngine — Mutation Contract');
+{
+  // GameScene relies on in-place mutation of handResult. Lock that in: the object
+  // identity must be preserved, and score must always equal peanuts * mult.
+  const st = { inning: 8, outs: 0, bases: [{}, {}, {}], currentInningPlayerRuns: 2 };
+
+  const r = { handName: 'Pair', outcome: 'Single', peanuts: 2, mult: 1, score: 2 };
+  const ref = r;
+  BonusEngine.applyStaff(r, st, {
+    staff: [{ name: 'A', effect: { type: 'flat_peanuts_per_ab', value: 2 } }],
+  });
+  assert(ref === r, 'applyStaff mutates in place rather than returning a copy');
+  assert(r.score === r.peanuts * r.mult, `score stays consistent (got ${r.score})`);
+
+  // Chained through all three, as _onPlay does
+  const chained = { handName: 'Pair', outcome: 'Home Run', peanuts: 2, mult: 2, score: 4 };
+  BonusEngine.applyStaff(chained, st, {
+    staff: [{ name: 'A', effect: { type: 'add_mult', value: 1 } }],
+  });
+  BonusEngine.applyLineup(chained, st, {
+    effects: [{ type: 'team_add_peanuts_on_xbh', value: 1 }],
+    batter: { name: 'B', power: 5, bats: 'R' }, discardCount: 0,
+  });
+  BonusEngine.applySynergies(chained, st, {
+    synergies: [{ name: 'S', bonus: { type: 'add_mult_on_hr', value: 1 } }],
+    batter: { name: 'B', power: 5, bats: 'R' },
+  });
+  assert(chained.mult === 4, `chained mult 2+1+1 (got ${chained.mult})`);
+  assert(chained.peanuts === 3, `chained peanuts 2+1 (got ${chained.peanuts})`);
+  assert(chained.score === 12, `chained score = 3*4 (got ${chained.score})`);
+
+  // A result with zero bonuses must be byte-identical afterward
+  const untouched = { handName: 'Pair', outcome: 'Single', peanuts: 4, mult: 2, score: 8 };
+  const snapshot = JSON.stringify(untouched);
+  BonusEngine.applyStaff(untouched, st, { staff: [] });
+  BonusEngine.applyLineup(untouched, st, { effects: [] });
+  BonusEngine.applySynergies(untouched, st, { synergies: [] });
+  assert(JSON.stringify(untouched) === snapshot, 'no bonuses = result untouched');
+}
+
+
+group('34. BonusEngine — Resolution Order (GDD contract)');
+{
+  const st = { inning: 5, outs: 0, bases: [null, null, null], currentInningPlayerRuns: 0 };
+  const batter = { name: 'B', power: 5, bats: 'R' };
+
+  // Mult is additive across passes, not compounding: 1x + 1x + 1x = 3x, not 4x.
+  {
+    const r = { handName: 'Pair', outcome: 'Home Run', peanuts: 10, mult: 1, score: 10 };
+    BonusEngine.applyStaff(r, st, { staff: [{ name: 'S', effect: { type: 'add_mult', value: 1 } }] });
+    assert(r.mult === 2 && r.score === 20, `staff pass commits (got ${r.mult}x/${r.score})`);
+    BonusEngine.applySynergies(r, st, {
+      synergies: [{ name: 'Y', bonus: { type: 'add_mult_on_hr', value: 1 } }], batter,
+    });
+    assert(r.mult === 3, `mult additive across passes, not compounding (got ${r.mult})`);
+    assert(r.score === 30, `final score = final peanuts * final mult (got ${r.score})`);
+  }
+
+  // double_peanuts doubles only what exists when staff runs — later peanuts are safe.
+  {
+    const d = { handName: 'Pair', outcome: 'Home Run', peanuts: 5, mult: 1, score: 5 };
+    BonusEngine.applyStaff(d, st, {
+      staff: [{ name: 'Dbl', effect: { type: 'double_peanuts', condition: { type: 'outcome_is', value: 'Home Run' } } }],
+    });
+    assert(d.peanuts === 10, `double_peanuts doubles at staff time (got ${d.peanuts})`);
+    BonusEngine.applySynergies(d, st, {
+      synergies: [{ name: 'Y', bonus: { type: 'add_peanuts_all', value: 4 } }], batter,
+    });
+    assert(d.peanuts === 14, `later peanuts are not retroactively doubled (got ${d.peanuts})`);
+  }
+
+  // Score stays consistent after every pass in the real GameScene order.
+  {
+    const r = { handName: 'Pair', outcome: 'Double', peanuts: 3, mult: 2, score: 6 };
+    let consistent = true;
+    BonusEngine.applyStaff(r, st, { staff: [{ name: 'S', effect: { type: 'flat_peanuts_per_ab', value: 2 } }] });
+    if (r.score !== Math.round(r.peanuts * r.mult)) consistent = false;
+    BonusEngine.applyLineup(r, st, {
+      effects: [{ type: 'team_add_peanuts_on_xbh', value: 1 }], batter, discardCount: 0,
+    });
+    if (r.score !== Math.round(r.peanuts * r.mult)) consistent = false;
+    BonusEngine.applySynergies(r, st, {
+      synergies: [{ name: 'Y', bonus: { type: 'add_mult_all', value: 1 } }], batter,
+    });
+    if (r.score !== Math.round(r.peanuts * r.mult)) consistent = false;
+    assert(consistent, 'score stays consistent after each of the three passes');
+    assert(r.peanuts === 6 && r.mult === 3 && r.score === 18,
+      `full chain: 3+2+1 peanuts, 2+1 mult (got ${r.peanuts}/${r.mult}/${r.score})`);
+  }
 }
 
 // ═══════════════════════════════════════════════════════

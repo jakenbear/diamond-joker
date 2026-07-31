@@ -55,20 +55,24 @@ When the deck runs low, the discard pile is reshuffled back in.
 
 ### Hand Rankings → Baseball Outcomes
 
+Listed strongest to weakest. The ladder is **monotonic**: going down the table, neither the score nor the outcome ever improves — a rarer hand never pays less than a more common one.
+
 | Hand | Baseball Outcome | Peanuts | Mult | Score |
 |------|-----------------|-------|------|-------|
 | Royal Flush | Home Run (guaranteed) | 15 | 20 | 300 |
 | Straight Flush | 80% HR / 15% Triple / 5% Double | 10 | 10 | 100 |
-| Four of a Kind | Triple | 6 | 6 | 36 |
-| Flush | Double | 5 | 5 | 25 |
-| Straight | Home Run | 4 | 4 | 16 |
-| Full House | Double | 3 | 2.5 | 7.5 |
-| Three of a Kind | Triple | 3 | 3 | 9 |
+| Four of a Kind | Home Run | 10 | 6 | 60 |
+| Full House | Home Run | 8 | 5 | 40 |
+| Flush | Triple | 5 | 5 | 25 |
+| Straight | Triple | 4 | 4 | 16 |
+| Three of a Kind | Double | 3 | 3 | 9 |
 | Two Pair | Double | 2 | 2 | 4 |
 | Pair | Single | 1 | 1.5 | 1.5 |
 | High Card | Strikeout | 0 | 1 | 0 |
 
 **Score = floor(Peanuts × Mult)** — this becomes your peanut income for the shop.
+
+**Monotonicity is an invariant, not a coincidence.** It is enforced by tests in `test/sim.js`. When rebalancing, keep both `peanuts × mult` and the outcome's base value non-increasing down the table. (Previously a Straight paid a Home Run while Four of a Kind paid only a Triple, and a Full House scored 7.5 against a Flush's 25 — so building a stronger hand could actively cost you.)
 
 ### Hand Evaluation Rules
 - Straights and Flushes require exactly 5 cards
@@ -496,11 +500,44 @@ No duplicate traits offered (already-owned traits excluded).
 
 ---
 
+## Bonus Resolution Order
+
+Three passive bonus sources apply after the hand is evaluated and after batter/pitcher
+modifiers, in this fixed order:
+
+1. **Staff** — mascots & coaches (`data/coaches.js`, `data/mascots.js`)
+2. **Lineup** — bonus-player passives (`data/bonus_players.js`)
+3. **Synergies** — active lineup synergies (`data/synergies.js`)
+
+Each pass accumulates `peanutBonus` and `multBonus`, then commits them as
+`peanuts += peanutBonus`, `mult += multBonus`, `score = round(peanuts × mult)`.
+Mult bonuses are **additive**, both within a pass and across passes: a staff `+1x` and
+a synergy `+1x` on a base 1x hand yield 3x, not 4x. Score is recomputed after each
+pass, so the final score always equals the final `peanuts × mult`.
+
+Some effects don't touch the score and are instead returned for the caller to use:
+`errorMult` (feeds `SituationalEngine`, multiplicative), `extraBaseBonus`,
+`pairOutReduction`, and `contactSaveBoost` (all additive).
+
+Order matters for one visible case: `double_peanuts` doubles the peanut count *as it
+stands when staff runs*, so it does not double later lineup or synergy peanuts.
+
+**Known inconsistency (intentional, preserved):** the lineup XBH bonus
+(`team_add_peanuts_on_xbh`) counts Doubles, Triples, and Home Runs, while the synergy
+XBH bonus (`add_peanuts_on_xbh`) counts only Triples and Home Runs. This is a live
+balance difference, locked in by a test so it can't drift silently.
+
+Logic lives in `src/BonusEngine.js` (pure, no Phaser). `GameScene` holds thin wrappers
+that supply context.
+
+---
+
 ## Chip Economy
 
 ### Earning
 - Every at-bat: floor(peanuts × mult) from the played hand
 - Bonuses from batter stats, count modifiers, trait effects
+- Passive bonuses from staff, lineup, and synergies (see Bonus Resolution Order)
 
 ### Spending
 - Trait cards at the shop (20–45 peanuts each)
@@ -573,10 +610,15 @@ Each pitch in the pitcher's 4-pitch repertoire is a **board manipulation ability
 | Palmball | Plant best card from pitcher deck as next community card |
 
 ### Resolution
-Best 5-card hand from each side (2 hole + 5 community). Winner determined by hand score:
+Best 5-card hand from each side (2 hole + 5 community). The winner is decided by **poker hand strength** — hand class first, then the ranks involved (so a pair of Aces beats a pair of 3s). Hand *reward* values (peanuts × mult) are never used to pick a winner, since they measure payout, not rank.
+
 - **Pitcher wins** → Out (Strikeout / Flyout / Groundout based on margin)
 - **Batter wins** → Hit (Single / Double / Triple / HR based on margin)
-- **Tie** → Groundout (pitcher favored)
+- **Tie** → higher hole card wins (pitcher favored on an exact tie)
+
+Pitcher trait bonuses add weight *within* a hand class: they can swing a close call but can never make a weaker hand class beat a stronger one. The margin that selects the specific outcome is still measured on the reward scale.
+
+**Implementation note:** hand comparison uses `CardEngine.classify()`, which is pure — no RNG, no mutation. `CardEngine.evaluateHand()` must **not** be used for comparison: it rolls the batting out-chance and zeroes a made hand's score, which previously made the showdown non-deterministic (the same seven cards could resolve as a Flush or as a Pair).
 
 ### Pitcher Traits in the Showdown
 Every pitcher trait (see the Pitcher Traits table) is translated into showdown terms — either a flat/conditional bonus to the pitcher's hand score or a card manipulation (downgrade a batter hole card, scramble/swap community cards). Conditional traits read the live at-bat state: outs, inning, whether the pitcher's team leads, and whether runners are on base.

@@ -5,57 +5,61 @@
 When making ANY gameplay change (mechanics, balance, outcomes, traits, etc.):
 
 1. **GDD First** — Update `docs/GAME_DESIGN.md` with the new/changed mechanic before writing code
-2. **Phaser + Godot in Sync** — Every logic change must be applied to BOTH:
-   - JS: `src/` and `data/`
-   - GDScript: `godot/scripts/` and `godot/scripts/data/`
-3. **Tests Cover It** — If changing game logic, update or add tests in `test/sim.js`
-4. **Commit Together** — GDD update, Phaser code, Godot code, and tests go in the same commit (or tightly grouped commits)
+2. **Tests Cover It** — If changing game logic, update or add tests in `test/sim.js`
+3. **Commit Together** — GDD update, code, and tests go in the same commit (or tightly grouped commits)
 
-## File Mapping (JS ↔ GDScript)
+## The Godot Port Is Dead Code
 
-| JS Source | GDScript Mirror |
-|-----------|----------------|
-| `src/BaseballState.js` | `godot/scripts/baseball_state.gd` |
-| `src/CardEngine.js` | `godot/scripts/card_engine.gd` |
-| `src/RosterManager.js` | `godot/scripts/roster_manager.gd` |
-| `src/EffectEngine.js` | `godot/scripts/effect_engine.gd` |
-| `src/SituationalEngine.js` | `godot/scripts/situational_engine.gd` |
-| `src/TraitManager.js` | `godot/scripts/trait_manager.gd` |
-| `src/CountManager.js` | `godot/scripts/count_manager.gd` |
-| `data/hand_table.js` | `godot/scripts/data/hand_table.gd` |
-| `data/teams.js` | `godot/scripts/data/teams.gd` |
-| `data/decks.js` | `godot/scripts/data/decks.gd` |
-| `data/batter_traits.js` | `godot/scripts/data/batter_traits.gd` |
-| `data/pitcher_traits.js` | `godot/scripts/data/pitcher_traits.gd` |
-| `data/pitch_types.js` | `godot/scripts/data/pitch_types.gd` |
-| `src/ShowdownEngine.js` | `godot/scripts/showdown_engine.gd` |
+`godot/` is an abandoned port. **Do not keep it in sync.** The Phaser version in
+`src/` and `data/` is the only live implementation. Changes to game logic go to JS
+only — no GDScript mirror is required or wanted.
 
-## UI Scenes (Not Mirrored 1:1, But Match Functionally)
+## Architecture
 
-| Phaser Scene | Godot Scene |
-|-------------|-------------|
-| `src/scenes/GameScene.js` | `godot/scenes/game_scene.tscn` + `.gd` |
-| `src/scenes/PitchingScene.js` | `godot/scenes/pitching_scene.tscn` + `.gd` |
-| `src/scenes/ShopScene.js` | `godot/scenes/shop_scene.tscn` + `.gd` |
-| `src/scenes/TeamSelectScene.js` | `godot/scenes/title_scene.tscn` + `.gd` |
-| `src/scenes/GameOverScene.js` | `godot/scenes/game_over_scene.tscn` + `.gd` |
+Pure game logic lives in `src/*.js` with no Phaser dependency, so `test/sim.js` can
+import and exercise it directly. Phaser only appears in `src/scenes/*.js`. Keep it
+that way: if a rule can be tested without a canvas, it belongs in an engine file.
+
+| File | Responsibility |
+|------|----------------|
+| `src/CardEngine.js` | Deck management + poker hand evaluation |
+| `src/BaseballState.js` | Innings, outs, bases, score |
+| `src/RosterManager.js` | Lineup and roster state |
+| `src/EffectEngine.js` | Interprets trait effect descriptors from `data/` |
+| `src/SituationalEngine.js` | Context-dependent outcome adjustments |
+| `src/TraitManager.js` | Trait ownership and activation |
+| `src/CountManager.js` | Balls/strikes |
+| `src/ShowdownEngine.js` | Hold'em-style pitching showdown |
+| `data/*.js` | Tunable tables — hand table, teams, decks, traits, pitch types, balance |
+
+## Hand Evaluation: Two Entry Points
+
+- `CardEngine.classify(cards)` — **pure**. No RNG, no mutation, no game state.
+  Returns `strength` in poker order (higher = better). Use this whenever comparing
+  two hands (e.g. the showdown).
+- `CardEngine.evaluateHand(...)` — rolls the batting out-chance and can rewrite a
+  made hand's score to 0. **Never use it for comparison** — the same cards can
+  return different scores on repeated calls.
 
 ## Baseball Outcome Rules
 
 - Outcomes must be physically possible in baseball (no Grand Slam without runners, no Walk-Off in inning 1)
+- Only the home team can walk off
 - Top-tier hands resolve with probability curves, not identical "everyone scores" logic
-- The GDD hand table is the source of truth for outcome mappings
+- `data/hand_table.js` is the source of truth for outcome mappings, and its reward
+  ladder must stay **monotonic** — a stronger poker hand can never pay less than a
+  weaker one. `test/sim.js` group 19 enforces this.
 
 ## Card Art
 
-- 32×42 pixel art PNGs in `godot/assets/cards/`
+- 32×42 pixel art PNGs in `assets/cards/` (repo root — this is the live path)
 - Naming: `{suit}{rank}.png` (h/d/c/s + 2-10/j/q/k/a)
-- Phaser loads from `assets/cards/` via same naming convention
 - Scale: 3× (96×126) in game UI for 8-card hands
 
 ## Tech Stack
 
-- **Phaser 3** — web version, runs via `index.html`
-- **Godot 4.6** — native version, project at `godot/project.godot`
+- **Phaser 3** — runs via `index.html`
 - **Tests** — `node test/sim.js` (pure JS, no framework)
-- **No build step** — Phaser version is vanilla JS, no bundler
+- **No build step** — vanilla JS ES modules, no bundler
+- Two tests in the suite are statistical and sample-size sensitive (pitch-type hit
+  rates); a rare near-miss there is flakiness, not a regression. Re-run to confirm.

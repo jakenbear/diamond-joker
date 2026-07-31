@@ -8,3 +8,6 @@ cache/
 Cleaning
 Copying
 Packaging
+
+# Playwright MCP session artifacts
+.playwright-mcp/
