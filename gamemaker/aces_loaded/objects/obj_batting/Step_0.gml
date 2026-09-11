@@ -1,0 +1,99 @@
+var s = global.session;
+if (cinema) {
+    cinema_t += 1;
+    if (mouse_check_button_pressed(mb_left) || cinema_t >= 200) {
+        cinema = false;
+        finish_after_play();
+    }
+    exit;
+}
+
+refresh_selection();
+var _hand = s.cards.hand;
+var _n = array_length(_hand);
+var _sel = cards_selected_from_flags(selected);
+var _sel_n = array_length(_sel);
+var _max = s.max_select;
+
+if (!half_over && !resolving) {
+    var _card_y = 568;
+    var _order = cards_display_order(_hand, sort_mode);
+    btn_sort_def.selected = (sort_mode == "default");
+    btn_sort_rnk.selected = (sort_mode == "rank");
+    btn_sort_sut.selected = (sort_mode == "suit");
+    if (ui_button_update(btn_sort_def)) {
+        sort_mode = "default";
+    } else if (ui_button_update(btn_sort_rnk)) {
+        sort_mode = "rank";
+    } else if (ui_button_update(btn_sort_sut)) {
+        sort_mode = "suit";
+    }
+    if (mouse_check_button_pressed(mb_left)) {
+        for (var i = 0; i < _n; i++) {
+            var _cx = ui_card_x(i, _n);
+            if (ui_card_hit(_cx, _card_y)) {
+                var _hi = (i < array_length(_order)) ? _order[i] : i;
+                if (_hi >= 0 && _hi < array_length(selected)) {
+                    if (selected[_hi]) {
+                        selected[_hi] = false;
+                    } else if (_sel_n < _max) {
+                        selected[_hi] = true;
+                    }
+                }
+                break;
+            }
+        }
+        _sel = cards_selected_from_flags(selected);
+        _sel_n = array_length(_sel);
+    }
+
+    btn_play.disabled = (_sel_n < 1);
+    btn_discard.disabled = (_sel_n < 1);
+    btn_discard.label = "DISCARD  " + count_text(s.count);
+    if (s.strikes >= 2) {
+        btn_discard.label = "DISCARD  " + count_text(s.count) + " !";
+        btn_discard.fill = pal_red();
+    } else if (s.strikes == 1) {
+        btn_discard.fill = make_color_rgb(183, 110, 0);
+    } else {
+        btn_discard.fill = pal_green_dk();
+    }
+    if (_sel_n == 1 && bb_runner_count(s.baseball) > 0 && s.outs < 2) {
+        btn_play.label = "BUNT";
+    } else {
+        btn_play.label = "PLAY";
+    }
+
+    if (!btn_play.disabled && ui_button_update(btn_play)) {
+        var _res = session_play_hand(_sel);
+        selected = [];
+        if (is_struct(_res) && variable_struct_exists(_res, "redraw") && _res.redraw) {
+            refresh_selection();
+            selected = array_create(array_length(s.cards.hand), false);
+        } else if (s.show_showdowns) {
+            begin_cinema(_res);
+        } else {
+            finish_after_play();
+        }
+    } else if (!btn_discard.disabled && ui_button_update(btn_discard)) {
+        var _d = session_after_discard(_sel);
+        refresh_selection();
+        selected = array_create(array_length(s.cards.hand), false);
+        if (_d.kind == "redraw") {
+            // stay in the at-bat
+        } else if (_d.kind == "walk" || _d.kind == "k" || _d.kind == "foul_out") {
+            if (bb_is_game_over(s.baseball) || s.baseball.state == "SWITCH_SIDE") {
+                half_over = true;
+            } else {
+                resolving = true;
+            }
+        }
+    }
+} else if (resolving) {
+    if (ui_button_update(btn_next)) {
+        resolving = false;
+        begin_at_bat();
+    }
+} else if (ui_button_update(btn_continue)) {
+    flow_finish_player_half();
+}

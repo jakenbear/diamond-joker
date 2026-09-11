@@ -11,3 +11,8 @@ Packaging
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# GameMaker IDE local files
+gamemaker/**/*.resource_order
+gamemaker/**/*.yy.bak
+gamemaker/**/*.yyp.bak

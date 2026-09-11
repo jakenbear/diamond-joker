@@ -185,6 +185,8 @@ Mac sessions may continue design/planning against the frozen Phaser reference; t
 | **Logic complete** | Parity with current GDD systems (not Phaser visuals) |
 | **Ship-shaped** | Real art where we have it; remaining placeholders tracked for later |
 
+**2026-09-11:** Shell + most logic are in. Pickup list: `gamemaker/STATUS.md`.
+
 ---
 
 ## Open Decisions (resolved in brainstorm)

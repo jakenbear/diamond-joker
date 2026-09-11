@@ -206,7 +206,7 @@ A contact-10 batter rescues 40% of failed pairs back to singles.
 ### Batter Stat Bonuses (On Hit)
 - **Power:** +max(0, power - 5) bonus peanuts
 - **Contact:** +contact/10 bonus mult
-- **Speed:** speed × 5% chance for an extra base
+- **Speed:** speed × 5% chance for an extra base **on Singles**
 
 ---
 
@@ -547,6 +547,16 @@ These trigger automatically based on game state:
 - **Chance:** 40% + speed × 3%
 - **Result:** Each runner on 2nd/3rd advances one base (runner on 3rd scores)
 
+### Sac Bunt
+- **When:** Play exactly **1 card**, at least one runner on, outs < 2
+- **Result:** All runners advance one base, batter is out, 0 peanuts
+- Skips hand evaluation (no out-chance roll, no traits, no peanuts)
+
+### Extra Base (Speed)
+- **When:** A **Single** (not extra-base hits, walks, or homers)
+- **Chance:** batter speed × 5%, plus staff / lineup / synergy extra-base bonuses
+- **Result:** Lead runner takes one extra base
+
 ### Home Run Descriptions
 Flavor text based on runners scoring:
 - **0 runners:** "Solo Homer!"
@@ -573,7 +583,9 @@ After your batting half, before opponent bats. Once per inning, innings 1–9.
 1. 3 random trait cards displayed (weighted by rarity)
 2. Buy a card → assign to a roster player (max 2 traits each)
 3. Peanuts deducted, shop refreshes if buys remain
-4. Hit "Done" to continue to opponent's half
+4. **Staff tab:** hire coaches/mascots into slots (does not use the trait buy limit). Active staff can be **sold for 50%** of price.
+5. **Synergies tab:** all lineup synergies listed; active ones show their bonus, locked ones show the hint.
+6. Hit "Done" to continue to opponent's half
 
 No duplicate traits offered (already-owned traits excluded).
 
