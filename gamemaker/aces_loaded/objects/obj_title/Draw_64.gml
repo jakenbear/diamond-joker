@@ -6,4 +6,4 @@ ui_text(640, 322, "Poker hands. Baseball outcomes.", pal_cream(), fa_center);
 draw_set_color(pal_gold_dk());
 draw_rectangle(430, 352, 850, 354, false);
 ui_button_draw(btn_play);
-ui_text(640, 540, "Night game  -  1280x720", pal_dim(), fa_center);
+ui_text(640, 540, "F11 fullscreen   ·   F10 integer scale", pal_dim(), fa_center);

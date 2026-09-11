@@ -21,6 +21,7 @@ ui_nameplate(186, 268, 300, _batter.name, stat_line(_batter));
 if (_traits != "") {
     ui_text(186, 310, ui_ellipsize_px(_traits, 280), pal_muted(), fa_center);
 }
+ui_draw_staff_stack(186, 338);
 var _pitcher_sub = (_pnames != "") ? _pnames : "On the mound";
 ui_nameplate(1094, 268, 300, "vs " + _opp_p.name, ui_ellipsize_px(_pitcher_sub, 280));
 

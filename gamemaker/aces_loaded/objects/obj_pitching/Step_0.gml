@@ -2,6 +2,22 @@ if (flash_t > 0) {
     flash_t -= 1;
 }
 
+if (reveal_movie) {
+    reveal_t += 1;
+    if (mouse_check_button_pressed(mb_left) || reveal_t >= 90) {
+        reveal_movie = false;
+    }
+    exit;
+}
+
+if (effect_hold > 0) {
+    effect_hold -= 1;
+    if (mouse_check_button_pressed(mb_left) || effect_hold <= 0) {
+        run_pending_advance();
+    }
+    exit;
+}
+
 if (half_over) {
     if (ui_button_update(btn_continue)) {
         flow_finish_opponent_half();
@@ -17,6 +33,23 @@ if (resolving) {
     exit;
 }
 
+if (bullpen_open) {
+    for (var i = 0; i < array_length(reliever_btns); i++) {
+        if (ui_button_update(reliever_btns[i])) {
+            roster_swap_pitcher(global.session.roster, reliever_btns[i].bull_index);
+            close_bullpen();
+            start_showdown();
+            feedback = "Bullpen — " + roster_my_pitcher(global.session.roster).name + " in";
+            exit;
+        }
+    }
+    if (is_struct(btn_keep) && ui_button_update(btn_keep)) {
+        close_bullpen();
+        feedback = "Still pitching";
+    }
+    exit;
+}
+
 if (showdown.stage == "pre-flop") {
     if (ui_button_update(btn_deal)) {
         sd_deal_flop(showdown);
@@ -28,11 +61,8 @@ if (showdown.stage == "pre-flop") {
     }
     var _pen = roster_bullpen_ready(global.session.roster);
     if (global.session.roster.my_stamina <= 0.30 && array_length(_pen) > 0) {
-        btn_bullpen.label = "BULLPEN: " + _pen[0].pitcher.name;
         if (ui_button_update(btn_bullpen)) {
-            roster_swap_pitcher(global.session.roster, _pen[0].index);
-            start_showdown();
-            feedback = "Bullpen — " + roster_my_pitcher(global.session.roster).name + " in";
+            open_bullpen();
         }
     }
     exit;

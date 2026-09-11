@@ -1,6 +1,22 @@
 var s = global.session;
 if (cinema) {
     cinema_t += 1;
+    if (cinema_t < 160) {
+        var _t = clamp(cinema_t / 160, 0, 1);
+        var _speed = power(1 - _t, 2);
+        var _interval = 11 + ((1 - _speed) * 30);
+        if (cinema_t - cinema_last_tick >= _interval) {
+            cinema_last_tick = cinema_t;
+            sfx_spin_tick(600 - ((1 - _speed) * 300));
+        }
+    } else if (!cinema_locked) {
+        cinema_locked = true;
+        if (cinema_out) {
+            sfx_spin_fail();
+        } else {
+            sfx_spin_success();
+        }
+    }
     if (mouse_check_button_pressed(mb_left) || cinema_t >= 200) {
         cinema = false;
         finish_after_play();
@@ -36,8 +52,10 @@ if (!half_over && !resolving) {
                 if (_hi >= 0 && _hi < array_length(selected)) {
                     if (selected[_hi]) {
                         selected[_hi] = false;
+                        sfx_card_deselect();
                     } else if (_sel_n < _max) {
                         selected[_hi] = true;
+                        sfx_card_select();
                     }
                 }
                 break;
@@ -45,6 +63,19 @@ if (!half_over && !resolving) {
         }
         _sel = cards_selected_from_flags(selected);
         _sel_n = array_length(_sel);
+    }
+    var _hover = -1;
+    for (var i = 0; i < _n; i++) {
+        if (ui_card_hit(ui_card_x(i, _n), _card_y)) {
+            _hover = (i < array_length(_order)) ? _order[i] : i;
+            break;
+        }
+    }
+    if (_hover != hover_hi) {
+        hover_hi = _hover;
+        if (_hover >= 0) {
+            sfx_card_hover();
+        }
     }
 
     btn_play.disabled = (_sel_n < 1);
@@ -65,7 +96,9 @@ if (!half_over && !resolving) {
     }
 
     if (!btn_play.disabled && ui_button_update(btn_play)) {
+        sfx_play_hand();
         var _res = session_play_hand(_sel);
+        last_play = _res;
         selected = [];
         if (is_struct(_res) && variable_struct_exists(_res, "redraw") && _res.redraw) {
             refresh_selection();
@@ -76,16 +109,42 @@ if (!half_over && !resolving) {
             finish_after_play();
         }
     } else if (!btn_discard.disabled && ui_button_update(btn_discard)) {
+        sfx_discard();
         var _d = session_after_discard(_sel);
         refresh_selection();
         selected = array_create(array_length(s.cards.hand), false);
         if (_d.kind == "redraw") {
             // stay in the at-bat
-        } else if (_d.kind == "walk" || _d.kind == "k" || _d.kind == "foul_out") {
+        } else if (_d.kind == "walk") {
+            var _runs = (is_struct(_d.result) && variable_struct_exists(_d.result, "runs")) ? _d.result.runs : 0;
+            sfx_walk();
+            if (_runs > 0) {
+                sfx_later(0.25, function() { sfx_run_scored(); });
+            }
             if (bb_is_game_over(s.baseball) || s.baseball.state == "SWITCH_SIDE") {
                 half_over = true;
             } else {
                 resolving = true;
+            }
+        } else if (_d.kind == "k" || _d.kind == "foul_out") {
+            sfx_strike();
+            if (_d.kind == "k") {
+                sfx_later(0.12, function() { sfx_strikeout(); });
+            } else {
+                sfx_later(0.08, function() { sfx_out(); });
+            }
+            if (bb_is_game_over(s.baseball) || s.baseball.state == "SWITCH_SIDE") {
+                half_over = true;
+            } else {
+                resolving = true;
+            }
+        } else if (_d.kind == "pitch") {
+            if (string_pos("Ball", s.last_outcome) == 1) {
+                sfx_ball();
+            } else if (string_pos("Foul", s.last_outcome) == 1) {
+                sfx_foul();
+            } else if (string_pos("Strike", s.last_outcome) == 1) {
+                sfx_strike();
             }
         }
     }

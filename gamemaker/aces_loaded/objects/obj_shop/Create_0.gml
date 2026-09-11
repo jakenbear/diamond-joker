@@ -38,7 +38,7 @@ shop_rebuild = function() {
     var _sgap = (_sn > 0) ? min(360, 1000 / max(1, _sn)) : 360;
     var _sstart = 640 - ((_sn - 1) * _sgap) * 0.5;
     for (var i = 0; i < _sn; i++) {
-        var _btn = ui_button(_sstart + i * _sgap, 280, 300, 180, staff_offer[i].name, pal_panel_navy(), pal_gold());
+        var _btn = ui_button(_sstart + i * _sgap, 280, 300, 180, "", pal_panel_navy(), pal_gold());
         _btn.index = i;
         array_push(staff_btns, _btn);
     }

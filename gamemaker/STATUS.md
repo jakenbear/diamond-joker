@@ -2,7 +2,7 @@
 
 **Last session:** 2026-09-11  
 **Live project:** `gamemaker/aces_loaded/` (YYP IDEVersion **2026.0.0.16**)  
-**Compile:** VM, not YYC. Resolution **1280×720**.  
+**Compile:** VM, not YYC. Internal res **1280×720**, integer window scale, nearest-neighbor (interpolate off). F11 fullscreen, F10 cycle 1×/2×/3×.  
 **Phaser** (`src/`, `data/`) is frozen reference. **Godot** is dead — ignore it.
 
 **Goal:** Get GM as close to Phaser’s *systems* as we can, then Jake takes over in GameMaker. Later (not now): GM-native sprites, particles, lighting.
@@ -13,7 +13,7 @@
 
 The full loop plays: title → team → **starter picker** → opponent → 3/5/7/9 → trait draft → bat → shop → optional pack → pitching showdown → extras / walk-off → box score.
 
-Rules are most of the GDD. Presentation is a night-game GM UI (not a Phaser clone). Cards, team batter/pitcher/runner sprites, and draft **Showdowns** (pitch-roulette overlays) are in.
+Rules are most of the GDD. Presentation is a night-game GM UI (not a Phaser clone). Cards, team batter/pitcher/runner sprites, **team logos**, **shop coach faces / mascots**, batting staff stack, and draft **Showdowns** (pitch-roulette overlays) are in.
 
 Player is **away**. Only **home (opponent)** can walk off.
 
@@ -31,6 +31,9 @@ Player is **away**. Only **home (opponent)** can walk off.
 - Live hand preview (matches play; seeded at-bat RNG for chance traits)
 - AVG/HR/SB stat lines
 - Draft **SHOWDOWNS** toggle → skippable overlays: lines / rings / slots / crosshair / dice. Locks **green / red** only (no spinning outcome names)
+- Shop coach faces (`spr_faces`) + mascot animals (`spr_mascots`); team logos on select / matchup / HUD
+- Procedural SFX (`scr_sound`) matching Phaser SoundManager beeps
+- Pixel fonts: **m5x7** body as a native-size sprite font (`m5x7_16.png`; Daniel Linssen, CC0), **Kenney Pixel Square** titles at integer 2×/3× (Kenney, CC0). Loaded at runtime from `datafiles/`.
 
 ---
 
@@ -38,14 +41,11 @@ Player is **away**. Only **home (opponent)** can walk off.
 
 **Phaser parity still thin**
 
-1. **Shop faces + mascots** — sheets exist (`assets/sprites/faces.png`, `assets/animals/mascots_4x.png`); shop is text.
-2. **Team logos** on select — `assets/logo_*.png` unused.
-3. **Sound** — Phaser `SoundManager.js` is procedural beeps, no files. Same set in GML.
-4. **Pack flip** — packs resolve; no flip tween.
-5. **Showdown juice** — pitches apply + gold flash; no deal-in / pitch-effect movies.
-6. **Bounce cinema variant** — skipped; the other five are in.
-7. **Reliever picker** — first unused bullpen arm only.
-8. **Deck variants** — data exists; every run deals standard 52.
+1. ~~**Pack flip**~~ — face-down pack cards squash-flip on click.
+2. ~~**Showdown juice**~~ — pitch-effect color flash + hold; deal-in comparison after resolve.
+3. ~~**Bounce cinema variant**~~ — sixth overlay (ball + zone).
+4. ~~**Reliever picker**~~ — BULLPEN opens unused arms + KEEP.
+5. ~~**Deck variants**~~ — GameMaker matchup screen picker (Standard / No Face / Double / All Hearts / Small Ball). Phaser still always Standard.
 
 **Known same-as-Phaser leftovers (don’t “fix” unless asked)**
 

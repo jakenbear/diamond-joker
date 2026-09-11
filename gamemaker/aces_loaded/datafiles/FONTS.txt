@@ -1,0 +1,10 @@
+m5x7 — Daniel Linssen (CC0)
+https://managore.itch.io/m5x7
+Attribution appreciated, not required.
+
+m5x7_16.png is a 1-bit raster of m5x7 at its native 16px size (ASCII 32–126
+plus em dash, middle dot, and arrow; 8×10 cells). Loaded as a sprite font so
+body metrics match the original layout. The .ttf is kept as a fallback.
+
+Kenney Pixel Square — Kenney Vleugels (CC0)
+https://kenney.nl  — see kenpixel_square_LICENSE.txt

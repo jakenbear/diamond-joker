@@ -6,6 +6,10 @@ cinema_out = false;
 cinema_outcome = "";
 cinema_variant = "lines";
 cinema_slot_win = "O";
+cinema_last_tick = -999;
+cinema_locked = false;
+last_play = undefined;
+hover_hi = -1;
 sort_mode = "default";
 selected = array_create(7, false);
 btn_play = ui_button(520, 680, 200, 48, "PLAY", pal_green_dk(), pal_gold());
@@ -28,6 +32,7 @@ begin_at_bat = function() {
     refresh_selection();
     selected = array_create(array_length(global.session.cards.hand), false);
     if (_kind == "hbp") {
+        sfx_hbp();
         if (bb_is_game_over(global.session.baseball) || global.session.baseball.state == "SWITCH_SIDE") {
             half_over = true;
             resolving = false;
@@ -38,6 +43,11 @@ begin_at_bat = function() {
 };
 
 finish_after_play = function() {
+    if (is_struct(last_play) && !(variable_struct_exists(last_play, "redraw") && last_play.redraw)) {
+        var _oc = variable_struct_exists(last_play, "outcome") ? last_play.outcome : "";
+        var _runs = variable_struct_exists(last_play, "runs") ? last_play.runs : 0;
+        sfx_play_result(_oc, _runs);
+    }
     if (bb_is_game_over(global.session.baseball) || global.session.baseball.state == "SWITCH_SIDE") {
         half_over = true;
         resolving = false;
@@ -50,11 +60,17 @@ finish_after_play = function() {
 begin_cinema = function(_res) {
     cinema = true;
     cinema_t = 0;
+    cinema_last_tick = -999;
+    cinema_locked = false;
+    last_play = _res;
     cinema_outcome = is_struct(_res) && variable_struct_exists(_res, "outcome") ? _res.outcome : global.session.last_outcome;
     cinema_out = bonus_is_out(cinema_outcome);
     cinema_variant = cinema_pick();
     var _syms = ["O", "*", "+"];
     cinema_slot_win = _syms[irandom(2)];
+    if (cinema_variant == "bounce") {
+        cinema_bounce_build(cinema_out);
+    }
 };
 
 begin_at_bat();

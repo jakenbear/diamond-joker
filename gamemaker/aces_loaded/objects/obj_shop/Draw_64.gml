@@ -30,6 +30,8 @@ if (tab == "traits") {
         var _item = staff_offer[i];
         var _btn = staff_btns[i];
         ui_button_draw(_btn);
+        ui_draw_staff_portrait(_item, _btn.x, _btn.y - 42, 64);
+        ui_text(_btn.x, _btn.y + 10, _item.name, pal_cream(), fa_center);
         ui_text(_btn.x, _btn.y + 28, string_upper(_item.category) + "  ·  " + string(_item.price) + "p", pal_gold(), fa_center);
         ui_text_wrap(_btn.x, _btn.y + 42, fx_item_description(_item, s.regulation), pal_muted(), 270, fa_center);
     }
@@ -37,6 +39,7 @@ if (tab == "traits") {
         ui_text(640, 490, "ACTIVE  ·  sell for half", pal_gold(), fa_center);
         for (var i = 0; i < array_length(sell_btns); i++) {
             ui_button_draw(sell_btns[i]);
+            ui_draw_staff_portrait(s.baseball.staff[i], sell_btns[i].x - 96, sell_btns[i].y, 28);
         }
     }
     ui_button_draw(btn_buy);

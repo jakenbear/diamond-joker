@@ -13,8 +13,8 @@ function flow_goto_team_select() {
     room_goto(rm_team_select);
 }
 
-function flow_start_game(_player_id, _opp_id, _innings, _pitcher_index = 0) {
-    session_start(_player_id, _opp_id, _innings, _pitcher_index);
+function flow_start_game(_player_id, _opp_id, _innings, _pitcher_index = 0, _deck_id = "standard") {
+    session_start(_player_id, _opp_id, _innings, _pitcher_index, _deck_id);
     room_goto(rm_trait_draft);
 }
 

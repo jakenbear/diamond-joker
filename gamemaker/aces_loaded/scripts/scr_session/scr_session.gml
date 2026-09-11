@@ -47,6 +47,7 @@ function session_reset() {
         last_bonus_notes: "",
         at_bat_seed: 1,
         pitcher_index: 0,
+        deck_id: "standard",
         show_showdowns: false,
     };
 }
@@ -66,16 +67,17 @@ function session_teams() {
                 id: _t.id,
                 name: _t.name,
                 nickname: _t.nickname,
+                style: variable_struct_exists(_t, "style") ? _t.style : "",
                 color: make_color_rgb((_hex >> 16) & 255, (_hex >> 8) & 255, _hex & 255),
             });
         }
         return _teams;
     }
     _teams = [
-        { id: "CAN", name: "Canada", nickname: "Mounties", color: make_color_rgb(229, 57, 53) },
-        { id: "USA", name: "USA", nickname: "Eagles", color: make_color_rgb(21, 101, 192) },
-        { id: "JPN", name: "Japan", nickname: "Dragons", color: make_color_rgb(183, 28, 28) },
-        { id: "MEX", name: "Mexico", nickname: "Diablos", color: make_color_rgb(46, 125, 50) },
+        { id: "CAN", name: "Canada", nickname: "Mounties", style: "Balanced power and grit", color: make_color_rgb(229, 57, 53) },
+        { id: "USA", name: "USA", nickname: "Eagles", style: "Raw power and velocity", color: make_color_rgb(21, 101, 192) },
+        { id: "JPN", name: "Japan", nickname: "Dragons", style: "Precision contact and control", color: make_color_rgb(183, 28, 28) },
+        { id: "MEX", name: "Mexico", nickname: "Diablos", style: "Speed and clutch hitting", color: make_color_rgb(46, 125, 50) },
     ];
     return _teams;
 }
@@ -90,7 +92,7 @@ function session_team(_id) {
     return _teams[0];
 }
 
-function session_start(_player_id, _opp_id, _innings, _pitcher_index = 0) {
+function session_start(_player_id, _opp_id, _innings, _pitcher_index = 0, _deck_id = "standard") {
     session_reset();
     var s = global.session;
     s.player_team_id = _player_id;
@@ -99,6 +101,7 @@ function session_start(_player_id, _opp_id, _innings, _pitcher_index = 0) {
     s.opponent_team = session_team(_opp_id);
     s.regulation = _innings;
     s.pitcher_index = _pitcher_index;
+    s.deck_id = (_deck_id == undefined || _deck_id == "") ? "standard" : _deck_id;
     s.baseball = bb_create(_innings);
     s.count = count_create();
     var _pf = data_team_full(_player_id);
@@ -109,7 +112,7 @@ function session_start(_player_id, _opp_id, _innings, _pitcher_index = 0) {
     }
     var _pi = clamp(_pitcher_index, 0, array_length(_pf.pitchers) - 1);
     s.roster = roster_create(_pf, _pi, _of);
-    s.cards = cards_create("standard");
+    s.cards = cards_create(s.deck_id);
     session_sync();
 }
 
@@ -375,6 +378,7 @@ function session_resolve_count_outcome(_outcome, _label) {
     var _name = session_batter().name;
     var _res = bb_resolve(s.baseball, _outcome, 0, _name);
     session_finish_at_bat(_label + " — " + _res.description);
+    _res.outcome = _outcome;
     return _res;
 }
 
@@ -440,6 +444,7 @@ function session_play_hand(_sel) {
     if (array_length(_played) == 1 && bb_runner_count(s.baseball) > 0 && s.baseball.outs < 2) {
         var _bunt = bb_resolve(s.baseball, "Sac Bunt", 0, _raw.name);
         session_finish_at_bat("Sac Bunt — " + _bunt.description);
+        _bunt.outcome = "Sac Bunt";
         return _bunt;
     }
 
@@ -565,6 +570,7 @@ function session_play_hand(_sel) {
         _label += "  " + _notes;
     }
     session_finish_at_bat(_label);
+    _res.outcome = _result.outcome;
     return _res;
 }
 
@@ -609,6 +615,7 @@ function session_resolve_pitch(_outcome) {
         s.last_outcome += "  Defense!";
     }
     session_sync();
+    _res.outcome = _outcome;
     return _res;
 }
 

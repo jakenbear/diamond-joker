@@ -1,5 +1,52 @@
 /// @desc Ballpark UI. Buttons keep centered hitboxes so Step events stay unchanged.
 
+function ui_font_file(_fname) {
+    var _tries = [_fname, working_directory + _fname, working_directory + "datafiles/" + _fname, "datafiles/" + _fname];
+    for (var i = 0; i < array_length(_tries); i++) {
+        if (file_exists(_tries[i])) {
+            return _tries[i];
+        }
+    }
+    return _fname;
+}
+
+function ui_fonts_init() {
+    font_add_enable_aa(false);
+    if (!variable_global_exists("fnt_ui") || !font_exists(global.fnt_ui)) {
+        var _strip = ui_font_file("m5x7_16.png");
+        global.spr_font_ui = sprite_add(_strip, 98, false, false, 0, 0);
+        if (sprite_exists(global.spr_font_ui)) {
+            var _map = "";
+            var i = 32;
+            repeat (95) {
+                _map += chr(i);
+                i += 1;
+            }
+            _map += chr(8212) + chr(183) + chr(8594);
+            global.fnt_ui = font_add_sprite_ext(global.spr_font_ui, _map, true, 1);
+        } else {
+            global.fnt_ui = font_add(ui_font_file("m5x7.ttf"), 16, false, false, 32, 255);
+        }
+    }
+    if (!variable_global_exists("fnt_title") || !font_exists(global.fnt_title)) {
+        global.fnt_title = font_add(ui_font_file("kenpixel_square.ttf"), 16, false, false, 32, 255);
+    }
+}
+
+function ui_font() {
+    if (variable_global_exists("fnt_ui") && font_exists(global.fnt_ui)) {
+        return global.fnt_ui;
+    }
+    return -1;
+}
+
+function ui_font_title() {
+    if (variable_global_exists("fnt_title") && font_exists(global.fnt_title)) {
+        return global.fnt_title;
+    }
+    return ui_font();
+}
+
 function ui_button(_x, _y, _w, _h, _label, _fill, _stroke) {
     return {
         x: _x,
@@ -23,7 +70,11 @@ function ui_button_update(_btn) {
         _btn.x - _btn.w * 0.5, _btn.y - _btn.h * 0.5,
         _btn.x + _btn.w * 0.5, _btn.y + _btn.h * 0.5
     );
-    return _btn.hover && !_btn.disabled && mouse_check_button_pressed(mb_left);
+    var _clicked = _btn.hover && !_btn.disabled && mouse_check_button_pressed(mb_left);
+    if (_clicked) {
+        sfx_ui_tap();
+    }
+    return _clicked;
 }
 
 function ui_round(_x1, _y1, _x2, _y2, _r, _col, _outline) {
@@ -60,6 +111,7 @@ function ui_button_draw(_btn) {
         ui_round(_x1 + 4, _y1 + 3, _x2 - 4, _y1 + max(8, _btn.h * 0.28), 6, c_white, false);
         draw_set_alpha(1);
     }
+    draw_set_font(ui_font());
     draw_set_halign(fa_center);
     draw_set_valign(fa_middle);
     draw_set_color(_btn.disabled ? pal_gray() : pal_cream());
@@ -68,7 +120,8 @@ function ui_button_draw(_btn) {
 
 function ui_begin_draw(_mood = "field") {
     draw_set_alpha(1);
-    draw_set_font(-1);
+    gpu_set_texfilter(false);
+    draw_set_font(ui_font());
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);
     draw_set_color(c_white);
@@ -187,20 +240,43 @@ function ui_draw_infield(_cx, _cy, _size) {
 }
 
 function ui_text(_x, _y, _str, _col, _halign) {
+    draw_set_font(ui_font());
     draw_set_halign(_halign);
     draw_set_valign(fa_middle);
     draw_set_color(_col);
     draw_text(_x, _y, _str);
 }
 
+function ui_pixel_scale(_scale) {
+    if (_scale >= 2.5) {
+        return 3;
+    }
+    if (_scale >= 1.35) {
+        return 2;
+    }
+    return 1;
+}
+
 function ui_text_scale(_x, _y, _str, _col, _scale, _halign) {
+    var _s = ui_pixel_scale(_scale);
+    draw_set_font(ui_font_title());
     draw_set_halign(_halign);
     draw_set_valign(fa_middle);
     draw_set_color(_col);
-    draw_text_transformed(_x, _y, _str, _scale, _scale, 0);
+    draw_text_transformed(_x, _y, _str, _s, _s, 0);
+    draw_set_font(ui_font());
+}
+
+function ui_text_num(_x, _y, _str, _col, _halign) {
+    draw_set_font(ui_font());
+    draw_set_halign(_halign);
+    draw_set_valign(fa_middle);
+    draw_set_color(_col);
+    draw_text_transformed(_x, _y, _str, 2, 2, 0);
 }
 
 function ui_text_wrap(_x, _y, _str, _col, _w, _halign) {
+    draw_set_font(ui_font());
     draw_set_halign(_halign);
     draw_set_valign(fa_top);
     draw_set_color(_col);
@@ -216,6 +292,7 @@ function ui_ellipsize(_str, _max) {
 }
 
 function ui_ellipsize_px(_str, _max_w) {
+    draw_set_font(ui_font());
     if (string_width(_str) <= _max_w) {
         return _str;
     }
@@ -245,24 +322,47 @@ function ui_draw_diamond(_cx, _cy, _size, _col) {
 }
 
 function ui_bag(_cx, _cy, _on) {
+    var _s = 8;
     if (_on) {
         draw_set_alpha(0.4);
         draw_set_color(pal_gold());
-        draw_circle(_cx, _cy, 16, false);
+        draw_circle(_cx, _cy, 14, false);
         draw_set_alpha(1);
     }
-    draw_set_color(_on ? pal_gold() : make_color_rgb(90, 90, 90));
-    draw_rectangle(_cx - 7, _cy - 7, _cx + 7, _cy + 7, false);
+    ui_draw_diamond(_cx, _cy, _s, _on ? pal_gold() : make_color_rgb(90, 90, 90));
     draw_set_color(_on ? pal_cream() : pal_dim());
-    draw_rectangle(_cx - 7, _cy - 7, _cx + 7, _cy + 7, true);
+    draw_line(_cx, _cy - _s, _cx + _s, _cy);
+    draw_line(_cx + _s, _cy, _cx, _cy + _s);
+    draw_line(_cx, _cy + _s, _cx - _s, _cy);
+    draw_line(_cx - _s, _cy, _cx, _cy - _s);
 }
 
 function ui_draw_bases_gem(_x, _y, _bases) {
-    ui_bag(_x, _y - 14, _bases[1]);
-    ui_bag(_x + 16, _y, _bases[0]);
-    ui_bag(_x - 16, _y, _bases[2]);
-    draw_set_color(pal_cream());
-    draw_rectangle(_x - 5, _y + 14, _x + 5, _y + 20, false);
+    var _r = 18;
+    var _x2 = _x;
+    var _y2 = _y - _r;
+    var _x1 = _x + _r;
+    var _y1 = _y;
+    var _xh = _x;
+    var _yh = _y + _r;
+    var _x3 = _x - _r;
+    var _y3 = _y;
+    var _empty = make_color_rgb(70, 70, 76);
+
+    draw_set_color(make_color_rgb(28, 22, 12));
+    draw_triangle(_x2, _y2, _x1, _y1, _xh, _yh, false);
+    draw_triangle(_x2, _y2, _x3, _y3, _xh, _yh, false);
+
+    draw_set_color(pal_gold_dk());
+    draw_line_width(_x2, _y2, _x1, _y1, 2);
+    draw_line_width(_x1, _y1, _xh, _yh, 2);
+    draw_line_width(_xh, _yh, _x3, _y3, 2);
+    draw_line_width(_x3, _y3, _x2, _y2, 2);
+
+    ui_draw_diamond(_x1, _y1, 5, _bases[0] ? pal_gold() : _empty);
+    ui_draw_diamond(_x2, _y2, 5, _bases[1] ? pal_gold() : _empty);
+    ui_draw_diamond(_x3, _y3, 5, _bases[2] ? pal_gold() : _empty);
+    ui_draw_diamond(_xh, _yh, 4, pal_cream());
 }
 
 function ui_draw_field_bags(_cx, _cy, _size, _bases) {
@@ -296,6 +396,84 @@ function ui_draw_actor(_spr, _x, _y, _flip) {
     var _sx = _flip ? -2.5 : 2.5;
     draw_sprite_ext(_spr, 0, _x, _y, _sx, 2.5, 0, c_white, 1);
     gpu_set_texfilter(_filter);
+}
+
+function ui_draw_pixel(_spr, _frame, _x, _y, _px) {
+    if (_spr < 0 || !sprite_exists(_spr)) {
+        return;
+    }
+    var _sw = sprite_get_width(_spr);
+    if (_sw <= 0) {
+        return;
+    }
+    var _sc = _px / _sw;
+    var _filter = gpu_get_texfilter();
+    gpu_set_texfilter(false);
+    draw_sprite_ext(_spr, _frame, _x, _y, _sc, _sc, 0, c_white, 1);
+    gpu_set_texfilter(_filter);
+}
+
+function ui_logo_sprite(_team_id) {
+    var _key = "";
+    switch (_team_id) {
+        case "CAN": _key = "canada"; break;
+        case "USA": _key = "usa"; break;
+        case "JPN": _key = "japan"; break;
+        case "MEX": _key = "mexico"; break;
+        default: return -1;
+    }
+    return asset_get_index("spr_logo_" + _key);
+}
+
+function ui_draw_logo(_team_id, _x, _y, _px) {
+    ui_draw_pixel(ui_logo_sprite(_team_id), 0, _x, _y, _px);
+}
+
+function ui_staff_is_coach(_item) {
+    return is_struct(_item) && variable_struct_exists(_item, "category") && (_item.category == "coach");
+}
+
+function ui_staff_frame(_item) {
+    if (!is_struct(_item)) {
+        return 0;
+    }
+    if (ui_staff_is_coach(_item) && variable_struct_exists(_item, "faceIndex")) {
+        return _item.faceIndex;
+    }
+    if (variable_struct_exists(_item, "spriteIndex")) {
+        return _item.spriteIndex;
+    }
+    return 0;
+}
+
+function ui_draw_staff_portrait(_item, _x, _y, _px) {
+    if (!is_struct(_item)) {
+        return;
+    }
+    var _spr = ui_staff_is_coach(_item) ? spr_faces : spr_mascots;
+    ui_draw_pixel(_spr, ui_staff_frame(_item), _x, _y, _px);
+}
+
+function ui_draw_staff_stack(_cx, _cy) {
+    var s = global.session;
+    if (!is_struct(s.baseball)) {
+        return;
+    }
+    var _staff = s.baseball.staff;
+    var _n = array_length(_staff);
+    if (_n <= 0) {
+        return;
+    }
+    ui_text(_cx, _cy, "STAFF", pal_green(), fa_center);
+    for (var i = 0; i < _n; i++) {
+        var _item = _staff[i];
+        var _yy = _cy + 28 + i * 38;
+        var _coach = ui_staff_is_coach(_item);
+        ui_panel(_cx, _yy, 300, 34, pal_board(), _coach ? pal_green() : pal_orange());
+        ui_draw_staff_portrait(_item, _cx - 128, _yy, 28);
+        ui_text(_cx - 108, _yy - 7, ui_ellipsize_px(_item.name, 220), pal_cream(), fa_left);
+        ui_text(_cx - 108, _yy + 8, ui_ellipsize_px(fx_item_description(_item, s.regulation), 220), pal_muted(), fa_left);
+    }
 }
 
 function ui_draw_field_actors(_cx, _cy, _size, _bases) {
@@ -337,11 +515,13 @@ function ui_draw_hud() {
     draw_set_color(pal_gold());
     draw_rectangle(0, 0, 1280, 3, false);
 
-    ui_text_scale(24, 26, _away, pal_cream(), 1.15, fa_left);
-    ui_text_scale(118, 32, string(s.player_score), pal_amber(), 2.2, fa_left);
+    ui_draw_logo(_away, 22, 28, 28);
+    ui_text_scale(42, 26, _away, pal_cream(), 1.15, fa_left);
+    ui_text_num(118, 32, string(s.player_score), pal_amber(), fa_left);
     ui_text(640, 20, session_inning_text(), pal_gold(), fa_center);
-    ui_text_scale(1256, 26, _home, pal_cream(), 1.15, fa_right);
-    ui_text_scale(1162, 32, string(s.opponent_score), pal_amber(), 2.2, fa_right);
+    ui_draw_logo(_home, 1258, 28, 28);
+    ui_text_scale(1238, 26, _home, pal_cream(), 1.15, fa_right);
+    ui_text_num(1162, 32, string(s.opponent_score), pal_amber(), fa_right);
 
     ui_panel(640, 44, 168, 20, make_color_rgb(28, 22, 12), pal_gold_dk());
     ui_text(640, 44, string(s.peanuts) + " PEANUTS", pal_gold(), fa_center);
@@ -349,7 +529,7 @@ function ui_draw_hud() {
     ui_text(24, 64, "OUTS", pal_dim(), fa_left);
     ui_outs_pips(72, 64, s.outs);
     ui_text(140, 64, string(s.balls) + "-" + string(s.strikes), pal_cream(), fa_left);
-    ui_draw_bases_gem(230, 64, s.bases);
+    ui_draw_bases_gem(200, 36, s.bases);
 
     if (is_struct(s.roster)) {
         var _b = (s.half == "top") ? roster_batter(s.roster) : roster_opp_batter(s.roster);
@@ -477,13 +657,125 @@ function ui_nameplate(_x, _y, _w, _title, _sub) {
 }
 
 function cinema_pick() {
-    var _v = ["lines", "rings", "slots", "crosshair", "dice"];
+    var _v = ["lines", "rings", "slots", "crosshair", "dice", "bounce"];
     return _v[irandom(array_length(_v) - 1)];
 }
 
 function cinema_ease(_t) {
     var _u = clamp(_t / 160, 0, 1);
     return 1 - power(1 - _u, 3);
+}
+
+function cinema_bounce_point_in(_px, _py, _qpx, _qpy) {
+    var _inside = true;
+    var i;
+    for (i = 0; i < 4; i++) {
+        var _j = (i + 1) mod 4;
+        var _cross = (_qpx[_j] - _qpx[i]) * (_py - _qpy[i]) - (_qpy[_j] - _qpy[i]) * (_px - _qpx[i]);
+        if (_cross < 0) {
+            _inside = false;
+            break;
+        }
+    }
+    if (_inside) {
+        return true;
+    }
+    _inside = true;
+    for (i = 0; i < 4; i++) {
+        var _j = (i + 1) mod 4;
+        var _cross = (_qpx[_j] - _qpx[i]) * (_py - _qpy[i]) - (_qpy[_j] - _qpy[i]) * (_px - _qpx[i]);
+        if (_cross > 0) {
+            _inside = false;
+            break;
+        }
+    }
+    return _inside;
+}
+
+function cinema_bounce_build(_is_out) {
+    var _hw = 96;
+    var _hh = 96;
+    var _ball_r = 8;
+    var _fric = 0.985;
+    var _bdec = 0.8;
+    var _min_spd = 0.15;
+    var _spd = 3.5 + random(2);
+    var _ang = random(360);
+    var _svx = lengthdir_x(_spd, _ang);
+    var _svy = lengthdir_y(_spd, _ang);
+    var _spx = 0;
+    var _spy = 0;
+    var _ppx = [];
+    var _ppy = [];
+    array_push(_ppx, 0);
+    array_push(_ppy, 0);
+    var _step;
+    for (_step = 0; _step < 5000; _step++) {
+        _spx += _svx;
+        _spy += _svy;
+        if (_spx < -_hw + _ball_r) {
+            _spx = -_hw + _ball_r;
+            _svx = abs(_svx) * _bdec;
+        }
+        if (_spx > _hw - _ball_r) {
+            _spx = _hw - _ball_r;
+            _svx = -abs(_svx) * _bdec;
+        }
+        if (_spy < -_hh + _ball_r) {
+            _spy = -_hh + _ball_r;
+            _svy = abs(_svy) * _bdec;
+        }
+        if (_spy > _hh - _ball_r) {
+            _spy = _hh - _ball_r;
+            _svy = -abs(_svy) * _bdec;
+        }
+        _svx *= _fric;
+        _svy *= _fric;
+        array_push(_ppx, _spx);
+        array_push(_ppy, _spy);
+        if (point_distance(0, 0, _svx, _svy) < _min_spd) {
+            break;
+        }
+    }
+    var _fx = _ppx[array_length(_ppx) - 1];
+    var _fy = _ppy[array_length(_ppy) - 1];
+    var _qsize = 30 + random(15);
+    var _qpx = array_create(4, 0);
+    var _qpy = array_create(4, 0);
+    var _attempt;
+    var k;
+    if (!_is_out) {
+        for (_attempt = 0; _attempt < 20; _attempt++) {
+            for (k = 0; k < 4; k++) {
+                var _a = (k / 4) * 360 + (random(1) - 0.5) * 46;
+                var _r = _qsize * (0.6 + random(0.5));
+                _qpx[k] = _fx + lengthdir_x(_r, _a);
+                _qpy[k] = _fy + lengthdir_y(_r, _a);
+            }
+            if (cinema_bounce_point_in(_fx, _fy, _qpx, _qpy)) {
+                break;
+            }
+        }
+    } else {
+        for (_attempt = 0; _attempt < 30; _attempt++) {
+            var _ox = (random(1) - 0.5) * _hw * 1.4;
+            var _oy = (random(1) - 0.5) * _hh * 1.4;
+            for (k = 0; k < 4; k++) {
+                var _a = (k / 4) * 360 + (random(1) - 0.5) * 46;
+                var _r = _qsize * (0.6 + random(0.5));
+                _qpx[k] = _ox + lengthdir_x(_r, _a);
+                _qpy[k] = _oy + lengthdir_y(_r, _a);
+            }
+            if (!cinema_bounce_point_in(_fx, _fy, _qpx, _qpy)) {
+                break;
+            }
+        }
+    }
+    cinema_bz_path_px = _ppx;
+    cinema_bz_path_py = _ppy;
+    cinema_bz_quad_px = _qpx;
+    cinema_bz_quad_py = _qpy;
+    cinema_bz_n = array_length(_ppx);
 }
 
 function cinema_draw_rect_rot(_x, _y, _w, _h, _ang, _col) {
@@ -585,6 +877,24 @@ function cinema_draw(_t, _is_out, _outcome, _variant) {
         draw_rectangle(_cx + _voff - 2, _cy - 60, _cx + _voff + 2, _cy + 60, false);
         draw_set_color(_spin ? pal_gold() : _lock);
         draw_circle(_cx + _voff, _cy + _hoff, 6, false);
+    } else if (_variant == "bounce" && variable_instance_exists(id, "cinema_bz_n") && cinema_bz_n > 1) {
+        var _qcol = _spin ? make_color_rgb(34, 85, 170) : _lock;
+        draw_set_alpha(_spin ? 0.35 : 0.4);
+        draw_set_color(_qcol);
+        draw_triangle(_cx + cinema_bz_quad_px[0], _cy + cinema_bz_quad_py[0], _cx + cinema_bz_quad_px[1], _cy + cinema_bz_quad_py[1], _cx + cinema_bz_quad_px[2], _cy + cinema_bz_quad_py[2], false);
+        draw_triangle(_cx + cinema_bz_quad_px[0], _cy + cinema_bz_quad_py[0], _cx + cinema_bz_quad_px[2], _cy + cinema_bz_quad_py[2], _cx + cinema_bz_quad_px[3], _cy + cinema_bz_quad_py[3], false);
+        draw_set_alpha(1);
+        draw_set_color(_spin ? make_color_rgb(68, 136, 221) : _lock);
+        draw_line_width(_cx + cinema_bz_quad_px[0], _cy + cinema_bz_quad_py[0], _cx + cinema_bz_quad_px[1], _cy + cinema_bz_quad_py[1], 2);
+        draw_line_width(_cx + cinema_bz_quad_px[1], _cy + cinema_bz_quad_py[1], _cx + cinema_bz_quad_px[2], _cy + cinema_bz_quad_py[2], 2);
+        draw_line_width(_cx + cinema_bz_quad_px[2], _cy + cinema_bz_quad_py[2], _cx + cinema_bz_quad_px[3], _cy + cinema_bz_quad_py[3], 2);
+        draw_line_width(_cx + cinema_bz_quad_px[3], _cy + cinema_bz_quad_py[3], _cx + cinema_bz_quad_px[0], _cy + cinema_bz_quad_py[0], 2);
+        var _idx = clamp(floor(_e * (cinema_bz_n - 1)), 0, cinema_bz_n - 1);
+        if (!_spin) {
+            _idx = cinema_bz_n - 1;
+        }
+        draw_set_color(_spin ? pal_cream() : _lock);
+        draw_circle(_cx + cinema_bz_path_px[_idx], _cy + cinema_bz_path_py[_idx], 8, false);
     } else {
         var _angs = [15 + 5.6 * 360 * _e, 45 + 6.2 * 360 * _e, 70 + 6.8 * 360 * _e];
         if (!_spin) {

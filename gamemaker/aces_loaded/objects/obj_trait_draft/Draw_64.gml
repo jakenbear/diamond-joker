@@ -4,7 +4,7 @@ ui_text_scale(640, 36, "STARTING LINEUP", pal_gold(), 1.8, fa_center);
 var team_name = is_struct(global.session.player_team)
     ? global.session.player_team.name + " " + global.session.player_team.nickname
     : "Your team";
-ui_text(640, 62, team_name + " — one innate trait each", pal_cream(), fa_center);
+ui_text(640, 70, team_name + " — one innate trait each", pal_cream(), fa_center);
 
 var start_y = 130;
 var row_h = 52;

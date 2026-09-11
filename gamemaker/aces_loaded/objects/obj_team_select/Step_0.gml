@@ -39,8 +39,14 @@ if (phase == 0) {
             rebuild_buttons = true;
         }
     }
+    for (var i = 0; i < array_length(deck_buttons); i++) {
+        if (ui_button_update(deck_buttons[i])) {
+            deck_id = deck_buttons[i].deck_id;
+            rebuild_buttons = true;
+        }
+    }
     if (is_struct(btn_start) && ui_button_update(btn_start)) {
-        flow_start_game(player_id, opp_id, innings, pitcher_index);
+        flow_start_game(player_id, opp_id, innings, pitcher_index, deck_id);
     }
 }
 

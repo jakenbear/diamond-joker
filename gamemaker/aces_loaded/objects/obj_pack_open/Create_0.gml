@@ -3,13 +3,16 @@ tier = (s.pending_pack == "") ? "bronze" : s.pending_pack;
 cards = data_bonus_pack(tier, roster_bonus_ids(s.roster));
 selected = -1;
 replace_idx = -1;
-status_text = "Pick a bonus player, then the lineup slot to bench.";
+status_text = "Click a card to flip, then SIGN into a lineup slot.";
 card_btns = [];
 var _n = array_length(cards);
+revealed = array_create(_n, false);
+flipping = array_create(_n, false);
+flip_t = array_create(_n, 0);
 var _gap = 280;
 var _start = 640 - ((_n - 1) * _gap) * 0.5;
 for (var i = 0; i < _n; i++) {
-    var _btn = ui_button(_start + i * _gap, 280, 240, 200, cards[i].name, pal_panel_navy(), pal_gold());
+    var _btn = ui_button(_start + i * _gap, 280, 240, 200, "", pal_panel_navy(), pal_gold());
     _btn.index = i;
     array_push(card_btns, _btn);
 }

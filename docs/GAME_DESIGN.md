@@ -11,7 +11,7 @@
 **Resolution:** 1280×720
 **Session Length:** ~20–30 minutes
 
-You pick a national team, face an opponent across 9 innings. Each at-bat, you're dealt 8 cards—play a poker hand to determine the outcome. Better hands = better hits. Between innings, spend earned peanuts at the shop to equip trait cards that bend the rules in your favor.
+You pick a national team, face an opponent across 3–9 innings. Each at-bat, you're dealt 7 cards—play a poker hand to determine the outcome. Better hands = better hits. Between innings, spend earned peanuts at the shop to equip trait cards that bend the rules in your favor.
 
 ---
 
@@ -29,6 +29,7 @@ Inning Loop (per inning):
 
 ### End Conditions
 - **Game length** is chosen at Team Select: **3, 5, 7, or 9 innings** (default 9).
+- **Deck** is chosen on the same matchup screen (GameMaker). Phaser still always uses Standard.
 - After the chosen number of innings: highest score wins
 - Tied after regulation: extra innings until someone leads
 - The **player is the away team** and bats in the top half of every inning; the opponent (home team) bats last (bottom half). Real-baseball final-inning rules apply:
@@ -55,7 +56,7 @@ the player trailing (where the opponent never bats).
 ### Deck & Hand
 | Parameter | Value |
 |-----------|-------|
-| Deck size | 52 (standard poker deck) |
+| Deck size | 52 (Standard). Variants at Team Select — see Deck Variants |
 | Hand size | 7 cards |
 | Discards | Unlimited (count-based — see Count System) |
 | Cards played | 1–5 (selected from hand) |
@@ -643,13 +644,19 @@ that supply context.
 
 ## Deck Variants (Available)
 
-| Variant | Cards | Discards | Description |
-|---------|-------|----------|-------------|
-| Standard | 52 | 2 | Full poker deck |
-| No Face | 40 | 2 | No J/Q/K — tighter straights |
-| Double | 104 | 3 | Two decks shuffled together |
-| All Hearts | ~52 | 2 | All hearts — flushes guaranteed |
-| Small Ball | 32 | 2 | Only 7+ ranks — high-value hands |
+Chosen **once** on the Team Select matchup screen, with game length, before PLAY BALL. It sets the batting `CardEngine` for the whole run. Showdown still uses its own velocity-scaled hole decks.
+
+**GameMaker only** for now — Phaser has the tables but no picker, and still constructs `new CardEngine()` (Standard).
+
+Discards stay count-based; the old per-deck discard column is unused.
+
+| Variant | Cards | Description |
+|---------|-------|-------------|
+| Standard | 52 | Full poker deck |
+| No Face | 40 | No J/Q/K — tighter straights |
+| Double | 104 | Two decks shuffled together |
+| All Hearts | 52 | Four copies of hearts — flushes guaranteed |
+| Small Ball | 32 | Only 7+ ranks — high-value hands |
 
 ---
 
