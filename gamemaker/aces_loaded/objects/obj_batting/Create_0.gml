@@ -33,6 +33,11 @@ begin_at_bat = function() {
     selected = array_create(array_length(global.session.cards.hand), false);
     if (_kind == "hbp") {
         sfx_hbp();
+        var _hbp_runs = 0;
+        if (is_struct(global.session.baseball.last_result)) {
+            _hbp_runs = global.session.baseball.last_result.runs;
+        }
+        fx_play_result("HBP", _hbp_runs);
         if (bb_is_game_over(global.session.baseball) || global.session.baseball.state == "SWITCH_SIDE") {
             half_over = true;
             resolving = false;
@@ -47,6 +52,7 @@ finish_after_play = function() {
         var _oc = variable_struct_exists(last_play, "outcome") ? last_play.outcome : "";
         var _runs = variable_struct_exists(last_play, "runs") ? last_play.runs : 0;
         sfx_play_result(_oc, _runs);
+        fx_play_result(_oc, _runs);
     }
     if (bb_is_game_over(global.session.baseball) || global.session.baseball.state == "SWITCH_SIDE") {
         half_over = true;

@@ -65,3 +65,4 @@ if (tab == "traits") {
 }
 
 ui_button_draw(btn_continue);
+ui_end_draw();

@@ -159,3 +159,4 @@ if (half_over && !reveal_movie) {
         ui_button_draw(pitch_btns[i]);
     }
 }
+ui_end_draw();

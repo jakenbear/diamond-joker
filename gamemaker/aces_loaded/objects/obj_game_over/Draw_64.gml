@@ -18,3 +18,4 @@ var played = max(1, s.innings_played);
 ui_text(640, 478, string(played) + (played == 1 ? " inning" : " innings"), pal_muted(), fa_center);
 ui_button_draw(btn_again);
 ui_text(640, 680, "Aces Loaded!", pal_dim(), fa_center);
+ui_end_draw();

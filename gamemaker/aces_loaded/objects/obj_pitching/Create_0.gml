@@ -210,6 +210,7 @@ finish_showdown = function() {
     }
     sfx_later(0.18, method({ oc: _res.outcome, runs: _res.runs }, function() {
         sfx_play_result(oc, runs);
+        fx_play_result(oc, runs);
     }));
     var _st = global.session.baseball.state;
     if (bb_is_game_over(global.session.baseball) || _st == "SWITCH_SIDE") {
@@ -222,6 +223,7 @@ do_ibb = function() {
     feedback = "IBB — " + _res.description;
     resolving = true;
     sfx_walk();
+    fx_play_result("Walk", _res.runs);
     if (_res.runs > 0) {
         sfx_later(0.25, function() { sfx_run_scored(); });
     }

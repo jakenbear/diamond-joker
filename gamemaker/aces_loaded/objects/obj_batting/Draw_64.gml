@@ -88,3 +88,4 @@ if (!half_over && !resolving && !cinema) {
 if (cinema) {
     cinema_draw(cinema_t, cinema_out, cinema_outcome, cinema_variant);
 }
+ui_end_draw();

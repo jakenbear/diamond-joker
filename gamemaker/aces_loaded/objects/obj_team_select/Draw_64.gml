@@ -72,3 +72,4 @@ if (is_struct(btn_next)) {
 if (is_struct(btn_start)) {
     ui_button_draw(btn_start);
 }
+ui_end_draw();

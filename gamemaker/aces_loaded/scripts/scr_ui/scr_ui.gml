@@ -125,7 +125,12 @@ function ui_begin_draw(_mood = "field") {
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);
     draw_set_color(c_white);
+    fx_apply_shake();
     ui_draw_bg(_mood);
+}
+
+function ui_end_draw() {
+    fx_draw_end();
 }
 
 function ui_draw_bg(_mood) {
@@ -272,7 +277,11 @@ function ui_text_num(_x, _y, _str, _col, _halign) {
     draw_set_halign(_halign);
     draw_set_valign(fa_middle);
     draw_set_color(_col);
-    draw_text_transformed(_x, _y, _str, 2, 2, 0);
+    var _sc = 2;
+    if (fx_ready()) {
+        _sc = 2 * global.fx.score_scale;
+    }
+    draw_text_transformed(_x, _y, _str, _sc, _sc, 0);
 }
 
 function ui_text_wrap(_x, _y, _str, _col, _w, _halign) {

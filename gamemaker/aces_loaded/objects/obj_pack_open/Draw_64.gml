@@ -45,3 +45,4 @@ for (var i = 0; i < array_length(batter_btns); i++) {
 }
 ui_button_draw(btn_confirm);
 ui_button_draw(btn_skip);
+ui_end_draw();

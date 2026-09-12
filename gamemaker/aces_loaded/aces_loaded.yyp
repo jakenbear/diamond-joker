@@ -76,6 +76,7 @@
     {"id":{"name":"scr_display","path":"scripts/scr_display/scr_display.yy",},},
     {"id":{"name":"scr_effect_engine","path":"scripts/scr_effect_engine/scr_effect_engine.yy",},},
     {"id":{"name":"scr_flow","path":"scripts/scr_flow/scr_flow.yy",},},
+    {"id":{"name":"scr_fx","path":"scripts/scr_fx/scr_fx.yy",},},
     {"id":{"name":"scr_palette","path":"scripts/scr_palette/scr_palette.yy",},},
     {"id":{"name":"scr_roster_manager","path":"scripts/scr_roster_manager/scr_roster_manager.yy",},},
     {"id":{"name":"scr_session","path":"scripts/scr_session/scr_session.yy",},},

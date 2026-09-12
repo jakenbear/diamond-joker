@@ -24,3 +24,4 @@ ui_button_draw(btn_auto);
 ui_button_draw(btn_confirm);
 ui_button_draw(btn_showdowns);
 ui_text(820, 646, show_showdowns ? "Pitch roulette on PLAY" : "Skip pitch animations", pal_muted(), fa_center);
+ui_end_draw();

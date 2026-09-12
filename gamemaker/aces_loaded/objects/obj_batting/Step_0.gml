@@ -118,6 +118,7 @@ if (!half_over && !resolving) {
         } else if (_d.kind == "walk") {
             var _runs = (is_struct(_d.result) && variable_struct_exists(_d.result, "runs")) ? _d.result.runs : 0;
             sfx_walk();
+            fx_play_result("Walk", _runs);
             if (_runs > 0) {
                 sfx_later(0.25, function() { sfx_run_scored(); });
             }
@@ -129,8 +130,10 @@ if (!half_over && !resolving) {
         } else if (_d.kind == "k" || _d.kind == "foul_out") {
             sfx_strike();
             if (_d.kind == "k") {
+                fx_count("k");
                 sfx_later(0.12, function() { sfx_strikeout(); });
             } else {
+                fx_play_result("Flyout", 0);
                 sfx_later(0.08, function() { sfx_out(); });
             }
             if (bb_is_game_over(s.baseball) || s.baseball.state == "SWITCH_SIDE") {
@@ -141,10 +144,13 @@ if (!half_over && !resolving) {
         } else if (_d.kind == "pitch") {
             if (string_pos("Ball", s.last_outcome) == 1) {
                 sfx_ball();
+                fx_count("ball");
             } else if (string_pos("Foul", s.last_outcome) == 1) {
                 sfx_foul();
+                fx_count("foul");
             } else if (string_pos("Strike", s.last_outcome) == 1) {
                 sfx_strike();
+                fx_count("strike");
             }
         }
     }

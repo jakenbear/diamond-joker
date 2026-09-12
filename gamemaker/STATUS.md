@@ -5,7 +5,7 @@
 **Compile:** VM, not YYC. Internal res **1280×720**, integer window scale, nearest-neighbor (interpolate off). F11 fullscreen, F10 cycle 1×/2×/3×.  
 **Phaser** (`src/`, `data/`) is frozen reference. **Godot** is dead — ignore it.
 
-**Goal:** Get GM as close to Phaser’s *systems* as we can, then Jake takes over in GameMaker. Later (not now): GM-native sprites, particles, lighting.
+**Goal:** Get GM as close to Phaser’s *systems* as we can, then Jake takes over in GameMaker. Later (not now): GM-native sprites, pitcher-to-plate cinematic.
 
 ---
 
@@ -34,6 +34,8 @@ Player is **away**. Only **home (opponent)** can walk off.
 - Shop coach faces (`spr_faces`) + mascot animals (`spr_mascots`); team logos on select / matchup / HUD
 - Procedural SFX (`scr_sound`) matching Phaser SoundManager beeps
 - Pixel fonts: **m5x7** body as a native-size sprite font (`m5x7_16.png`; Daniel Linssen, CC0), **Kenney Pixel Square** titles at integer 2×/3× (Kenney, CC0). Loaded at runtime from `datafiles/`.
+- Camera punch + color flash on balls/strikes/K/HBP/hits (`scr_fx`). Dirt sparks on the diamond and HUD gem, peanut burst on runs, score-text punch.
+- Home-run celebration: harder punch, gold flash, light-tower pulses, confetti, hopping runners (grand slam is bigger).
 
 ---
 
@@ -54,7 +56,7 @@ Player is **away**. Only **home (opponent)** can walk off.
 
 **Later, because it’s GameMaker**
 
-Better sprites, particles, camera punch, pitcher-to-plate cinematic. Do not fake that with more Phaser chrome now.
+Better sprites, pitcher-to-plate cinematic. Do not fake that with more Phaser chrome now.
 
 ---
 
