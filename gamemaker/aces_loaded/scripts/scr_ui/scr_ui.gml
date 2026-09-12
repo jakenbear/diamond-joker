@@ -44,7 +44,10 @@ function ui_font_title() {
     if (variable_global_exists("fnt_title") && font_exists(global.fnt_title)) {
         return global.fnt_title;
     }
-    return ui_font();
+    if (variable_global_exists("fnt_ui") && font_exists(global.fnt_ui)) {
+        return global.fnt_ui;
+    }
+    return -1;
 }
 
 function ui_button(_x, _y, _w, _h, _label, _fill, _stroke) {
@@ -230,6 +233,20 @@ function ui_draw_vignette() {
     draw_set_alpha(1);
 }
 
+function ui_field() {
+    return { cx: 640, cy: 340, size: 210 };
+}
+
+function ui_team_color(_id) {
+    switch (_id) {
+        case "CAN": return make_color_rgb(200, 42, 42);
+        case "USA": return make_color_rgb(28, 72, 160);
+        case "JPN": return make_color_rgb(176, 32, 40);
+        case "MEX": return make_color_rgb(36, 110, 52);
+        default: return pal_gold_dk();
+    }
+}
+
 function ui_draw_infield(_cx, _cy, _size) {
     var _d = pal_dirt();
     draw_set_color(_d);
@@ -402,8 +419,8 @@ function ui_draw_actor(_spr, _x, _y, _flip) {
     }
     var _filter = gpu_get_texfilter();
     gpu_set_texfilter(false);
-    var _sx = _flip ? -2.5 : 2.5;
-    draw_sprite_ext(_spr, 0, _x, _y, _sx, 2.5, 0, c_white, 1);
+    var _sx = _flip ? -3 : 3;
+    draw_sprite_ext(_spr, 0, _x, _y, _sx, 3, 0, c_white, 1);
     gpu_set_texfilter(_filter);
 }
 
@@ -463,6 +480,30 @@ function ui_draw_staff_portrait(_item, _x, _y, _px) {
     ui_draw_pixel(_spr, ui_staff_frame(_item), _x, _y, _px);
 }
 
+function ui_player_face_index(_name) {
+    if (!sprite_exists(spr_faces)) {
+        return 0;
+    }
+    var _n = sprite_get_number(spr_faces);
+    if (_n <= 0) {
+        return 0;
+    }
+    return floor(stat_hash01(_name + "face") * _n);
+}
+
+function ui_draw_player_portrait(_cx, _cy, _name, _team_id, _px) {
+    var _half = _px * 0.5;
+    draw_set_color(ui_team_color(_team_id));
+    draw_rectangle(_cx - _half - 3, _cy - _half - 3, _cx + _half + 3, _cy + _half + 3, false);
+    draw_set_color(make_color_rgb(18, 14, 12));
+    draw_rectangle(_cx - _half, _cy - _half, _cx + _half, _cy + _half, false);
+    draw_set_color(pal_gold());
+    draw_rectangle(_cx - _half, _cy - _half, _cx + _half, _cy + _half, true);
+    if (sprite_exists(spr_faces)) {
+        ui_draw_pixel(spr_faces, ui_player_face_index(_name), _cx, _cy, _px - 8);
+    }
+}
+
 function ui_draw_staff_stack(_cx, _cy) {
     var s = global.session;
     if (!is_struct(s.baseball)) {
@@ -492,11 +533,11 @@ function ui_draw_field_actors(_cx, _cy, _size, _bases) {
     var _batter = (is_struct(s.roster) && is_struct(s.baseball)) ? roster_effective_batter(s.roster, s.baseball) : undefined;
     var _pitcher = is_struct(s.roster) ? session_pitcher() : undefined;
     var _lefty = (is_struct(_batter) && _batter.bats == "L");
-    ui_draw_actor(ui_team_sprite(_you, "batter"), _cx + (_lefty ? 22 : -22), _cy + _size - 5, _lefty);
+    ui_draw_actor(ui_team_sprite(_you, "batter"), _cx + (_lefty ? 26 : -26), _cy + _size * 0.55, _lefty);
     var _p_left = (is_struct(_pitcher) && _pitcher.throws == "L");
     ui_draw_actor(ui_team_sprite(_opp, "pitcher"), _cx, _cy, !_p_left);
-    var _rx = [_cx + _size + 12, _cx, _cx - _size - 12];
-    var _ry = [_cy - 10, _cy - _size - 15, _cy - 10];
+    var _rx = [_cx + _size, _cx, _cx - _size];
+    var _ry = [_cy - 22, _cy - _size - 22, _cy - 22];
     for (var i = 0; i < 3; i++) {
         if (_bases[i]) {
             ui_draw_actor(ui_team_sprite(_you, "runner"), _rx[i], _ry[i], false);
@@ -512,7 +553,7 @@ function ui_outs_pips(_x, _y, _outs) {
     }
 }
 
-function ui_draw_hud() {
+function ui_draw_hud(_callout = "", _callout_col = pal_gold()) {
     var s = global.session;
     var _away = is_struct(s.player_team) ? s.player_team.id : "AWAY";
     var _home = is_struct(s.opponent_team) ? s.opponent_team.id : "HOME";
@@ -540,12 +581,14 @@ function ui_draw_hud() {
     ui_text(140, 64, string(s.balls) + "-" + string(s.strikes), pal_cream(), fa_left);
     ui_draw_bases_gem(200, 36, s.bases);
 
-    if (is_struct(s.roster)) {
-        var _b = (s.half == "top") ? roster_batter(s.roster) : roster_opp_batter(s.roster);
-        ui_text(300, 64, ui_ellipsize(_b.pos + " " + _b.name, 22), pal_cream(), fa_left);
+    var _msg = _callout;
+    var _col = _callout_col;
+    if (_msg == "" && s.last_outcome != "") {
+        _msg = s.last_outcome;
+        _col = pal_gold();
     }
-    if (s.last_outcome != "") {
-        ui_text(1256, 64, ui_ellipsize_px(s.last_outcome, 360), pal_gold(), fa_right);
+    if (_msg != "") {
+        ui_text(640, 68, ui_ellipsize_px(_msg, 640), _col, fa_center);
     }
 }
 
@@ -559,20 +602,30 @@ function ui_draw_synergies() {
     if (_n <= 0) {
         return;
     }
+    draw_set_font(ui_font());
     var _gap = 8;
-    var _w = (_n <= 4) ? 188 : 150;
-    var _total = _n * _w + (_n - 1) * _gap;
-    if (_total > 1040) {
-        _w = max(120, (1040 - (_n - 1) * _gap) / _n);
-        _total = _n * _w + (_n - 1) * _gap;
-    }
-    var _x0 = 640 - _total * 0.5 + _w * 0.5;
+    var _need = 120;
     for (var i = 0; i < _n; i++) {
-        var _cx = _x0 + i * (_w + _gap);
+        _need = max(_need, string_width(_syn[i].name) + 24);
+    }
+    var _cols = _n;
+    var _w = _need;
+    if ((_n * _w) + ((_n - 1) * _gap) > 1180) {
+        _cols = min(3, _n);
+        _w = min(300, (1180 - ((_cols - 1) * _gap)) / _cols);
+    }
+    for (var i = 0; i < _n; i++) {
+        var _col = i mod _cols;
+        var _row = i div _cols;
+        var _row_n = min(_cols, _n - (_row * _cols));
+        var _row_w = (_row_n * _w) + ((_row_n - 1) * _gap);
+        var _x0 = 640 - (_row_w * 0.5) + (_w * 0.5);
+        var _cx = _x0 + (_col * (_w + _gap));
+        var _cy = 98 + (_row * 26);
         draw_set_alpha(0.82);
-        ui_panel(_cx, 98, _w, 20, pal_board(), pal_violet());
+        ui_panel(_cx, _cy, _w, 22, pal_board(), pal_violet());
         draw_set_alpha(1);
-        ui_text(_cx, 98, ui_ellipsize_px(_syn[i].name, _w - 16), pal_violet(), fa_center);
+        ui_text(_cx, _cy, _syn[i].name, pal_violet(), fa_center);
     }
 }
 
@@ -665,6 +718,72 @@ function ui_nameplate(_x, _y, _w, _title, _sub) {
     ui_text(_x, _y + 12, _sub, pal_cream(), fa_center);
 }
 
+function ui_draw_player_card(_cx, _top, _team_id, _player, _kind, _line2, _lit = false) {
+    if (!is_struct(_player)) {
+        return;
+    }
+    var _staff = [];
+    if (_kind == "batter" && variable_global_exists("session") && is_struct(global.session.baseball) && is_array(global.session.baseball.staff)) {
+        _staff = global.session.baseball.staff;
+    }
+    var _staff_n = array_length(_staff);
+    var _w = 252;
+    var _body = 236;
+    var _staff_h = (_staff_n > 0) ? 78 : 0;
+    var _h = _body + _staff_h;
+    var _cy = _top + (_h * 0.5);
+    var _col = ui_team_color(_team_id);
+    if (_lit) {
+        var _gx1 = _cx - (_w * 0.5) - 8;
+        var _gy1 = _cy - (_h * 0.5) - 8;
+        var _gx2 = _cx + (_w * 0.5) + 8;
+        var _gy2 = _cy + (_h * 0.5) + 8;
+        draw_set_alpha(0.4);
+        ui_round(_gx1, _gy1, _gx2, _gy2, 16, pal_gold(), false);
+        draw_set_alpha(1);
+        ui_round(_gx1, _gy1, _gx2, _gy2, 16, pal_gold(), true);
+    }
+    ui_panel(_cx, _cy, _w, _h, pal_board(), pal_gold());
+
+    var _x1 = _cx - (_w * 0.5) + 6;
+    var _x2 = _cx + (_w * 0.5) - 6;
+    var _y1 = _cy - (_h * 0.5) + 6;
+    draw_set_color(_col);
+    draw_rectangle(_x1, _y1, _x2, _y1 + 32, false);
+    ui_draw_logo(_team_id, _x1 + 16, _y1 + 16, 22);
+    var _pos = variable_struct_exists(_player, "pos") ? _player.pos : "P";
+    ui_text(_cx + 12, _y1 + 16, _pos, pal_cream(), fa_center);
+
+    ui_draw_player_portrait(_cx, _y1 + 80, _player.name, _team_id, 72);
+    ui_text(_cx, _y1 + 128, ui_ellipsize_px(_player.name, _w - 28), pal_gold(), fa_center);
+
+    if (_kind == "pitcher") {
+        var _throws = variable_struct_exists(_player, "throws") ? _player.throws : "R";
+        ui_text(_cx, _y1 + 150, ui_ellipsize_px(_throws + "HP  VEL " + string(_player.velocity) + "  CTL " + string(_player.control) + "  STA " + string(_player.stamina), _w - 28), pal_cream(), fa_center);
+    } else {
+        var _bats = variable_struct_exists(_player, "bats") ? _player.bats : "R";
+        ui_text(_cx, _y1 + 150, "Bats " + _bats, pal_cream(), fa_center);
+        ui_text(_cx, _y1 + 168, ui_ellipsize_px(stat_line(_player), _w - 28), pal_cream(), fa_center);
+    }
+    if (_line2 != "") {
+        ui_text_wrap(_cx, _y1 + 186, _line2, pal_muted(), _w - 36, fa_center);
+    }
+
+    if (_staff_n > 0) {
+        var _sy = _cy + (_h * 0.5) - _staff_h + 8;
+        draw_set_color(pal_gold_dk());
+        draw_rectangle(_x1, _sy, _x2, _sy + 1, false);
+        ui_text(_cx, _sy + 12, "STAFF", pal_green(), fa_center);
+        var _gap = min(58, (_w - 28) / max(1, _staff_n));
+        var _sx0 = _cx - ((_staff_n - 1) * _gap) * 0.5;
+        for (var i = 0; i < _staff_n; i++) {
+            var _sx = _sx0 + (i * _gap);
+            ui_draw_staff_portrait(_staff[i], _sx, _sy + 38, 28);
+            ui_text(_sx, _sy + 60, ui_ellipsize_px(_staff[i].name, _gap - 2), pal_cream(), fa_center);
+        }
+    }
+}
+
 function cinema_pick() {
     var _v = ["lines", "rings", "slots", "crosshair", "dice", "bounce"];
     return _v[irandom(array_length(_v) - 1)];
@@ -672,7 +791,42 @@ function cinema_pick() {
 
 function cinema_ease(_t) {
     var _u = clamp(_t / 160, 0, 1);
-    return 1 - power(1 - _u, 3);
+    var _split = 0.36;
+    var _early = 0.64;
+    if (_u <= _split) {
+        return (_u / _split) * _early;
+    }
+    var _local = (_u - _split) / (1 - _split);
+    return _early + ((1 - _early) * (1 - power(1 - _local, 3)));
+}
+
+function cinema_lock_blend(_t) {
+    return clamp((_t - 152) / 8, 0, 1);
+}
+
+function cinema_arrive(_rest, _turns, _e) {
+    return _rest + (_turns * 360 * (1 - _e));
+}
+
+function cinema_setup(_is_out, _variant) {
+    var _syms = ["O", "*", "+"];
+    var _wi = irandom(2);
+    cinema_slot_win = _syms[_wi];
+    cinema_slot_miss = _syms[(_wi + 1 + irandom(1)) mod 3];
+    if (_is_out) {
+        cinema_line_rest = [8, 34, -28];
+        cinema_ring_rest = [18, 42, 58];
+        cinema_hair_rest = [22, -18];
+        cinema_dice_rest = [8, -12, 32];
+    } else {
+        cinema_line_rest = [0, 0, 0];
+        cinema_ring_rest = [28, 28, 28];
+        cinema_hair_rest = [0, 0];
+        cinema_dice_rest = [0, 0, 0];
+    }
+    if (_variant == "bounce") {
+        cinema_bounce_build(_is_out);
+    }
 }
 
 function cinema_bounce_point_in(_px, _py, _qpx, _qpy) {
@@ -806,10 +960,11 @@ function cinema_draw_rect_rot(_x, _y, _w, _h, _ang, _col) {
 }
 
 function cinema_draw(_t, _is_out, _outcome, _variant) {
-    var _spin = _t < 160;
     var _e = cinema_ease(_t);
+    var _decay = 1 - _e;
+    var _blend = cinema_lock_blend(_t);
     var _lock = _is_out ? pal_red() : pal_green();
-    var _ink = _spin ? pal_gold() : _lock;
+    var _ink = merge_color(pal_gold(), _lock, _blend);
     var _cx = 640;
     var _cy = 318;
 
@@ -820,108 +975,98 @@ function cinema_draw(_t, _is_out, _outcome, _variant) {
     ui_panel(_cx, 330, 220, 220, pal_board(), _ink);
 
     if (_variant == "lines") {
-        var _a1 = 0 + (5 * 360) * _e;
-        var _a2 = 60 + ((5.7 * 360) * _e) * -1;
-        var _a3 = 120 + (6.3 * 360) * _e;
-        if (!_spin) {
-            _a1 = 0;
-            _a2 = _is_out ? 28 : 0;
-            _a3 = _is_out ? -22 : 0;
-        }
-        draw_set_color(_spin ? pal_cream() : _lock);
+        var _a1 = cinema_arrive(cinema_line_rest[0], 8, _e);
+        var _a2 = cinema_arrive(cinema_line_rest[1], -9, _e);
+        var _a3 = cinema_arrive(cinema_line_rest[2], 10, _e);
+        draw_set_color(merge_color(pal_cream(), _lock, _blend));
         draw_circle(_cx, _cy, 52, false);
-        draw_set_color(_spin ? pal_red() : _lock);
+        draw_set_color(merge_color(pal_red(), _lock, _blend));
         draw_line_width(_cx - dcos(_a1) * 44, _cy - dsin(_a1) * 44, _cx + dcos(_a1) * 44, _cy + dsin(_a1) * 44, 5);
         draw_line_width(_cx - dcos(_a2) * 44, _cy - dsin(_a2) * 44, _cx + dcos(_a2) * 44, _cy + dsin(_a2) * 44, 5);
         draw_line_width(_cx - dcos(_a3) * 44, _cy - dsin(_a3) * 44, _cx + dcos(_a3) * 44, _cy + dsin(_a3) * 44, 5);
     } else if (_variant == "rings") {
-        var _r1 = 28 + 22 * sin(_e * 6 * pi);
-        var _r2 = 28 + 28 * sin(_e * 7.4 * pi);
-        var _r3 = 28 + 34 * sin(_e * 8.8 * pi);
-        if (!_spin) {
-            _r1 = _is_out ? 18 : 28;
-            _r2 = _is_out ? 42 : 28;
-            _r3 = _is_out ? 58 : 28;
-        }
-        draw_set_color(_spin ? make_color_rgb(204, 51, 51) : _lock);
+        var _r1 = lerp(28, cinema_ring_rest[0], _e) + (22 * dsin(cinema_arrive(0, 8, _e)));
+        var _r2 = lerp(28, cinema_ring_rest[1], _e) + (28 * dsin(cinema_arrive(0, -9, _e)));
+        var _r3 = lerp(28, cinema_ring_rest[2], _e) + (34 * dsin(cinema_arrive(0, 10, _e)));
+        draw_set_color(merge_color(make_color_rgb(204, 51, 51), _lock, _blend));
         draw_circle(_cx, _cy, max(4, _r1), true);
-        draw_set_color(_spin ? make_color_rgb(51, 136, 204) : _lock);
+        draw_set_color(merge_color(make_color_rgb(51, 136, 204), _lock, _blend));
         draw_circle(_cx, _cy, max(4, _r2), true);
-        draw_set_color(_spin ? make_color_rgb(204, 204, 51) : _lock);
+        draw_set_color(merge_color(make_color_rgb(204, 204, 51), _lock, _blend));
         draw_circle(_cx, _cy, max(4, _r3), true);
     } else if (_variant == "slots") {
         var _sym = ["O", "*", "+"];
-        var _win = _sym[irandom(2)];
-        if (!variable_instance_exists(id, "cinema_slot_win")) {
-            cinema_slot_win = _win;
+        var _win_i = 0;
+        var _miss_i = 1;
+        for (var _si = 0; _si < 3; _si++) {
+            if (_sym[_si] == cinema_slot_win) {
+                _win_i = _si;
+            }
+            if (_sym[_si] == cinema_slot_miss) {
+                _miss_i = _si;
+            }
         }
-        _win = cinema_slot_win;
-        var _stops = [0.55, 0.75, 1];
-        var _speeds = [5, 6, 7];
+        var _stops = [0.58, 0.78, 1];
+        var _extras = [14, 18, 22];
         var _xs = [_cx - 42, _cx, _cx + 42];
+        var _u = clamp(_t / 160, 0, 1);
         draw_set_color(pal_dim());
         draw_rectangle(_cx - 21, _cy - 50, _cx - 19, _cy + 50, false);
         draw_rectangle(_cx + 19, _cy - 50, _cx + 21, _cy + 50, false);
         for (var i = 0; i < 3; i++) {
-            var _p = min(1, _e / _stops[i]);
+            var _target = (_is_out && i == 2) ? _miss_i : _win_i;
+            var _p = min(1, _u / _stops[i]);
             var _pe = 1 - power(1 - _p, 3);
-            var _txt;
-            if (_p >= 1 || !_spin) {
-                _txt = (_is_out && i == 2) ? _sym[(_sym[0] == _win) ? 1 : 0] : _win;
-            } else {
-                _txt = _sym[floor(_pe * _speeds[i]) mod 3];
-            }
-            ui_text_scale(_xs[i], _cy, _txt, _spin ? pal_cream() : _lock, 2.2, fa_center);
+            var _pos = _target - (_extras[i] * (1 - _pe));
+            var _idx = ((floor(_pos + 0.001) mod 3) + 3) mod 3;
+            ui_text_scale(_xs[i], _cy, _sym[_idx], merge_color(pal_cream(), _lock, _blend), 2.2, fa_center);
         }
     } else if (_variant == "crosshair") {
-        var _hoff = 60 * sin(_e * 7 * pi);
-        var _voff = 60 * sin(_e * 8.3 * pi);
-        if (!_spin) {
-            _hoff = _is_out ? 22 : 0;
-            _voff = _is_out ? -18 : 0;
-        }
-        draw_set_color(_spin ? make_color_rgb(204, 51, 51) : _lock);
+        var _hoff = lerp(0, cinema_hair_rest[0], _e) + (60 * dsin(cinema_arrive(0, 7, _e)));
+        var _voff = lerp(0, cinema_hair_rest[1], _e) + (60 * dsin(cinema_arrive(0, -8, _e)));
+        draw_set_color(merge_color(make_color_rgb(204, 51, 51), _lock, _blend));
         draw_rectangle(_cx - 60, _cy + _hoff - 2, _cx + 60, _cy + _hoff + 2, false);
-        draw_set_color(_spin ? make_color_rgb(51, 136, 204) : _lock);
+        draw_set_color(merge_color(make_color_rgb(51, 136, 204), _lock, _blend));
         draw_rectangle(_cx + _voff - 2, _cy - 60, _cx + _voff + 2, _cy + 60, false);
-        draw_set_color(_spin ? pal_gold() : _lock);
+        draw_set_color(merge_color(pal_gold(), _lock, _blend));
         draw_circle(_cx + _voff, _cy + _hoff, 6, false);
     } else if (_variant == "bounce" && variable_instance_exists(id, "cinema_bz_n") && cinema_bz_n > 1) {
-        var _qcol = _spin ? make_color_rgb(34, 85, 170) : _lock;
-        draw_set_alpha(_spin ? 0.35 : 0.4);
+        var _qcol = merge_color(make_color_rgb(34, 85, 170), _lock, _blend);
+        draw_set_alpha(0.35 + (0.05 * _blend));
         draw_set_color(_qcol);
         draw_triangle(_cx + cinema_bz_quad_px[0], _cy + cinema_bz_quad_py[0], _cx + cinema_bz_quad_px[1], _cy + cinema_bz_quad_py[1], _cx + cinema_bz_quad_px[2], _cy + cinema_bz_quad_py[2], false);
         draw_triangle(_cx + cinema_bz_quad_px[0], _cy + cinema_bz_quad_py[0], _cx + cinema_bz_quad_px[2], _cy + cinema_bz_quad_py[2], _cx + cinema_bz_quad_px[3], _cy + cinema_bz_quad_py[3], false);
         draw_set_alpha(1);
-        draw_set_color(_spin ? make_color_rgb(68, 136, 221) : _lock);
+        draw_set_color(merge_color(make_color_rgb(68, 136, 221), _lock, _blend));
         draw_line_width(_cx + cinema_bz_quad_px[0], _cy + cinema_bz_quad_py[0], _cx + cinema_bz_quad_px[1], _cy + cinema_bz_quad_py[1], 2);
         draw_line_width(_cx + cinema_bz_quad_px[1], _cy + cinema_bz_quad_py[1], _cx + cinema_bz_quad_px[2], _cy + cinema_bz_quad_py[2], 2);
         draw_line_width(_cx + cinema_bz_quad_px[2], _cy + cinema_bz_quad_py[2], _cx + cinema_bz_quad_px[3], _cy + cinema_bz_quad_py[3], 2);
         draw_line_width(_cx + cinema_bz_quad_px[3], _cy + cinema_bz_quad_py[3], _cx + cinema_bz_quad_px[0], _cy + cinema_bz_quad_py[0], 2);
-        var _idx = clamp(floor(_e * (cinema_bz_n - 1)), 0, cinema_bz_n - 1);
-        if (!_spin) {
-            _idx = cinema_bz_n - 1;
-        }
-        draw_set_color(_spin ? pal_cream() : _lock);
+        var _u = clamp(_t / 160, 0, 1);
+        var _idx = clamp(floor(_u * (cinema_bz_n - 1)), 0, cinema_bz_n - 1);
+        draw_set_color(merge_color(pal_cream(), _lock, _blend));
         draw_circle(_cx + cinema_bz_path_px[_idx], _cy + cinema_bz_path_py[_idx], 8, false);
     } else {
-        var _angs = [15 + 5.6 * 360 * _e, 45 + 6.2 * 360 * _e, 70 + 6.8 * 360 * _e];
-        if (!_spin) {
-            _angs = [0, 0, _is_out ? 32 : 0];
-        }
         var _dx = [_cx - 52, _cx, _cx + 52];
         var _dc = [make_color_rgb(204, 51, 51), make_color_rgb(51, 136, 204), make_color_rgb(204, 204, 51)];
+        var _turns = [8, -9, 10];
         for (var i = 0; i < 3; i++) {
-            cinema_draw_rect_rot(_dx[i], _cy, 40, 40, _angs[i], _spin ? _dc[i] : _lock);
+            var _ang = cinema_arrive(cinema_dice_rest[i], _turns[i], _e);
+            cinema_draw_rect_rot(_dx[i], _cy, 40, 40, _ang, merge_color(_dc[i], _lock, _blend));
             draw_set_color(c_white);
             draw_circle(_dx[i], _cy, 4, false);
         }
     }
 
-    if (_spin) {
+    if (_blend < 1) {
+        draw_set_alpha(1 - _blend);
         ui_text(_cx, 430, "PITCHING...", pal_muted(), fa_center);
-    } else {
+        draw_set_alpha(1);
+    }
+    if (_blend > 0) {
+        draw_set_alpha(_blend);
         ui_text_scale(_cx, 430, _is_out ? "X" : "+", _lock, 2.4, fa_center);
+        draw_set_alpha(1);
     }
     ui_text(_cx, 470, "click to skip", pal_dim(), fa_center);
 }

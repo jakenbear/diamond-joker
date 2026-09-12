@@ -6,9 +6,15 @@ cinema_out = false;
 cinema_outcome = "";
 cinema_variant = "lines";
 cinema_slot_win = "O";
+cinema_slot_miss = "*";
+cinema_line_rest = [0, 0, 0];
+cinema_ring_rest = [28, 28, 28];
+cinema_hair_rest = [0, 0];
+cinema_dice_rest = [0, 0, 0];
 cinema_last_tick = -999;
 cinema_locked = false;
 last_play = undefined;
+card_batter = undefined;
 hover_hi = -1;
 sort_mode = "default";
 selected = array_create(7, false);
@@ -28,6 +34,7 @@ refresh_selection = function() {
 };
 
 begin_at_bat = function() {
+    card_batter = roster_effective_batter(global.session.roster, global.session.baseball);
     var _kind = session_start_at_bat();
     refresh_selection();
     selected = array_create(array_length(global.session.cards.hand), false);
@@ -72,11 +79,7 @@ begin_cinema = function(_res) {
     cinema_outcome = is_struct(_res) && variable_struct_exists(_res, "outcome") ? _res.outcome : global.session.last_outcome;
     cinema_out = bonus_is_out(cinema_outcome);
     cinema_variant = cinema_pick();
-    var _syms = ["O", "*", "+"];
-    cinema_slot_win = _syms[irandom(2)];
-    if (cinema_variant == "bounce") {
-        cinema_bounce_build(cinema_out);
-    }
+    cinema_setup(cinema_out, cinema_variant);
 };
 
 begin_at_bat();

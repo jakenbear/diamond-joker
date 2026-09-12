@@ -42,20 +42,22 @@ for (var i = 0; i < array_length(team_buttons); i++) {
     var t = session_team(team_buttons[i].team_id);
     var _bx = team_buttons[i].x;
     var _by = team_buttons[i].y;
-    ui_text(_bx, _by - 78, t.name, pal_cream(), fa_center);
+    var _tw = team_buttons[i].w - 24;
+    ui_text(_bx, _by - 78, ui_ellipsize_px(t.name, _tw), pal_cream(), fa_center);
     ui_draw_logo(t.id, _bx, _by - 8, 80);
-    ui_text(_bx, _by + 48, t.nickname, pal_cream(), fa_center);
+    ui_text(_bx, _by + 48, ui_ellipsize_px(t.nickname, _tw), pal_cream(), fa_center);
     if (variable_struct_exists(t, "style") && t.style != "") {
-        ui_text_wrap(_bx, _by + 62, t.style, pal_muted(), team_buttons[i].w - 16, fa_center);
+        ui_text_wrap(_bx, _by + 62, t.style, pal_muted(), _tw, fa_center);
     }
 }
 for (var i = 0; i < array_length(pitcher_buttons); i++) {
     ui_button_draw(pitcher_buttons[i]);
     var staff = session_team_pitchers(player_id);
     var p = staff[pitcher_buttons[i].pitcher_index];
-    ui_text(pitcher_buttons[i].x, pitcher_buttons[i].y - 10, p.name, pal_cream(), fa_center);
+    var _pw = pitcher_buttons[i].w - 24;
+    ui_text(pitcher_buttons[i].x, pitcher_buttons[i].y - 10, ui_ellipsize_px(p.name, _pw), pal_cream(), fa_center);
     var line = "VEL " + string(p.velocity) + "   CTL " + string(p.control) + "   STA " + string(p.stamina) + "   " + p.throws;
-    ui_text(pitcher_buttons[i].x, pitcher_buttons[i].y + 14, line, pal_muted(), fa_center);
+    ui_text(pitcher_buttons[i].x, pitcher_buttons[i].y + 14, ui_ellipsize_px(line, _pw), pal_muted(), fa_center);
 }
 for (var i = 0; i < array_length(innings_buttons); i++) {
     ui_button_draw(innings_buttons[i]);

@@ -80,9 +80,10 @@ function fx_burst(_px, _py, _n, _col, _kind, _spd) {
 }
 
 function fx_diamond_dirt() {
-    var _cx = 640;
-    var _cy = 368;
-    var _sz = 168;
+    var _f = ui_field();
+    var _cx = _f.cx;
+    var _cy = _f.cy;
+    var _sz = _f.size;
     var _bases = (variable_global_exists("session") && is_struct(global.session)) ? global.session.bases : [false, false, false];
     if (_bases[0]) {
         fx_burst(_cx + _sz, _cy, 7, pal_dirt(), "dirt", 1.8);
